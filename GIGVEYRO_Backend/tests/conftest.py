@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -7,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password
 from app.db.session import engine, get_db
 from app.enums.account import UserRole
+from app.enums.wallet import Currency
 from app.main import app
 from app.models.account import Account
+from app.models.wallet import UserWallet
 
 
 @pytest.fixture
@@ -62,5 +65,29 @@ def make_account(db_session):
         await db_session.flush()
         await db_session.refresh(account)
         return account
+
+    return _make
+
+
+@pytest.fixture
+def make_wallet(db_session):
+    async def _make(
+        account: Account,
+        *,
+        available: Decimal = Decimal("0"),
+        insurance: Decimal = Decimal("0"),
+        frozen: Decimal = Decimal("0"),
+    ) -> UserWallet:
+        wallet = UserWallet(
+            account_id=account.id,
+            currency=Currency.USDT,
+            available_balance=available,
+            insurance_balance=insurance,
+            frozen_balance=frozen,
+        )
+        db_session.add(wallet)
+        await db_session.flush()
+        await db_session.refresh(wallet)
+        return wallet
 
     return _make
