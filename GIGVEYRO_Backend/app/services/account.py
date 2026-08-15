@@ -7,6 +7,7 @@ from app.core.security import hash_password
 from app.enums.account import UserRole
 from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.services.wallet import WalletService
 
 
 class AccountNotFoundError(Exception):
@@ -26,8 +27,9 @@ class OwnerCreationNotAllowedError(Exception):
 
 
 class AccountService:
-    def __init__(self, repository: AccountRepository):
+    def __init__(self, repository: AccountRepository, wallet_service: WalletService | None = None):
         self._repository = repository
+        self._wallet_service = wallet_service
 
     async def get_by_id(self, account_id: uuid.UUID) -> Account | None:
         return await self._repository.get_by_id(account_id)
@@ -67,11 +69,18 @@ class AccountService:
             is_active=True,
         )
         try:
-            return await self._repository.create(account)
+            created = await self._repository.create(account)
         except IntegrityError as exc:
             # Last-resort guard against a race between the checks above and
             # the insert - the DB unique constraints are the real backstop.
             raise DuplicateAccountError("account data") from exc
+
+        if role == UserRole.USER and self._wallet_service is not None:
+            # Same transaction as the account insert - if this fails, the
+            # whole request rolls back and no orphan account is left behind.
+            await self._wallet_service.create_wallet_for_user(created)
+
+        return created
 
     async def list_accounts(
         self,
