@@ -18,5 +18,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
+    MAX_ACTIVE_REQUISITES_PER_USER: int = 10
+
 
 settings = Settings()
