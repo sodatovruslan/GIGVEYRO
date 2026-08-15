@@ -38,6 +38,48 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 pip install -r requirements.txt
 ```
 
+### 4. Настроить переменные окружения
+
+Скопируй `.env.example` в `.env` и заполни `DATABASE_URL` реальными значениями:
+
+```powershell
+copy .env.example .env
+```
+
+## PostgreSQL
+
+Проект использует PostgreSQL (async-драйвер `asyncpg`).
+
+### Формат DATABASE_URL
+
+```env
+DATABASE_URL=postgresql+asyncpg://<user>:<password>@<host>:<port>/<database>
+```
+
+### Создание development database и пользователя
+
+Локально должен быть установлен и запущен PostgreSQL. Подключись под суперпользователем (например, `postgres`) и выполни:
+
+```sql
+CREATE DATABASE gigveyro;
+CREATE USER gigveyro_user WITH PASSWORD 'CHANGE_ME';
+GRANT ALL PRIVILEGES ON DATABASE gigveyro TO gigveyro_user;
+```
+
+После этого пропиши реальные значения в `.env`. `.env` не коммитится в Git — только `.env.example` с плейсхолдерами.
+
+### Применение миграций
+
+```powershell
+alembic upgrade head
+```
+
+### Проверка текущей ревизии
+
+```powershell
+alembic current
+```
+
 ## Запуск сервера
 
 ```powershell
@@ -46,5 +88,18 @@ uvicorn app.main:app --reload
 
 ## Проверка
 
-- Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- Application health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- Database health check: [http://127.0.0.1:8000/health/db](http://127.0.0.1:8000/health/db)
 - Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+## Тесты
+
+```powershell
+pytest
+```
+
+## Lint
+
+```powershell
+ruff check .
+```
