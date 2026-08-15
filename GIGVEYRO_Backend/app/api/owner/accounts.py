@@ -8,6 +8,8 @@ from app.db.session import get_db
 from app.enums.account import UserRole
 from app.repositories.account import AccountRepository
 from app.repositories.ledger import LedgerRepository
+from app.repositories.payment_requisite import PaymentRequisiteRepository
+from app.repositories.traffic import TrafficRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.account import AccountRead
 from app.schemas.owner_account import (
@@ -22,6 +24,7 @@ from app.services.account import (
     DuplicateAccountError,
     OwnerCreationNotAllowedError,
 )
+from app.services.traffic import TrafficService
 from app.services.wallet import WalletService
 
 router = APIRouter(
@@ -32,10 +35,12 @@ router = APIRouter(
 
 
 def _service(db: AsyncSession = Depends(get_db)) -> AccountService:
-    wallet_service = WalletService(
-        WalletRepository(db), LedgerRepository(db), AccountRepository(db)
+    account_repository = AccountRepository(db)
+    wallet_service = WalletService(WalletRepository(db), LedgerRepository(db), account_repository)
+    traffic_service = TrafficService(
+        TrafficRepository(db), PaymentRequisiteRepository(db), account_repository
     )
-    return AccountService(AccountRepository(db), wallet_service)
+    return AccountService(account_repository, wallet_service, traffic_service)
 
 
 def _not_found() -> HTTPException:
