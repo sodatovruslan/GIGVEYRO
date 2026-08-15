@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.account import UserRole
@@ -38,3 +38,62 @@ class AccountRepository:
         await self._session.flush()
         await self._session.refresh(account)
         return account
+
+    async def update(self, account: Account) -> Account:
+        await self._session.flush()
+        await self._session.refresh(account)
+        return account
+
+    async def list_accounts(
+        self,
+        *,
+        role: UserRole | None,
+        is_active: bool | None,
+        search: str | None,
+        limit: int,
+        offset: int,
+    ) -> list[Account]:
+        query = self._filtered_query(select(Account), role=role, is_active=is_active, search=search)
+        query = query.order_by(Account.created_at.desc()).limit(limit).offset(offset)
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
+    async def count_accounts(
+        self,
+        *,
+        role: UserRole | None,
+        is_active: bool | None,
+        search: str | None,
+    ) -> int:
+        query = self._filtered_query(
+            select(func.count()).select_from(Account), role=role, is_active=is_active, search=search
+        )
+        result = await self._session.execute(query)
+        return result.scalar_one()
+
+    @staticmethod
+    def _filtered_query(
+        query: Select,
+        *,
+        role: UserRole | None,
+        is_active: bool | None,
+        search: str | None,
+    ) -> Select:
+        # Managed (USER/MERCHANT) listing only - OWNER accounts are never
+        # exposed through this admin listing/search.
+        query = query.where(Account.role != UserRole.OWNER)
+        if role is not None:
+            query = query.where(Account.role == role)
+        if is_active is not None:
+            query = query.where(Account.is_active == is_active)
+        if search:
+            pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    Account.username.ilike(pattern),
+                    Account.full_name.ilike(pattern),
+                    Account.email.ilike(pattern),
+                    Account.phone.ilike(pattern),
+                )
+            )
+        return query
