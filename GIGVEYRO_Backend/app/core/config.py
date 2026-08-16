@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +21,12 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     MAX_ACTIVE_REQUISITES_PER_USER: int = 10
+
+    DEAL_TTL_MINUTES: int = 30
+    # Demo/dev-only fixed rate - NOT a production exchange rate source.
+    # A later stage will replace ConfiguredExchangeRateProvider with a live
+    # provider without DealService needing to change.
+    DEMO_USDT_TJS_RATE: Decimal = Decimal("10.90")
 
 
 settings = Settings()
