@@ -11,29 +11,48 @@ from app.models.account import Account
 from app.models.appeal import DealAppeal
 from app.repositories.appeal import AppealRepository
 from app.repositories.deal import DealRepository
-from app.services.deal import DealNotFoundError, transition_deal
+from app.services.deal import transition_deal
 from app.services.wallet import WalletService
 
 
 class AppealNotFoundError(Exception):
-    """Raised when an appeal is missing or not visible to the caller."""
+    """Raised when an appeal is not found or not accessible."""
 
 
-class AppealNotAllowedError(Exception):
-    """Raised when creating or modifying an appeal is prohibited."""
+class AppealNotEligibleError(Exception):
+    """Raised when a deal is not eligible for opening an appeal."""
+
+
+class ActiveAppealExistsError(Exception):
+    """Raised when an active appeal already exists for a deal."""
 
 
 class InvalidAppealTransitionError(Exception):
-    """Raised when an illegal status change is attempted on an appeal."""
+    """Raised when attempting an illegal appeal state transition."""
 
 
 def generate_appeal_public_id() -> str:
     return f"APL-{secrets.token_hex(4).upper()}"
 
 
+ALLOWED_APPEAL_TRANSITIONS: dict[AppealStatus, set[AppealStatus]] = {
+    AppealStatus.OPEN: {AppealStatus.UNDER_REVIEW, AppealStatus.CANCELLED},
+    AppealStatus.UNDER_REVIEW: {AppealStatus.RESOLVED},
+    AppealStatus.RESOLVED: set(),
+    AppealStatus.CANCELLED: set(),
+}
+
+
+def transition_appeal(appeal: DealAppeal, new_status: AppealStatus) -> None:
+    if new_status not in ALLOWED_APPEAL_TRANSITIONS.get(appeal.status, set()):
+        raise InvalidAppealTransitionError(
+            f"cannot transition appeal from {appeal.status} to {new_status}"
+        )
+    appeal.status = new_status
+
+
 class AppealService:
     def __init__(
-
         self,
         appeal_repository: AppealRepository,
         deal_repository: DealRepository,
@@ -45,45 +64,47 @@ class AppealService:
 
     async def open_appeal(
         self,
-        actor: Account,
+        account: Account,
         *,
         deal_id: uuid.UUID,
-        reason_code: AppealReason,
-        message: str,
+        reason: AppealReason,
+        description: str,
     ) -> DealAppeal:
         deal = await self._deals.get_by_id_for_update(deal_id)
         if deal is None:
-            raise DealNotFoundError()
+            raise AppealNotFoundError("deal not found")
 
-        if actor.role == UserRole.USER and deal.user_id != actor.id:
-            raise AppealNotAllowedError("you are not a participant in this deal")
-        elif actor.role == UserRole.MERCHANT and deal.merchant_id != actor.id:
-            raise AppealNotAllowedError("you are not a participant in this deal")
-        elif actor.role not in (UserRole.USER, UserRole.MERCHANT):
-            raise AppealNotAllowedError("only deal participants can open an appeal")
+        if account.role == UserRole.USER:
+            if deal.user_id != account.id:
+                raise AppealNotFoundError("deal not found")
+        elif account.role == UserRole.MERCHANT:
+            if deal.merchant_id != account.id:
+                raise AppealNotFoundError("deal not found")
+        else:
+            raise AppealNotEligibleError("only participating USER or merchant can open appeal")
 
         if deal.status not in (DealStatus.ACCEPTED, DealStatus.PAYMENT_PENDING):
-            raise AppealNotAllowedError(
+            raise AppealNotEligibleError(
                 f"cannot open appeal for deal in status {deal.status}"
             )
 
-        active_appeal = await self._appeals.get_active_by_deal_id(deal.id)
+        active_appeal = await self._appeals.get_active_for_deal(deal.id)
         if active_appeal is not None:
-            raise AppealNotAllowedError("an active appeal already exists for this deal")
+            raise ActiveAppealExistsError("an active appeal already exists for this deal")
 
-        previous_deal_status = deal.status
+        previous_status = deal.status
 
         last_error: IntegrityError | None = None
         for _ in range(3):
             appeal = DealAppeal(
                 public_id=generate_appeal_public_id(),
                 deal_id=deal.id,
-                opened_by_account_id=actor.id,
-                opened_by_role=actor.role,
-                reason_code=reason_code,
-                message=message,
+                opened_by_account_id=account.id,
+                opened_by_role=account.role,
+                reason=reason,
+                description=description,
                 status=AppealStatus.OPEN,
-                previous_deal_status=previous_deal_status,
+                previous_deal_status=previous_status,
             )
             try:
                 appeal = await self._appeals.create(appeal)
@@ -91,96 +112,78 @@ class AppealService:
             except IntegrityError as exc:
                 last_error = exc
         else:
-            raise last_error  # pragma: no cover
+            raise ActiveAppealExistsError("an active appeal already exists for this deal") from last_error
 
         transition_deal(deal, DealStatus.DISPUTED)
         await self._deals.save(deal)
 
         return appeal
 
-    async def cancel_appeal(
-        self, actor: Account, *, appeal_id: uuid.UUID
-    ) -> DealAppeal:
+    async def cancel_appeal(self, account: Account, appeal_id: uuid.UUID) -> DealAppeal:
         appeal = await self._appeals.get_by_id_for_update(appeal_id)
         if appeal is None:
-            raise AppealNotFoundError()
+            raise AppealNotFoundError("appeal not found")
 
-        if appeal.opened_by_account_id != actor.id:
-            raise AppealNotAllowedError("only the appeal creator can cancel it")
+        if appeal.opened_by_account_id != account.id:
+            raise AppealNotFoundError("appeal not found")
 
         if appeal.status != AppealStatus.OPEN:
-            raise InvalidAppealTransitionError(
-                f"cannot cancel appeal in status {appeal.status}"
-            )
+            raise InvalidAppealTransitionError("only OPEN appeals can be cancelled by opener")
 
         deal = await self._deals.get_by_id_for_update(appeal.deal_id)
         if deal is None:
-            raise DealNotFoundError()
+            raise AppealNotFoundError("associated deal not found")
 
-        appeal.status = AppealStatus.CANCELLED
-        saved_appeal = await self._appeals.save(appeal)
+        transition_appeal(appeal, AppealStatus.CANCELLED)
 
-        transition_deal(deal, appeal.previous_deal_status)
-        await self._deals.save(deal)
+        if deal.status == DealStatus.DISPUTED:
+            transition_deal(deal, appeal.previous_deal_status)
+            await self._deals.save(deal)
 
-        return saved_appeal
+        return await self._appeals.save(appeal)
 
-    async def get_for_participant(
-        self, actor: Account, appeal_id: uuid.UUID
-    ) -> DealAppeal:
+    async def get_for_account(self, account_id: uuid.UUID, appeal_id: uuid.UUID) -> DealAppeal:
         appeal = await self._appeals.get_by_id(appeal_id)
-        if appeal is None:
-            raise AppealNotFoundError()
-
-        deal = await self._deals.get_by_id(appeal.deal_id)
-        if deal is None:
-            raise AppealNotFoundError()
-
-        if actor.role == UserRole.USER and deal.user_id != actor.id:
-            raise AppealNotFoundError()
-        if actor.role == UserRole.MERCHANT and deal.merchant_id != actor.id:
-            raise AppealNotFoundError()
-
+        if appeal is None or appeal.opened_by_account_id != account_id:
+            raise AppealNotFoundError("appeal not found")
         return appeal
 
-    async def list_for_participant(
-        self,
-        actor: Account,
-        *,
-        status: AppealStatus | None,
-        limit: int,
-        offset: int,
+    async def list_for_account(
+        self, account_id: uuid.UUID, *, status: AppealStatus | None, limit: int, offset: int
     ) -> tuple[list[DealAppeal], int]:
         items = await self._appeals.list_for_account(
-            actor.id, status=status, limit=limit, offset=offset
+            account_id, status=status, limit=limit, offset=offset
         )
-        total = await self._appeals.count_for_account(actor.id, status=status)
+        total = await self._appeals.count_for_account(account_id, status=status)
         return items, total
 
     # -- OWNER ACTIONS ----------------------------------------------------
 
-    async def take_under_review(
+    async def review_by_owner(
         self, owner_id: uuid.UUID, appeal_id: uuid.UUID, owner_note: str | None = None
     ) -> DealAppeal:
         appeal = await self._appeals.get_by_id_for_update(appeal_id)
         if appeal is None:
-            raise AppealNotFoundError()
+            raise AppealNotFoundError("appeal not found")
 
         if appeal.status == AppealStatus.UNDER_REVIEW:
+            if owner_note:
+                appeal.owner_note = owner_note
+                await self._appeals.save(appeal)
             return appeal
 
         if appeal.status != AppealStatus.OPEN:
             raise InvalidAppealTransitionError(
-                f"cannot take under review appeal in status {appeal.status}"
+                f"cannot review appeal in status {appeal.status}"
             )
 
-        appeal.status = AppealStatus.UNDER_REVIEW
         if owner_note:
             appeal.owner_note = owner_note
 
+        transition_appeal(appeal, AppealStatus.UNDER_REVIEW)
         return await self._appeals.save(appeal)
 
-    async def resolve_appeal(
+    async def resolve_by_owner(
         self,
         owner_id: uuid.UUID,
         appeal_id: uuid.UUID,
@@ -190,32 +193,21 @@ class AppealService:
     ) -> DealAppeal:
         appeal = await self._appeals.get_by_id_for_update(appeal_id)
         if appeal is None:
-            raise AppealNotFoundError()
+            raise AppealNotFoundError("appeal not found")
 
         if appeal.status == AppealStatus.RESOLVED:
             return appeal
 
-        if appeal.status not in (AppealStatus.OPEN, AppealStatus.UNDER_REVIEW):
+        if appeal.status != AppealStatus.UNDER_REVIEW:
             raise InvalidAppealTransitionError(
-                f"cannot resolve appeal in status {appeal.status}"
+                f"cannot resolve appeal in status {appeal.status}, must be UNDER_REVIEW"
             )
 
         deal = await self._deals.get_by_id_for_update(appeal.deal_id)
-        if deal is None:
-            raise DealNotFoundError()
+        if deal is None or deal.user_id is None or deal.amount_usdt is None:
+            raise AppealNotFoundError("associated deal is invalid")
 
-        if deal.user_id is None or deal.amount_usdt is None:
-            raise AppealNotAllowedError("deal missing participant user or amount_usdt")
-
-        if resolution == AppealResolution.RELEASE_TO_USER:
-            await self._wallet_service.release_for_deal(
-                user_account_id=deal.user_id,
-                amount=deal.amount_usdt,
-                deal_id=deal.id,
-            )
-            transition_deal(deal, DealStatus.CANCELLED)
-
-        elif resolution == AppealResolution.SETTLE_TO_MERCHANT:
+        if resolution == AppealResolution.MERCHANT_WINS:
             await self._wallet_service.settle_deal(
                 user_account_id=deal.user_id,
                 merchant_account_id=deal.merchant_id,
@@ -224,10 +216,17 @@ class AppealService:
                 actor_id=owner_id,
             )
             transition_deal(deal, DealStatus.COMPLETED)
+        elif resolution == AppealResolution.USER_WINS:
+            await self._wallet_service.release_for_deal(
+                user_account_id=deal.user_id,
+                amount=deal.amount_usdt,
+                deal_id=deal.id,
+            )
+            transition_deal(deal, DealStatus.CANCELLED)
 
         await self._deals.save(deal)
 
-        appeal.status = AppealStatus.RESOLVED
+        transition_appeal(appeal, AppealStatus.RESOLVED)
         appeal.resolution = resolution
         appeal.owner_note = owner_note
         appeal.resolved_by_account_id = owner_id
@@ -238,7 +237,7 @@ class AppealService:
     async def get_for_owner(self, appeal_id: uuid.UUID) -> DealAppeal:
         appeal = await self._appeals.get_by_id(appeal_id)
         if appeal is None:
-            raise AppealNotFoundError()
+            raise AppealNotFoundError("appeal not found")
         return appeal
 
     async def list_for_owner(
