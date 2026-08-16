@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -8,13 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password
 from app.db.session import engine, get_db
 from app.enums.account import UserRole
+from app.enums.deal import DealStatus
 from app.enums.payment_requisite import PaymentRequisiteType
 from app.enums.wallet import Currency
 from app.main import app
 from app.models.account import Account
+from app.models.deal import Deal
 from app.models.payment_requisite import PaymentRequisite
 from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
+from app.services.deal import generate_public_id
 
 
 @pytest.fixture
@@ -134,5 +138,31 @@ def make_traffic_settings(db_session):
         await db_session.flush()
         await db_session.refresh(settings)
         return settings
+
+    return _make
+
+
+@pytest.fixture
+def make_deal(db_session):
+    async def _make(
+        merchant: Account,
+        *,
+        amount_tjs: Decimal = Decimal("200"),
+        status: DealStatus = DealStatus.AVAILABLE,
+        expires_in_minutes: int = 30,
+        user: Account | None = None,
+    ) -> Deal:
+        deal = Deal(
+            public_id=generate_public_id(),
+            merchant_id=merchant.id,
+            user_id=user.id if user else None,
+            amount_tjs=amount_tjs,
+            status=status,
+            expires_at=datetime.now(UTC) + timedelta(minutes=expires_in_minutes),
+        )
+        db_session.add(deal)
+        await db_session.flush()
+        await db_session.refresh(deal)
+        return deal
 
     return _make
