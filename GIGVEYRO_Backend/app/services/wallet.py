@@ -303,6 +303,7 @@ class WalletService:
 
         # 2. Update Merchant wallet (available += amount)
         m_avail_before = merchant_wallet.available_balance
+        m_held_before = merchant_wallet.held_balance
 
         merchant_wallet.available_balance = m_avail_before + amount
         await self._merchant_wallets.save(merchant_wallet)
@@ -320,6 +321,8 @@ class WalletService:
             insurance_after=Decimal("0"),
             frozen_before=Decimal("0"),
             frozen_after=Decimal("0"),
+            held_before=m_held_before,
+            held_after=merchant_wallet.held_balance,
             reference_type="deal",
             reference_id=deal_id,
             description="Settlement credit from completed deal",
@@ -328,6 +331,167 @@ class WalletService:
         merchant_entry = await self._ledger.create(merchant_entry)
 
         return user_entry, merchant_entry
+
+    # -- STAGE 10 WITHDRAWAL WALLET MUTATIONS ---------------------------
+
+    async def hold_for_withdrawal(
+        self, *, merchant_id: uuid.UUID, amount: Decimal, withdrawal_id: uuid.UUID
+    ) -> LedgerEntry:
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            entry_type=LedgerEntryType.WITHDRAWAL_HOLD,
+        )
+        if existing is not None:
+            return existing
+
+        merchant_wallet = await self._merchant_wallets.get_by_account_id_for_update(merchant_id)
+        if merchant_wallet is None:
+            raise WalletNotFoundError()
+
+        m_avail_before = merchant_wallet.available_balance
+        m_held_before = merchant_wallet.held_balance
+
+        if m_avail_before < amount:
+            raise InsufficientBalanceError("insufficient available balance for withdrawal")
+
+        merchant_wallet.available_balance = m_avail_before - amount
+        merchant_wallet.held_balance = m_held_before + amount
+        await self._merchant_wallets.save(merchant_wallet)
+
+        entry = LedgerEntry(
+            merchant_wallet_id=merchant_wallet.id,
+            account_id=merchant_id,
+            type=LedgerEntryType.WITHDRAWAL_HOLD,
+            balance_bucket=BalanceBucket.HELD,
+            currency=merchant_wallet.currency,
+            amount=amount,
+            available_before=m_avail_before,
+            available_after=merchant_wallet.available_balance,
+            insurance_before=Decimal("0"),
+            insurance_after=Decimal("0"),
+            frozen_before=Decimal("0"),
+            frozen_after=Decimal("0"),
+            held_before=m_held_before,
+            held_after=merchant_wallet.held_balance,
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            description="Hold balance for withdrawal request",
+            created_by_account_id=merchant_id,
+        )
+        return await self._ledger.create(entry)
+
+    async def release_for_withdrawal(
+        self,
+        *,
+        merchant_id: uuid.UUID,
+        amount: Decimal,
+        withdrawal_id: uuid.UUID,
+        actor_id: uuid.UUID,
+    ) -> LedgerEntry:
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            entry_type=LedgerEntryType.WITHDRAWAL_RELEASE,
+        )
+        if existing is not None:
+            return existing
+
+        merchant_wallet = await self._merchant_wallets.get_by_account_id_for_update(merchant_id)
+        if merchant_wallet is None:
+            raise WalletNotFoundError()
+
+        m_avail_before = merchant_wallet.available_balance
+        m_held_before = merchant_wallet.held_balance
+
+        if m_held_before < amount:
+            raise InsufficientBalanceError("insufficient held balance to release withdrawal")
+
+        merchant_wallet.held_balance = m_held_before - amount
+        merchant_wallet.available_balance = m_avail_before + amount
+        await self._merchant_wallets.save(merchant_wallet)
+
+        entry = LedgerEntry(
+            merchant_wallet_id=merchant_wallet.id,
+            account_id=merchant_id,
+            type=LedgerEntryType.WITHDRAWAL_RELEASE,
+            balance_bucket=BalanceBucket.AVAILABLE,
+            currency=merchant_wallet.currency,
+            amount=amount,
+            available_before=m_avail_before,
+            available_after=merchant_wallet.available_balance,
+            insurance_before=Decimal("0"),
+            insurance_after=Decimal("0"),
+            frozen_before=Decimal("0"),
+            frozen_after=Decimal("0"),
+            held_before=m_held_before,
+            held_after=merchant_wallet.held_balance,
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            description="Release held balance for rejected/cancelled withdrawal",
+            created_by_account_id=actor_id,
+        )
+        return await self._ledger.create(entry)
+
+    async def pay_withdrawal(
+        self,
+        *,
+        merchant_id: uuid.UUID,
+        amount: Decimal,
+        withdrawal_id: uuid.UUID,
+        actor_id: uuid.UUID,
+    ) -> LedgerEntry:
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            entry_type=LedgerEntryType.WITHDRAWAL_PAID,
+        )
+        if existing is not None:
+            return existing
+
+        merchant_wallet = await self._merchant_wallets.get_by_account_id_for_update(merchant_id)
+        if merchant_wallet is None:
+            raise WalletNotFoundError()
+
+        m_avail_before = merchant_wallet.available_balance
+        m_held_before = merchant_wallet.held_balance
+
+        if m_held_before < amount:
+            raise InsufficientBalanceError("insufficient held balance to mark paid")
+
+        merchant_wallet.held_balance = m_held_before - amount
+        await self._merchant_wallets.save(merchant_wallet)
+
+        entry = LedgerEntry(
+            merchant_wallet_id=merchant_wallet.id,
+            account_id=merchant_id,
+            type=LedgerEntryType.WITHDRAWAL_PAID,
+            balance_bucket=BalanceBucket.HELD,
+            currency=merchant_wallet.currency,
+            amount=-amount,
+            available_before=m_avail_before,
+            available_after=merchant_wallet.available_balance,
+            insurance_before=Decimal("0"),
+            insurance_after=Decimal("0"),
+            frozen_before=Decimal("0"),
+            frozen_after=Decimal("0"),
+            held_before=m_held_before,
+            held_after=merchant_wallet.held_balance,
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            description="Final deduction of held funds upon paid withdrawal",
+            created_by_account_id=actor_id,
+        )
+        return await self._ledger.create(entry)
 
     async def credit_deposit(
         self, *, account_id: uuid.UUID, amount: Decimal, deposit_id: uuid.UUID

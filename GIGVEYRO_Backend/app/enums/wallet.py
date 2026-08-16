@@ -15,6 +15,7 @@ class BalanceBucket(StrEnum):
     AVAILABLE = "available"
     INSURANCE = "insurance"
     FROZEN = "frozen"
+    HELD = "held"
 
 
 class LedgerEntryType(StrEnum):
@@ -31,3 +32,8 @@ class LedgerEntryType(StrEnum):
 
     # Used since Stage 8's confirmed TRC20 deposit credit.
     DEPOSIT_CREDIT = "deposit_credit"
+
+    # Stage 10 Merchant Withdrawal workflow.
+    WITHDRAWAL_HOLD = "withdrawal_hold"
+    WITHDRAWAL_RELEASE = "withdrawal_release"
+    WITHDRAWAL_PAID = "withdrawal_paid"

@@ -78,6 +78,8 @@ class LedgerEntry(Base):
     insurance_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
     frozen_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
     frozen_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
+    held_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
+    held_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
 
     reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     reference_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)

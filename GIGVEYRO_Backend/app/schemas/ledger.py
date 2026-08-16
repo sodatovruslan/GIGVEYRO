@@ -21,6 +21,8 @@ class LedgerEntryRead(BaseModel):
     insurance_after: Money
     frozen_before: Money
     frozen_after: Money
+    held_before: Money
+    held_after: Money
     reference_type: str | None
     reference_id: uuid.UUID | None
     description: str | None

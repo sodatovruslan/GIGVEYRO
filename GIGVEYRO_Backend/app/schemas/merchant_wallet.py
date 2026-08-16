@@ -9,3 +9,4 @@ class MerchantWalletRead(BaseModel):
 
     currency: Currency
     available_balance: Money
+    held_balance: Money
