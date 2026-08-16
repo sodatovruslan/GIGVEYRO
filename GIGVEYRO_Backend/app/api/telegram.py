@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_account, get_db
+from app.core.config import settings
 from app.models.account import Account
 from app.repositories.telegram import TelegramLinkRepository
 from app.schemas.notification import TelegramLinkCodeRead, TelegramWebhookPayload
@@ -17,10 +18,10 @@ async def create_telegram_link_code(
 ):
     repo = TelegramLinkRepository(session)
     service = TelegramService(repo)
-    link = await service.generate_link_code(account.id)
+    raw_code, link = await service.generate_link_code(account.id)
     return TelegramLinkCodeRead(
-        link_code=link.link_code,
-        expires_at=link.link_expires_at,
+        verification_code=raw_code,
+        expires_at=link.verification_expires_at,
     )
 
 
@@ -29,6 +30,13 @@ async def telegram_webhook(
     payload: TelegramWebhookPayload,
     session: AsyncSession = Depends(get_db),
 ):
+    # DEV-only / Mock mock-endpoint protection
+    if getattr(settings, "APP_ENV", "development").lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Telegram webhook endpoint is disabled in production."
+        )
+
     if not payload.message:
         return {"status": "ok", "processed": False}
 

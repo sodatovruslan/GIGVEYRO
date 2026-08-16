@@ -1,15 +1,35 @@
 import uuid
 from typing import Sequence
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.enums.notification import NotificationStatus
-from app.models.notification import Notification, NotificationOutbox
+from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
+from app.models.notification import Notification, NotificationDelivery, NotificationOutbox, NotificationPreference
 
 
 class NotificationRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def get_or_create_preference(self, account_id: uuid.UUID) -> NotificationPreference:
+        stmt = select(NotificationPreference).where(NotificationPreference.account_id == account_id)
+        res = await self.session.execute(stmt)
+        pref = res.scalar_one_or_none()
+        if not pref:
+            pref = NotificationPreference(account_id=account_id)
+            self.session.add(pref)
+            await self.session.flush()
+        return pref
+
+    async def update_preference(
+        self, pref: NotificationPreference, updates: dict
+    ) -> NotificationPreference:
+        for field, value in updates.items():
+            if value is not None and hasattr(pref, field):
+                setattr(pref, field, value)
+        await self.session.flush()
+        return pref
 
     async def create_notification(self, notification: Notification) -> Notification:
         self.session.add(notification)
@@ -21,19 +41,44 @@ class NotificationRepository:
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def get_by_id_and_account(self, notification_id: uuid.UUID, account_id: uuid.UUID) -> Notification | None:
+        stmt = (
+            select(Notification)
+            .options(selectinload(Notification.deliveries))
+            .where(Notification.id == notification_id, Notification.account_id == account_id)
+        )
+        res = await self.session.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def list_for_account(
         self,
         account_id: uuid.UUID,
         limit: int = 50,
         offset: int = 0,
         unread_only: bool = False,
+        type_: NotificationType | None = None,
     ) -> Sequence[Notification]:
-        stmt = select(Notification).where(Notification.account_id == account_id)
+        stmt = (
+            select(Notification)
+            .options(selectinload(Notification.deliveries))
+            .where(Notification.account_id == account_id)
+        )
         if unread_only:
             stmt = stmt.where(Notification.is_read.is_(False))
+        if type_:
+            stmt = stmt.where(Notification.type == type_)
+
         stmt = stmt.order_by(Notification.created_at.desc()).limit(limit).offset(offset)
         res = await self.session.execute(stmt)
         return res.scalars().all()
+
+    async def get_unread_count(self, account_id: uuid.UUID) -> int:
+        stmt = (
+            select(func.count(Notification.id))
+            .where(Notification.account_id == account_id, Notification.is_read.is_(False))
+        )
+        res = await self.session.execute(stmt)
+        return res.scalar_one() or 0
 
     async def mark_as_read(self, notification_id: uuid.UUID, account_id: uuid.UUID) -> bool:
         stmt = (
@@ -46,6 +91,15 @@ class NotificationRepository:
         )
         res = await self.session.execute(stmt)
         return res.rowcount > 0
+
+    async def mark_all_as_read(self, account_id: uuid.UUID) -> int:
+        stmt = (
+            update(Notification)
+            .where(Notification.account_id == account_id, Notification.is_read.is_(False))
+            .values(is_read=True)
+        )
+        res = await self.session.execute(stmt)
+        return res.rowcount
 
     async def create_outbox_entry(self, entry: NotificationOutbox) -> NotificationOutbox:
         self.session.add(entry)
@@ -65,3 +119,33 @@ class NotificationRepository:
         )
         res = await self.session.execute(stmt)
         return res.scalars().all()
+
+    async def create_delivery(self, delivery: NotificationDelivery) -> NotificationDelivery:
+        self.session.add(delivery)
+        await self.session.flush()
+        return delivery
+
+    async def list_deliveries_for_owner(
+        self,
+        status: NotificationStatus | None = None,
+        channel: NotificationChannel | None = None,
+        account_id: uuid.UUID | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Sequence[NotificationDelivery]:
+        stmt = select(NotificationDelivery).join(Notification)
+        if status:
+            stmt = stmt.where(NotificationDelivery.status == status)
+        if channel:
+            stmt = stmt.where(NotificationDelivery.channel == channel)
+        if account_id:
+            stmt = stmt.where(Notification.account_id == account_id)
+
+        stmt = stmt.order_by(NotificationDelivery.created_at.desc()).limit(limit).offset(offset)
+        res = await self.session.execute(stmt)
+        return res.scalars().all()
+
+    async def get_delivery_by_id(self, delivery_id: uuid.UUID) -> NotificationDelivery | None:
+        stmt = select(NotificationDelivery).where(NotificationDelivery.id == delivery_id)
+        res = await self.session.execute(stmt)
+        return res.scalar_one_or_none()

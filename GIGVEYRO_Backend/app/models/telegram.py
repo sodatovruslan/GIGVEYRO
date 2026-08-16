@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, BigInteger, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,10 +27,10 @@ class TelegramAccountLink(Base):
     chat_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True, unique=True, index=True
     )
-    link_code: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, unique=True, index=True
+    verification_code_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
     )
-    link_expires_at: Mapped[datetime | None] = mapped_column(
+    verification_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     is_linked: Mapped[bool] = mapped_column(default=False, nullable=False)
