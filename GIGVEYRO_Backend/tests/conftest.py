@@ -6,19 +6,23 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings as app_settings
 from app.core.security import hash_password
 from app.db.session import engine, get_db
 from app.enums.account import UserRole
 from app.enums.deal import DealStatus
+from app.enums.deposit import DepositAsset, DepositNetwork, DepositStatus
 from app.enums.payment_requisite import PaymentRequisiteType
 from app.enums.wallet import Currency
 from app.main import app
 from app.models.account import Account
 from app.models.deal import Deal
+from app.models.deposit import Deposit
 from app.models.payment_requisite import PaymentRequisite
 from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
 from app.services.deal import generate_public_id
+from app.services.deposit import generate_deposit_public_id
 
 
 @pytest.fixture
@@ -164,5 +168,40 @@ def make_deal(db_session):
         await db_session.flush()
         await db_session.refresh(deal)
         return deal
+
+    return _make
+
+
+@pytest.fixture
+def make_deposit(db_session):
+    async def _make(
+        account: Account,
+        *,
+        expected_amount: Decimal = Decimal("100"),
+        status: DepositStatus = DepositStatus.WAITING,
+        expires_in_minutes: int = 30,
+        required_confirmations: int = 20,
+        tx_hash: str | None = None,
+        received_amount: Decimal | None = None,
+        confirmations: int = 0,
+    ) -> Deposit:
+        deposit = Deposit(
+            public_id=generate_deposit_public_id(),
+            account_id=account.id,
+            network=DepositNetwork.TRC20,
+            asset=DepositAsset.USDT,
+            expected_amount=expected_amount,
+            deposit_address=app_settings.USDT_TRC20_DEPOSIT_ADDRESS,
+            tx_hash=tx_hash,
+            received_amount=received_amount,
+            confirmations=confirmations,
+            required_confirmations=required_confirmations,
+            status=status,
+            expires_at=datetime.now(UTC) + timedelta(minutes=expires_in_minutes),
+        )
+        db_session.add(deposit)
+        await db_session.flush()
+        await db_session.refresh(deposit)
+        return deposit
 
     return _make
