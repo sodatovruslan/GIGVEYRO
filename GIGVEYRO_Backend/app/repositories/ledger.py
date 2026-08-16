@@ -30,6 +30,18 @@ class LedgerRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_reference(
+        self, *, reference_type: str, reference_id: uuid.UUID, entry_type: LedgerEntryType
+    ) -> LedgerEntry | None:
+        result = await self._session.execute(
+            select(LedgerEntry).where(
+                LedgerEntry.reference_type == reference_type,
+                LedgerEntry.reference_id == reference_id,
+                LedgerEntry.type == entry_type,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def list_for_account(
         self,
         *,

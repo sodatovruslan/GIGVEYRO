@@ -122,6 +122,64 @@ class WalletService:
             idempotency_key=idempotency_key,
         )
 
+    async def freeze_for_deal(
+        self, *, account_id: uuid.UUID, amount: Decimal, deal_id: uuid.UUID
+    ) -> LedgerEntry:
+        """Moves `amount` from available to frozen for an accepted Deal.
+        A transfer between buckets, not a mint/burn - available_balance +
+        frozen_balance is unchanged by this call. Idempotent by (deal_id,
+        DEAL_FREEZE): a caller that somehow invokes this twice for the same
+        deal gets back the original ledger entry instead of freezing twice.
+        The entry's balance_bucket is FROZEN (the bucket that increased);
+        the paired available_before/after on the same row records the
+        decrease - every ledger row already carries a full 3-bucket
+        snapshot, so a two-bucket transfer doesn't need its own bucket enum
+        value.
+        """
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="deal", reference_id=deal_id, entry_type=LedgerEntryType.DEAL_FREEZE
+        )
+        if existing is not None:
+            return existing
+
+        wallet = await self._wallets.get_by_account_id_for_update(account_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        available_before = wallet.available_balance
+        insurance_before = wallet.insurance_balance
+        frozen_before = wallet.frozen_balance
+
+        if available_before < amount:
+            raise InsufficientBalanceError("available balance cannot cover this deal")
+
+        wallet.available_balance = available_before - amount
+        wallet.frozen_balance = frozen_before + amount
+        await self._wallets.save(wallet)
+
+        entry = LedgerEntry(
+            wallet_id=wallet.id,
+            account_id=account_id,
+            type=LedgerEntryType.DEAL_FREEZE,
+            balance_bucket=BalanceBucket.FROZEN,
+            currency=wallet.currency,
+            amount=amount,
+            available_before=available_before,
+            available_after=wallet.available_balance,
+            insurance_before=insurance_before,
+            insurance_after=wallet.insurance_balance,
+            frozen_before=frozen_before,
+            frozen_after=wallet.frozen_balance,
+            reference_type="deal",
+            reference_id=deal_id,
+            description="Freeze for accepted deal",
+            created_by_account_id=account_id,
+        )
+        return await self._ledger.create(entry)
+
     async def manual_adjust(
         self,
         *,
