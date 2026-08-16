@@ -18,9 +18,6 @@ from app.schemas.payment_requisite import mask_card_number
 from app.services.exchange_rate import ExchangeRateProvider
 from app.services.wallet import WalletService
 
-# USDT amounts round to 8 decimal places, matching the NUMERIC(20,8) wallet
-# columns. Half-up is a neutral, well-understood rounding rule - it doesn't
-# systematically favor either the platform or the counterparty.
 USDT_QUANTUM = Decimal("0.00000001")
 
 _TERMINAL_TIMESTAMP_FIELD = {
@@ -32,8 +29,17 @@ _TERMINAL_TIMESTAMP_FIELD = {
 ALLOWED_TRANSITIONS: dict[DealStatus, set[DealStatus]] = {
     DealStatus.CREATED: {DealStatus.AVAILABLE},
     DealStatus.AVAILABLE: {DealStatus.ACCEPTED, DealStatus.CANCELLED, DealStatus.EXPIRED},
-    DealStatus.ACCEPTED: {DealStatus.PAYMENT_PENDING, DealStatus.DISPUTED},
-    DealStatus.PAYMENT_PENDING: {DealStatus.COMPLETED, DealStatus.DISPUTED},
+    DealStatus.ACCEPTED: {
+        DealStatus.PAYMENT_PENDING,
+        DealStatus.COMPLETED,
+        DealStatus.CANCELLED,
+        DealStatus.DISPUTED,
+    },
+    DealStatus.PAYMENT_PENDING: {
+        DealStatus.COMPLETED,
+        DealStatus.CANCELLED,
+        DealStatus.DISPUTED,
+    },
     DealStatus.COMPLETED: set(),
     DealStatus.CANCELLED: set(),
     DealStatus.EXPIRED: set(),
@@ -42,8 +48,7 @@ ALLOWED_TRANSITIONS: dict[DealStatus, set[DealStatus]] = {
 
 
 class DealNotFoundError(Exception):
-    """Covers a missing deal and one that exists but isn't visible to the
-    caller (wrong merchant/user) - one safe 404 either way."""
+    """Covers a missing deal and one that exists but isn't visible."""
 
 
 class DealCreationNotAllowedError(Exception):
@@ -55,18 +60,15 @@ class InvalidDealTransitionError(Exception):
 
 
 class DealNotAvailableError(Exception):
-    """Raised when accept targets a deal that isn't AVAILABLE (wrong
-    status, expired, or already taken by someone else)."""
+    """Raised when accept targets a deal that isn't AVAILABLE."""
 
 
 class UserNotEligibleError(Exception):
-    """Raised when the accepting USER's account/traffic state blocks
-    accepting deals."""
+    """Raised when the accepting USER's account/traffic state blocks accepting deals."""
 
 
 class RequisiteNotEligibleError(Exception):
-    """Raised when the chosen requisite isn't usable for accepting a
-    deal (not found, not owned, inactive, or archived)."""
+    """Raised when the chosen requisite isn't usable."""
 
 
 def generate_public_id() -> str:
@@ -128,7 +130,7 @@ class DealService:
             except IntegrityError as exc:
                 last_error = exc
         else:
-            raise last_error  # pragma: no cover - astronomically unlikely
+            raise last_error
 
         transition_deal(deal, DealStatus.AVAILABLE)
         return await self._deals.save(deal)
@@ -176,11 +178,6 @@ class DealService:
     async def accept_deal(
         self, *, account: Account, deal_id: uuid.UUID, requisite_id: uuid.UUID
     ) -> Deal:
-        # The deal row lock is the single serialization point for
-        # concurrent accepts of the same deal: whichever transaction gets
-        # here first proceeds and commits status=ACCEPTED; the other
-        # unblocks afterwards, re-reads the now-ACCEPTED row, and is
-        # rejected below - never a double accept.
         deal = await self._deals.get_by_id_for_update(deal_id)
         if deal is None:
             raise DealNotFoundError()
@@ -201,8 +198,6 @@ class DealService:
         rate = await self._rate_provider.get_usdt_tjs_rate()
         amount_usdt = calculate_amount_usdt(deal.amount_tjs, rate)
 
-        # Raises WalletNotFoundError / InsufficientBalanceError as needed;
-        # idempotent by (deal_id, DEAL_FREEZE) so a retry never double-freezes.
         await self._wallet_service.freeze_for_deal(
             account_id=account.id, amount=amount_usdt, deal_id=deal.id
         )
@@ -217,6 +212,58 @@ class DealService:
         deal.amount_usdt = amount_usdt
         transition_deal(deal, DealStatus.ACCEPTED)
 
+        return await self._deals.save(deal)
+
+    # -- STAGE 9: SETTLEMENT & RELEASE ----------------------------------
+
+    async def complete_deal(self, deal_id: uuid.UUID, *, actor_id: uuid.UUID | None = None) -> Deal:
+        """Completes a deal (Settlement): User frozen -= USDT, Merchant available += USDT."""
+        deal = await self._deals.get_by_id_for_update(deal_id)
+        if deal is None:
+            raise DealNotFoundError()
+
+        if deal.status == DealStatus.COMPLETED:
+            return deal
+
+        if deal.status not in (DealStatus.ACCEPTED, DealStatus.PAYMENT_PENDING):
+            raise InvalidDealTransitionError(f"cannot complete deal in status {deal.status}")
+
+        if deal.user_id is None or deal.amount_usdt is None:
+            raise InvalidDealTransitionError("deal is missing accepted user or amount_usdt")
+
+        await self._wallet_service.settle_deal(
+            user_account_id=deal.user_id,
+            merchant_account_id=deal.merchant_id,
+            amount=deal.amount_usdt,
+            deal_id=deal.id,
+            actor_id=actor_id,
+        )
+
+        transition_deal(deal, DealStatus.COMPLETED)
+        return await self._deals.save(deal)
+
+    async def cancel_or_release_deal(
+        self, deal_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
+    ) -> Deal:
+        """Cancels/releases an accepted deal: User frozen -= USDT, User available += USDT."""
+        deal = await self._deals.get_by_id_for_update(deal_id)
+        if deal is None:
+            raise DealNotFoundError()
+
+        if deal.status == DealStatus.CANCELLED:
+            return deal
+
+        if deal.status not in (DealStatus.ACCEPTED, DealStatus.PAYMENT_PENDING):
+            raise InvalidDealTransitionError(f"cannot release deal in status {deal.status}")
+
+        if deal.user_id is None or deal.amount_usdt is None:
+            raise InvalidDealTransitionError("deal is missing accepted user or amount_usdt")
+
+        await self._wallet_service.release_for_deal(
+            user_account_id=deal.user_id, amount=deal.amount_usdt, deal_id=deal.id
+        )
+
+        transition_deal(deal, DealStatus.CANCELLED)
         return await self._deals.save(deal)
 
     # -- OWNER (read-only) ------------------------------------------------

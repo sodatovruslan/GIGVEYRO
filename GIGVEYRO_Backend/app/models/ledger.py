@@ -14,32 +14,33 @@ from app.models.wallet import MONEY
 
 
 class LedgerEntry(Base):
-    """Append-only financial audit trail. Never updated or deleted by the
-    application - a mistaken operation gets a compensating entry instead.
+    """Append-only financial audit trail for both UserWallets and MerchantWallets.
+    Never updated or deleted by the application - a mistaken operation gets a compensating entry instead.
 
-    Every row stores a full 3-bucket snapshot of the wallet (available/
-    insurance/frozen before and after), not just the bucket that changed,
-    so any single entry can be read as a complete point-in-time statement
-    of the wallet without replaying history. `balance_bucket` says which
-    bucket `amount` was applied to; `amount` is the signed delta for that
-    bucket (positive = credit, negative = debit).
+    For UserWallet entries: wallet_id is populated.
+    For MerchantWallet entries: merchant_wallet_id is populated.
     """
 
     __tablename__ = "ledger_entries"
     __table_args__ = (
-        # Plain UNIQUE is sufficient for idempotency: Postgres never treats
-        # two NULLs as equal, so any number of entries with no idempotency
-        # key are still allowed - only a real duplicate key is rejected.
         UniqueConstraint(
             "wallet_id", "idempotency_key", name="uq_ledger_entries_wallet_idempotency_key"
+        ),
+        UniqueConstraint(
+            "merchant_wallet_id",
+            "idempotency_key",
+            name="uq_ledger_entries_merchant_idempotency_key",
         ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    wallet_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("wallets.id"), nullable=False, index=True
+    wallet_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("wallets.id"), nullable=True, index=True
+    )
+    merchant_wallet_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("merchant_wallets.id"), nullable=True, index=True
     )
     account_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False, index=True
@@ -73,10 +74,10 @@ class LedgerEntry(Base):
 
     available_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     available_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
-    insurance_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
-    insurance_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
-    frozen_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
-    frozen_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    insurance_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
+    insurance_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
+    frozen_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
+    frozen_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=Decimal("0"))
 
     reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     reference_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
@@ -87,9 +88,6 @@ class LedgerEntry(Base):
     created_by_account_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True
     )
-    # clock_timestamp() (actual wall-clock time per statement), not now()
-    # (frozen at transaction start) - a transaction that appends several
-    # entries must not have them collide on the same timestamp.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

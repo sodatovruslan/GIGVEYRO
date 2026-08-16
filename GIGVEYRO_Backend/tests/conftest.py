@@ -18,6 +18,7 @@ from app.main import app
 from app.models.account import Account
 from app.models.deal import Deal
 from app.models.deposit import Deposit
+from app.models.merchant_wallet import MerchantWallet
 from app.models.payment_requisite import PaymentRequisite
 from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
@@ -105,6 +106,26 @@ def make_wallet(db_session):
 
 
 @pytest.fixture
+def make_merchant_wallet(db_session):
+    async def _make(
+        account: Account,
+        *,
+        available: Decimal = Decimal("0"),
+    ) -> MerchantWallet:
+        wallet = MerchantWallet(
+            account_id=account.id,
+            currency=Currency.USDT,
+            available_balance=available,
+        )
+        db_session.add(wallet)
+        await db_session.flush()
+        await db_session.refresh(wallet)
+        return wallet
+
+    return _make
+
+
+@pytest.fixture
 def make_requisite(db_session):
     async def _make(
         account: Account,
@@ -155,12 +176,14 @@ def make_deal(db_session):
         status: DealStatus = DealStatus.AVAILABLE,
         expires_in_minutes: int = 30,
         user: Account | None = None,
+        amount_usdt: Decimal | None = None,
     ) -> Deal:
         deal = Deal(
             public_id=generate_public_id(),
             merchant_id=merchant.id,
             user_id=user.id if user else None,
             amount_tjs=amount_tjs,
+            amount_usdt=amount_usdt,
             status=status,
             expires_at=datetime.now(UTC) + timedelta(minutes=expires_in_minutes),
         )

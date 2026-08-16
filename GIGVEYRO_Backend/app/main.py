@@ -5,6 +5,7 @@ from app.api.deals import router as deals_router
 from app.api.deposits import router as deposits_router
 from app.api.health import router as health_router
 from app.api.merchant.deals import router as merchant_deals_router
+from app.api.merchant.wallet import router as merchant_wallet_router
 from app.api.owner.accounts import router as owner_accounts_router
 from app.api.owner.deals import router as owner_deals_router
 from app.api.owner.deposits import router as owner_deposits_router
@@ -30,6 +31,7 @@ app.include_router(owner_traffic_router)
 app.include_router(owner_deals_router)
 app.include_router(owner_deposits_router)
 app.include_router(wallet_router)
+app.include_router(merchant_wallet_router)
 app.include_router(requisites_router)
 app.include_router(traffic_router)
 app.include_router(merchant_deals_router)
@@ -37,7 +39,6 @@ app.include_router(deals_router)
 app.include_router(deposits_router)
 
 if settings.APP_ENV != "production":
-    # DEV-only mock blockchain event ingestion - never mounted in production.
     from app.api.owner.dev_deposits import router as dev_deposits_router
 
     app.include_router(dev_deposits_router)

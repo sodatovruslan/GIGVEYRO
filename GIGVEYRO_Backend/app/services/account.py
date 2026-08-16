@@ -44,8 +44,6 @@ class AccountService:
     async def get_by_username(self, username: str) -> Account | None:
         return await self._repository.get_by_username(username)
 
-    # -- OWNER account management (USER/MERCHANT only) ----------------------
-
     async def create_managed_account(
         self,
         *,
@@ -78,18 +76,16 @@ class AccountService:
         try:
             created = await self._repository.create(account)
         except IntegrityError as exc:
-            # Last-resort guard against a race between the checks above and
-            # the insert - the DB unique constraints are the real backstop.
             raise DuplicateAccountError("account data") from exc
 
         if role == UserRole.USER:
-            # Same transaction as the account insert - if either of these
-            # fails, the whole request rolls back and no orphan account or
-            # half-initialized USER is left behind.
             if self._wallet_service is not None:
                 await self._wallet_service.create_wallet_for_user(created)
             if self._traffic_service is not None:
                 await self._traffic_service.create_settings_for_user(created.id)
+        elif role == UserRole.MERCHANT:
+            if self._wallet_service is not None:
+                await self._wallet_service.create_wallet_for_merchant(created)
 
         return created
 
@@ -146,15 +142,10 @@ class AccountService:
         account.is_active = is_active
         updated = await self._repository.update(account)
 
-        # Blocking a USER must turn traffic off in the same transaction, so
-        # a blocked account can never keep "assign me deals" set. Unblocking
-        # deliberately does NOT re-enable it - the user opts back in.
         if not is_active and account.role == UserRole.USER and self._traffic_service is not None:
             try:
                 await self._traffic_service.disable_traffic(account_id)
             except TrafficSettingsNotFoundError:
-                # Best-effort: a USER without traffic settings yet (e.g. a
-                # legacy account predating Stage 6) has nothing to disable.
                 pass
 
         return updated

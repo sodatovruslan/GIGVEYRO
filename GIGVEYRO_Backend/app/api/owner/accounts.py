@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,12 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.enums.account import UserRole
+from app.enums.wallet import LedgerEntryType
 from app.repositories.account import AccountRepository
 from app.repositories.ledger import LedgerRepository
+from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.traffic import TrafficRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.account import AccountRead
+from app.schemas.ledger import LedgerListResponse
+from app.schemas.merchant_wallet import MerchantWalletRead
 from app.schemas.owner_account import (
     AccountListResponse,
     OwnerAccountCreate,
@@ -25,7 +30,7 @@ from app.services.account import (
     OwnerCreationNotAllowedError,
 )
 from app.services.traffic import TrafficService
-from app.services.wallet import WalletService
+from app.services.wallet import WalletNotFoundError, WalletService
 
 router = APIRouter(
     prefix="/owner/accounts",
@@ -36,11 +41,25 @@ router = APIRouter(
 
 def _service(db: AsyncSession = Depends(get_db)) -> AccountService:
     account_repository = AccountRepository(db)
-    wallet_service = WalletService(WalletRepository(db), LedgerRepository(db), account_repository)
+    wallet_service = WalletService(
+        WalletRepository(db),
+        LedgerRepository(db),
+        account_repository,
+        MerchantWalletRepository(db),
+    )
     traffic_service = TrafficService(
         TrafficRepository(db), PaymentRequisiteRepository(db), account_repository
     )
     return AccountService(account_repository, wallet_service, traffic_service)
+
+
+def _wallet_service(db: AsyncSession = Depends(get_db)) -> WalletService:
+    return WalletService(
+        WalletRepository(db),
+        LedgerRepository(db),
+        AccountRepository(db),
+        MerchantWalletRepository(db),
+    )
 
 
 def _not_found() -> HTTPException:
@@ -89,6 +108,44 @@ async def get_account(
     if account is None:
         raise _not_found()
     return account
+
+
+@router.get("/{merchant_id}/merchant-wallet", response_model=MerchantWalletRead)
+async def get_merchant_wallet_for_owner(
+    merchant_id: uuid.UUID, wallet_service: WalletService = Depends(_wallet_service)
+) -> MerchantWalletRead:
+    try:
+        return await wallet_service.get_merchant_wallet_for_account(merchant_id)
+    except WalletNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="merchant wallet not found"
+        ) from exc
+
+
+@router.get("/{merchant_id}/merchant-wallet/ledger", response_model=LedgerListResponse)
+async def get_merchant_ledger_for_owner(
+    merchant_id: uuid.UUID,
+    entry_type: LedgerEntryType | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    wallet_service: WalletService = Depends(_wallet_service),
+) -> LedgerListResponse:
+    try:
+        items, total = await wallet_service.get_ledger_for_account(
+            merchant_id,
+            entry_type=entry_type,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+            offset=offset,
+        )
+        return LedgerListResponse(items=items, total=total, limit=limit, offset=offset)
+    except WalletNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="merchant ledger not found"
+        ) from exc
 
 
 @router.patch("/{account_id}", response_model=AccountRead)

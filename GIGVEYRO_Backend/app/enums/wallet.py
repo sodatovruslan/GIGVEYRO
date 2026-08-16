@@ -24,9 +24,10 @@ class LedgerEntryType(StrEnum):
 
     # Used since Stage 7's Deal accept flow.
     DEAL_FREEZE = "deal_freeze"
-    # Reserved for the future Deal settlement workflow.
+    # Stage 9 Deal settlement & release workflow.
     DEAL_RELEASE = "deal_release"
     DEAL_SETTLEMENT = "deal_settlement"
+    DEAL_SETTLEMENT_CREDIT = "deal_settlement_credit"
 
     # Used since Stage 8's confirmed TRC20 deposit credit.
     DEPOSIT_CREDIT = "deposit_credit"

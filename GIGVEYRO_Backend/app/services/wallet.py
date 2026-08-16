@@ -6,17 +6,16 @@ from app.enums.account import UserRole
 from app.enums.wallet import BalanceBucket, Currency, LedgerEntryType
 from app.models.account import Account
 from app.models.ledger import LedgerEntry
+from app.models.merchant_wallet import MerchantWallet
 from app.models.wallet import UserWallet
 from app.repositories.account import AccountRepository
 from app.repositories.ledger import LedgerRepository
+from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.wallet import WalletRepository
 
 
 class WalletNotFoundError(Exception):
-    """No wallet is reachable for the given account - covers a missing
-    account, a non-USER account, and a USER account without a wallet row
-    yet. Collapsed into one safe error so this nested resource never
-    reveals which of those is actually true."""
+    """No wallet is reachable for the given account."""
 
 
 class InactiveAccountError(Exception):
@@ -24,8 +23,7 @@ class InactiveAccountError(Exception):
 
 
 class InvalidAmountError(Exception):
-    """Raised when an amount fails a business-level sanity check (defense
-    in depth alongside Pydantic schema validation)."""
+    """Raised when an amount fails a business-level sanity check."""
 
 
 class InsufficientBalanceError(Exception):
@@ -38,14 +36,22 @@ class WalletService:
         wallet_repository: WalletRepository,
         ledger_repository: LedgerRepository,
         account_repository: AccountRepository,
+        merchant_wallet_repository: MerchantWalletRepository | None = None,
     ):
         self._wallets = wallet_repository
         self._ledger = ledger_repository
         self._accounts = account_repository
+        self._merchant_wallets = merchant_wallet_repository or MerchantWalletRepository(
+            wallet_repository._session
+        )
 
     async def create_wallet_for_user(self, account: Account) -> UserWallet:
         wallet = UserWallet(account_id=account.id, currency=Currency.USDT)
         return await self._wallets.create(wallet)
+
+    async def create_wallet_for_merchant(self, account: Account) -> MerchantWallet:
+        wallet = MerchantWallet(account_id=account.id, currency=Currency.USDT)
+        return await self._merchant_wallets.create(wallet)
 
     async def get_wallet_for_account(self, account_id: uuid.UUID) -> UserWallet:
         account = await self._accounts.get_by_id(account_id)
@@ -53,6 +59,16 @@ class WalletService:
             raise WalletNotFoundError()
 
         wallet = await self._wallets.get_by_account_id(account_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+        return wallet
+
+    async def get_merchant_wallet_for_account(self, account_id: uuid.UUID) -> MerchantWallet:
+        account = await self._accounts.get_by_id(account_id)
+        if account is None or account.role != UserRole.MERCHANT:
+            raise WalletNotFoundError()
+
+        wallet = await self._merchant_wallets.get_by_account_id(account_id)
         if wallet is None:
             raise WalletNotFoundError()
         return wallet
@@ -67,7 +83,9 @@ class WalletService:
         limit: int,
         offset: int,
     ) -> tuple[list[LedgerEntry], int]:
-        await self.get_wallet_for_account(account_id)  # same visibility rule as the wallet itself
+        account = await self._accounts.get_by_id(account_id)
+        if account is None or account.role not in (UserRole.USER, UserRole.MERCHANT):
+            raise WalletNotFoundError()
 
         items = await self._ledger.list_for_account(
             account_id=account_id,
@@ -125,17 +143,6 @@ class WalletService:
     async def freeze_for_deal(
         self, *, account_id: uuid.UUID, amount: Decimal, deal_id: uuid.UUID
     ) -> LedgerEntry:
-        """Moves `amount` from available to frozen for an accepted Deal.
-        A transfer between buckets, not a mint/burn - available_balance +
-        frozen_balance is unchanged by this call. Idempotent by (deal_id,
-        DEAL_FREEZE): a caller that somehow invokes this twice for the same
-        deal gets back the original ledger entry instead of freezing twice.
-        The entry's balance_bucket is FROZEN (the bucket that increased);
-        the paired available_before/after on the same row records the
-        decrease - every ledger row already carries a full 3-bucket
-        snapshot, so a two-bucket transfer doesn't need its own bucket enum
-        value.
-        """
         if not amount.is_finite() or amount <= 0:
             raise InvalidAmountError("amount must be a positive, finite number")
 
@@ -180,15 +187,151 @@ class WalletService:
         )
         return await self._ledger.create(entry)
 
+    async def release_for_deal(
+        self, *, user_account_id: uuid.UUID, amount: Decimal, deal_id: uuid.UUID
+    ) -> LedgerEntry:
+        """Unfreezes user funds for a cancelled/released deal."""
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="deal", reference_id=deal_id, entry_type=LedgerEntryType.DEAL_RELEASE
+        )
+        if existing is not None:
+            return existing
+
+        wallet = await self._wallets.get_by_account_id_for_update(user_account_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        if wallet.frozen_balance < amount:
+            raise InsufficientBalanceError("frozen balance is insufficient to release deal funds")
+
+        available_before = wallet.available_balance
+        insurance_before = wallet.insurance_balance
+        frozen_before = wallet.frozen_balance
+
+        wallet.frozen_balance = frozen_before - amount
+        wallet.available_balance = available_before + amount
+        await self._wallets.save(wallet)
+
+        entry = LedgerEntry(
+            wallet_id=wallet.id,
+            account_id=user_account_id,
+            type=LedgerEntryType.DEAL_RELEASE,
+            balance_bucket=BalanceBucket.AVAILABLE,
+            currency=wallet.currency,
+            amount=amount,
+            available_before=available_before,
+            available_after=wallet.available_balance,
+            insurance_before=insurance_before,
+            insurance_after=wallet.insurance_balance,
+            frozen_before=frozen_before,
+            frozen_after=wallet.frozen_balance,
+            reference_type="deal",
+            reference_id=deal_id,
+            description="Release frozen funds for cancelled deal",
+            created_by_account_id=user_account_id,
+        )
+        return await self._ledger.create(entry)
+
+    async def settle_deal(
+        self,
+        *,
+        user_account_id: uuid.UUID,
+        merchant_account_id: uuid.UUID,
+        amount: Decimal,
+        deal_id: uuid.UUID,
+        actor_id: uuid.UUID | None = None,
+    ) -> tuple[LedgerEntry, LedgerEntry]:
+        """Settles completed deal: User frozen -= amount, Merchant available += amount."""
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        user_existing = await self._ledger.get_by_reference(
+            reference_type="deal", reference_id=deal_id, entry_type=LedgerEntryType.DEAL_SETTLEMENT
+        )
+        merchant_existing = await self._ledger.get_by_reference(
+            reference_type="deal",
+            reference_id=deal_id,
+            entry_type=LedgerEntryType.DEAL_SETTLEMENT_CREDIT,
+        )
+        if user_existing is not None and merchant_existing is not None:
+            return user_existing, merchant_existing
+
+        # Lock ordering: UserWallet then MerchantWallet
+        user_wallet = await self._wallets.get_by_account_id_for_update(user_account_id)
+        if user_wallet is None:
+            raise WalletNotFoundError()
+
+        merchant_wallet = await self._merchant_wallets.get_by_account_id_for_update(
+            merchant_account_id
+        )
+        if merchant_wallet is None:
+            raise WalletNotFoundError()
+
+        if user_wallet.frozen_balance < amount:
+            raise InsufficientBalanceError("insufficient frozen balance for deal settlement")
+
+        # 1. Update User wallet (frozen -= amount)
+        u_avail_before = user_wallet.available_balance
+        u_ins_before = user_wallet.insurance_balance
+        u_froz_before = user_wallet.frozen_balance
+
+        user_wallet.frozen_balance = u_froz_before - amount
+        await self._wallets.save(user_wallet)
+
+        user_entry = LedgerEntry(
+            wallet_id=user_wallet.id,
+            account_id=user_account_id,
+            type=LedgerEntryType.DEAL_SETTLEMENT,
+            balance_bucket=BalanceBucket.FROZEN,
+            currency=user_wallet.currency,
+            amount=-amount,
+            available_before=u_avail_before,
+            available_after=user_wallet.available_balance,
+            insurance_before=u_ins_before,
+            insurance_after=user_wallet.insurance_balance,
+            frozen_before=u_froz_before,
+            frozen_after=user_wallet.frozen_balance,
+            reference_type="deal",
+            reference_id=deal_id,
+            description="Settlement deduction from frozen balance",
+            created_by_account_id=actor_id,
+        )
+        user_entry = await self._ledger.create(user_entry)
+
+        # 2. Update Merchant wallet (available += amount)
+        m_avail_before = merchant_wallet.available_balance
+
+        merchant_wallet.available_balance = m_avail_before + amount
+        await self._merchant_wallets.save(merchant_wallet)
+
+        merchant_entry = LedgerEntry(
+            merchant_wallet_id=merchant_wallet.id,
+            account_id=merchant_account_id,
+            type=LedgerEntryType.DEAL_SETTLEMENT_CREDIT,
+            balance_bucket=BalanceBucket.AVAILABLE,
+            currency=merchant_wallet.currency,
+            amount=amount,
+            available_before=m_avail_before,
+            available_after=merchant_wallet.available_balance,
+            insurance_before=Decimal("0"),
+            insurance_after=Decimal("0"),
+            frozen_before=Decimal("0"),
+            frozen_after=Decimal("0"),
+            reference_type="deal",
+            reference_id=deal_id,
+            description="Settlement credit from completed deal",
+            created_by_account_id=actor_id,
+        )
+        merchant_entry = await self._ledger.create(merchant_entry)
+
+        return user_entry, merchant_entry
+
     async def credit_deposit(
         self, *, account_id: uuid.UUID, amount: Decimal, deposit_id: uuid.UUID
     ) -> LedgerEntry:
-        """Credits `amount` to available for a confirmed TRC20 deposit.
-        Insurance/frozen are untouched. Idempotent by (deposit_id,
-        DEPOSIT_CREDIT): a caller invoking this twice for the same deposit
-        (e.g. a replayed confirmation event) gets back the original ledger
-        entry instead of crediting twice.
-        """
         if not amount.is_finite() or amount <= 0:
             raise InvalidAmountError("amount must be a positive, finite number")
 
@@ -274,8 +417,6 @@ class WalletService:
         if not target.is_active:
             raise InactiveAccountError("cannot modify the wallet of an inactive account")
 
-        # Row-locked for the remainder of this transaction so a concurrent
-        # mutation on the same wallet has to wait instead of racing us.
         wallet = await self._wallets.get_by_account_id_for_update(target_account_id)
         if wallet is None:
             raise WalletNotFoundError()

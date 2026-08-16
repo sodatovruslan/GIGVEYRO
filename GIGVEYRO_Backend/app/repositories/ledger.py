@@ -13,7 +13,6 @@ class LedgerRepository:
         self._session = session
 
     async def create(self, entry: LedgerEntry) -> LedgerEntry:
-        # Append-only: there is deliberately no update()/delete() here.
         self._session.add(entry)
         await self._session.flush()
         await self._session.refresh(entry)
@@ -25,6 +24,17 @@ class LedgerRepository:
         result = await self._session.execute(
             select(LedgerEntry).where(
                 LedgerEntry.wallet_id == wallet_id,
+                LedgerEntry.idempotency_key == idempotency_key,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_merchant_wallet_and_idempotency_key(
+        self, merchant_wallet_id: uuid.UUID, idempotency_key: str
+    ) -> LedgerEntry | None:
+        result = await self._session.execute(
+            select(LedgerEntry).where(
+                LedgerEntry.merchant_wallet_id == merchant_wallet_id,
                 LedgerEntry.idempotency_key == idempotency_key,
             )
         )
