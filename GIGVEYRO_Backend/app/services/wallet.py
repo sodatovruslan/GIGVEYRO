@@ -180,6 +180,57 @@ class WalletService:
         )
         return await self._ledger.create(entry)
 
+    async def credit_deposit(
+        self, *, account_id: uuid.UUID, amount: Decimal, deposit_id: uuid.UUID
+    ) -> LedgerEntry:
+        """Credits `amount` to available for a confirmed TRC20 deposit.
+        Insurance/frozen are untouched. Idempotent by (deposit_id,
+        DEPOSIT_CREDIT): a caller invoking this twice for the same deposit
+        (e.g. a replayed confirmation event) gets back the original ledger
+        entry instead of crediting twice.
+        """
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="deposit",
+            reference_id=deposit_id,
+            entry_type=LedgerEntryType.DEPOSIT_CREDIT,
+        )
+        if existing is not None:
+            return existing
+
+        wallet = await self._wallets.get_by_account_id_for_update(account_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        available_before = wallet.available_balance
+        insurance_before = wallet.insurance_balance
+        frozen_before = wallet.frozen_balance
+
+        wallet.available_balance = available_before + amount
+        await self._wallets.save(wallet)
+
+        entry = LedgerEntry(
+            wallet_id=wallet.id,
+            account_id=account_id,
+            type=LedgerEntryType.DEPOSIT_CREDIT,
+            balance_bucket=BalanceBucket.AVAILABLE,
+            currency=wallet.currency,
+            amount=amount,
+            available_before=available_before,
+            available_after=wallet.available_balance,
+            insurance_before=insurance_before,
+            insurance_after=wallet.insurance_balance,
+            frozen_before=frozen_before,
+            frozen_after=wallet.frozen_balance,
+            reference_type="deposit",
+            reference_id=deposit_id,
+            description="Credit for confirmed TRC20 deposit",
+            created_by_account_id=None,
+        )
+        return await self._ledger.create(entry)
+
     async def manual_adjust(
         self,
         *,
