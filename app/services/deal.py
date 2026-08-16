@@ -7,8 +7,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.enums.account import UserRole
+from app.enums.appeal import AppealReason
 from app.enums.deal import DealStatus
 from app.models.account import Account
+from app.models.appeal import DealAppeal
 from app.models.deal import Deal
 from app.repositories.account import AccountRepository
 from app.repositories.deal import DealRepository
@@ -104,6 +106,7 @@ class DealService:
         account_repository: AccountRepository,
         wallet_service: WalletService,
         rate_provider: ExchangeRateProvider,
+        appeal_service=None,
     ):
         self._deals = deal_repository
         self._requisites = requisite_repository
@@ -111,6 +114,7 @@ class DealService:
         self._accounts = account_repository
         self._wallet_service = wallet_service
         self._rate_provider = rate_provider
+        self._appeal_service = appeal_service
 
     # -- MERCHANT -------------------------------------------------------
 
@@ -155,6 +159,35 @@ class DealService:
         )
         total = await self._deals.count_for_merchant(merchant_id, status=status)
         return items, total
+
+    async def mark_paid_by_merchant(
+        self,
+        merchant_id: uuid.UUID,
+        deal_id: uuid.UUID,
+        *,
+        payment_reference: str | None = None,
+        payment_note: str | None = None,
+    ) -> Deal:
+        deal = await self._deals.get_by_id_for_update(deal_id)
+        if deal is None or deal.merchant_id != merchant_id:
+            raise DealNotFoundError()
+
+        if deal.status == DealStatus.PAYMENT_PENDING:
+            return deal
+
+        if deal.status != DealStatus.ACCEPTED:
+            raise InvalidDealTransitionError(
+                f"cannot mark paid for deal in status {deal.status}"
+            )
+
+        deal.merchant_marked_paid_at = datetime.now(UTC)
+        if payment_reference:
+            deal.payment_reference = payment_reference.strip()
+        if payment_note:
+            deal.payment_note = payment_note.strip()
+
+        transition_deal(deal, DealStatus.PAYMENT_PENDING)
+        return await self._deals.save(deal)
 
     # -- USER -------------------------------------------------------------
 
@@ -218,6 +251,73 @@ class DealService:
         transition_deal(deal, DealStatus.ACCEPTED)
 
         return await self._deals.save(deal)
+
+    async def confirm_received_by_user(self, user: Account, deal_id: uuid.UUID) -> Deal:
+        deal = await self._deals.get_by_id_for_update(deal_id)
+        if deal is None or deal.user_id != user.id:
+            raise DealNotFoundError()
+
+        if deal.status == DealStatus.COMPLETED:
+            return deal
+
+        if deal.status != DealStatus.PAYMENT_PENDING:
+            raise InvalidDealTransitionError(
+                f"cannot confirm received for deal in status {deal.status}"
+            )
+
+        if deal.amount_usdt is None:
+            raise InvalidDealTransitionError("deal is missing amount_usdt")
+
+        await self._wallet_service.settle_deal(
+            user_account_id=user.id,
+            merchant_account_id=deal.merchant_id,
+            amount=deal.amount_usdt,
+            deal_id=deal.id,
+            actor_id=user.id,
+        )
+
+        deal.user_confirmed_received_at = datetime.now(UTC)
+        transition_deal(deal, DealStatus.COMPLETED)
+        return await self._deals.save(deal)
+
+    async def report_payment_problem_by_user(
+        self,
+        user: Account,
+        deal_id: uuid.UUID,
+        *,
+        reason_code: AppealReason,
+        message: str,
+    ) -> tuple[Deal, DealAppeal | None]:
+        deal = await self._deals.get_by_id_for_update(deal_id)
+        if deal is None or deal.user_id != user.id:
+            raise DealNotFoundError()
+
+        if deal.status == DealStatus.DISPUTED:
+            appeal = None
+            if self._appeal_service is not None:
+                appeal = await self._appeal_service.get_for_participant(user, deal.id)
+            return deal, appeal
+
+        if deal.status != DealStatus.PAYMENT_PENDING:
+            raise InvalidDealTransitionError(
+                f"cannot report payment problem for deal in status {deal.status}"
+            )
+
+        deal.user_rejected_payment_at = datetime.now(UTC)
+
+        appeal = None
+        if self._appeal_service is not None:
+            appeal = await self._appeal_service.open_appeal(
+                user,
+                deal_id=deal.id,
+                reason_code=reason_code,
+                message=message,
+            )
+        else:
+            transition_deal(deal, DealStatus.DISPUTED)
+            await self._deals.save(deal)
+
+        return deal, appeal
 
     # -- STAGE 9: SETTLEMENT & RELEASE ----------------------------------
 
