@@ -28,5 +28,12 @@ class Settings(BaseSettings):
     # provider without DealService needing to change.
     DEMO_USDT_TJS_RATE: Decimal = Decimal("10.90")
 
+    # Mock/dev placeholder - NOT a real wallet address. One shared address
+    # for all USER deposits; see the Stage 8 report for why this requires a
+    # Deposit Intent correlation model rather than amount-based matching.
+    USDT_TRC20_DEPOSIT_ADDRESS: str = "TMOCK_GIGVEYRO_DEPOSIT_ADDRESS"
+    DEPOSIT_TTL_MINUTES: int = 30
+    TRC20_REQUIRED_CONFIRMATIONS: int = 20
+
 
 settings = Settings()
