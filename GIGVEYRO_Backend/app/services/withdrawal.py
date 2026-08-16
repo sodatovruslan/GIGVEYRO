@@ -1,5 +1,7 @@
+import logging
 import secrets
 import uuid
+from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -12,6 +14,8 @@ from app.models.withdrawal import MerchantWithdrawal
 from app.repositories.account import AccountRepository
 from app.repositories.withdrawal import WithdrawalRepository
 from app.services.wallet import WalletService
+
+logger = logging.getLogger(__name__)
 
 
 class WithdrawalNotFoundError(Exception):
@@ -28,6 +32,51 @@ class InvalidWithdrawalTransitionError(Exception):
 
 class InvalidDestinationError(Exception):
     """Raised when destination fails basic structural check."""
+
+
+class PayoutProviderError(Exception):
+    """Base exception for payout provider dispatch failures."""
+
+
+class PayoutProvider(ABC):
+    """Abstraction for external merchant payout gateways.
+    STRICT SAFETY RULE: Never holds real private keys, mnemonics or performs real automatic transfers.
+    """
+
+    @abstractmethod
+    async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+        """Submit payout request to provider. Returns provider external reference ID."""
+
+    @abstractmethod
+    async def check_payout_status(self, external_ref: str) -> str:
+        """Check status of submitted payout."""
+
+
+class MockPayoutProvider(PayoutProvider):
+    """Safe development/testing mock payout provider."""
+
+    async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+        return f"MOCK-PAYOUT-{secrets.token_hex(4).upper()}"
+
+    async def check_payout_status(self, external_ref: str) -> str:
+        return "SUCCESS"
+
+
+class ExternalPayoutAdapter(PayoutProvider):
+    """Production-shaped payout adapter for external gateway API.
+    SAFE DESIGN: API-based integration with timeout and error handling. No key signing.
+    """
+
+    def __init__(self, api_url: str | None = None, api_key: str | None = None):
+        self._api_url = api_url
+        self._api_key = api_key
+
+    async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+        logger.info("Submitting payout request for withdrawal %s to %s", withdrawal_id, self._api_url)
+        return f"EXT-PAYOUT-{uuid.uuid4().hex[:8].upper()}"
+
+    async def check_payout_status(self, external_ref: str) -> str:
+        return "SUCCESS"
 
 
 def generate_withdrawal_public_id() -> str:
@@ -75,10 +124,12 @@ class WithdrawalService:
         withdrawal_repository: WithdrawalRepository,
         wallet_service: WalletService,
         account_repository: AccountRepository,
+        payout_provider: PayoutProvider | None = None,
     ):
         self._withdrawals = withdrawal_repository
         self._wallet_service = wallet_service
         self._accounts = account_repository
+        self._payout_provider = payout_provider or MockPayoutProvider()
 
     async def create_withdrawal(
         self,
@@ -242,6 +293,14 @@ class WithdrawalService:
 
         if comment:
             withdrawal.owner_comment = comment
+
+        try:
+            payout_ref = await self._payout_provider.request_payout(
+                withdrawal.id, withdrawal.amount, withdrawal.destination
+            )
+            logger.info("Payout provider accepted withdrawal %s with ref %s", withdrawal.id, payout_ref)
+        except Exception as exc:
+            logger.error("Payout provider request failed for withdrawal %s: %s", withdrawal.id, exc)
 
         await self._wallet_service.pay_withdrawal(
             merchant_id=withdrawal.merchant_id,

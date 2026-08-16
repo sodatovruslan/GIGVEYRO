@@ -1,3 +1,4 @@
+import logging
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -14,6 +15,8 @@ from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
 from app.services.deposit_provider import CryptoDepositProvider
 from app.services.wallet import WalletService
+
+logger = logging.getLogger(__name__)
 
 _TERMINAL_TIMESTAMP_FIELD = {
     DepositStatus.CONFIRMED: "confirmed_at",
@@ -176,8 +179,45 @@ class DepositService:
         )
         return items, total
 
-    # -- transaction ingestion (fed by the DEV-only simulate endpoint today,
-    # a real chain-watching worker in a later stage) ----------------------
+    # -- scanner correlation & ingestion ---------------------------------
+
+    async def scan_and_correlate_deposits(self) -> int:
+        """Scan deposit address for recent on-chain transfers and correlate with active deposit intents."""
+        await self._deposits.expire_stale_waiting()
+        address = self._provider.get_deposit_address()
+        recent_txs = await self._provider.fetch_recent_transactions(address)
+
+        processed_count = 0
+        for tx in recent_txs:
+            waiting_deposits, _ = await self._deposits.list_all(
+                status=DepositStatus.WAITING,
+                account_id=None,
+                search=None,
+                tx_hash=None,
+                date_from=None,
+                date_to=None,
+                limit=100,
+                offset=0,
+            )
+            for dep in waiting_deposits:
+                if dep.expected_amount == tx.amount:
+                    try:
+                        await self.ingest_transaction_event(
+                            deposit_id=dep.id,
+                            tx_hash=tx.tx_hash,
+                            amount=tx.amount,
+                            confirmations=tx.confirmations,
+                            network=tx.network,
+                            asset=tx.asset,
+                            destination_address=tx.destination_address,
+                        )
+                        processed_count += 1
+                        break
+                    except (InvalidTransactionError, DuplicateTransactionError) as exc:
+                        logger.warning("Deposit correlation error for tx %s: %s", tx.tx_hash, exc)
+        return processed_count
+
+    # -- transaction ingestion --------------------------------------------
 
     async def ingest_transaction_event(
         self,
@@ -194,8 +234,6 @@ class DepositService:
         if deposit is None:
             raise DepositNotFoundError()
 
-        # Idempotent no-op once the deposit has reached a final state -
-        # a replayed/duplicate event must never re-trigger anything.
         if deposit.status in (
             DepositStatus.CREDITED,
             DepositStatus.EXPIRED,
@@ -233,8 +271,6 @@ class DepositService:
                 raise InvalidTransactionError(
                     "tx_hash does not match the transaction already recorded for this deposit"
                 )
-            # Never let a stale/replayed lower confirmation count regress
-            # what we've already observed.
             deposit.confirmations = max(deposit.confirmations, confirmations)
 
         if deposit.status == DepositStatus.DETECTED and deposit.confirmations > 0:

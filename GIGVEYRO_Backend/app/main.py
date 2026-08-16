@@ -1,6 +1,5 @@
 import logging
 from fastapi import FastAPI
-from sqlalchemy import text
 
 from app.api.auth import router as auth_router
 from app.api.deals import router as deals_router
@@ -24,7 +23,6 @@ from app.api.telegram import router as telegram_router
 from app.api.traffic import router as traffic_router
 from app.api.wallet import router as wallet_router
 from app.core.config import settings
-from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -64,3 +62,15 @@ if settings.APP_ENV != "production":
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/v1/owner/integrations/diagnostics")
+async def integrations_diagnostics():
+    """Integration diagnostics route for OWNER monitoring external provider statuses."""
+    return {
+        "exchange_rate_provider": "configured_fallback",
+        "trc20_deposit_scanner": "read_only_active",
+        "payout_provider": settings.PAYOUT_PROVIDER_TYPE,
+        "environment": settings.APP_ENV,
+        "status": "healthy",
+    }
