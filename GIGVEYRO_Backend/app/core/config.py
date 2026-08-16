@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "GIGVEYRO"
     APP_ENV: str = "development"
     DEBUG: bool = False
+    DOCS_ENABLED: bool = True
     DATABASE_URL: str
 
     JWT_SECRET_KEY: str
@@ -24,6 +26,16 @@ class Settings(BaseSettings):
 
     DEAL_TTL_MINUTES: int = 30
     DEMO_USDT_TJS_RATE: Decimal = Decimal("10.90")
+
+    # Security & CORS Settings
+    CORS_ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "test"]
+
+    # Rate Limiting Settings
+    LOGIN_RATE_LIMIT_REQUESTS: int = 5
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    DEFAULT_RATE_LIMIT_REQUESTS: int = 100
+    DEFAULT_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
     # Provider Selector Settings
     DEPOSIT_PROVIDER_TYPE: str = "mock"  # "mock" or "trongrid"
@@ -51,6 +63,17 @@ class Settings(BaseSettings):
     # Payout Provider Settings
     PAYOUT_API_URL: str = "https://api.payout-provider-mock.internal"
     PAYOUT_API_KEY: str = ""
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.APP_ENV == "production":
+            if self.DEBUG:
+                raise ValueError("DEBUG must be False in production")
+            if "CHANGE_ME" in self.JWT_SECRET_KEY or len(self.JWT_SECRET_KEY) < 32:
+                raise ValueError("JWT_SECRET_KEY must be strong (>=32 chars) in production")
+            if "*" in self.CORS_ALLOWED_ORIGINS:
+                raise ValueError("Wildcard CORS origins are forbidden in production")
+        return self
 
 
 settings = Settings()

@@ -1,4 +1,5 @@
 from app.models.account import Account
+from app.models.audit import AuditLog
 from app.models.deal import Deal
 from app.models.deposit import Deposit, UnmatchedTransfer
 from app.models.ledger import LedgerEntry
@@ -8,6 +9,7 @@ from app.models.wallet import UserWallet
 
 __all__ = [
     "Account",
+    "AuditLog",
     "Deal",
     "Deposit",
     "UnmatchedTransfer",
