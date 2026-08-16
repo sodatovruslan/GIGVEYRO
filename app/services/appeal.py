@@ -11,7 +11,7 @@ from app.models.account import Account
 from app.models.appeal import DealAppeal
 from app.repositories.appeal import AppealRepository
 from app.repositories.deal import DealRepository
-from app.services.deal import transition_deal
+from app.services.deal import DealNotFoundError, transition_deal
 from app.services.wallet import WalletService
 
 
@@ -19,8 +19,8 @@ class AppealNotFoundError(Exception):
     """Raised when an appeal is not found or not accessible."""
 
 
-class AppealNotEligibleError(Exception):
-    """Raised when a deal is not eligible for opening an appeal."""
+class AppealNotAllowedError(Exception):
+    """Raised when a deal is not eligible or action is not allowed."""
 
 
 class ActiveAppealExistsError(Exception):
@@ -67,30 +67,30 @@ class AppealService:
         account: Account,
         *,
         deal_id: uuid.UUID,
-        reason: AppealReason,
-        description: str,
+        reason_code: AppealReason,
+        message: str,
     ) -> DealAppeal:
         deal = await self._deals.get_by_id_for_update(deal_id)
         if deal is None:
-            raise AppealNotFoundError("deal not found")
+            raise DealNotFoundError("deal not found")
 
         if account.role == UserRole.USER:
             if deal.user_id != account.id:
-                raise AppealNotFoundError("deal not found")
+                raise DealNotFoundError("deal not found")
         elif account.role == UserRole.MERCHANT:
             if deal.merchant_id != account.id:
-                raise AppealNotFoundError("deal not found")
+                raise DealNotFoundError("deal not found")
         else:
-            raise AppealNotEligibleError("only participating USER or merchant can open appeal")
+            raise AppealNotAllowedError("only participating USER or MERCHANT can open appeal")
 
         if deal.status not in (DealStatus.ACCEPTED, DealStatus.PAYMENT_PENDING):
-            raise AppealNotEligibleError(
+            raise AppealNotAllowedError(
                 f"cannot open appeal for deal in status {deal.status}"
             )
 
-        active_appeal = await self._appeals.get_active_for_deal(deal.id)
+        active_appeal = await self._appeals.get_active_by_deal_id(deal.id)
         if active_appeal is not None:
-            raise ActiveAppealExistsError("an active appeal already exists for this deal")
+            raise AppealNotAllowedError("an active appeal already exists for this deal")
 
         previous_status = deal.status
 
@@ -101,8 +101,8 @@ class AppealService:
                 deal_id=deal.id,
                 opened_by_account_id=account.id,
                 opened_by_role=account.role,
-                reason=reason,
-                description=description,
+                reason_code=reason_code,
+                message=message,
                 status=AppealStatus.OPEN,
                 previous_deal_status=previous_status,
             )
@@ -112,7 +112,7 @@ class AppealService:
             except IntegrityError as exc:
                 last_error = exc
         else:
-            raise ActiveAppealExistsError("an active appeal already exists for this deal") from last_error
+            raise AppealNotAllowedError("an active appeal already exists for this deal") from last_error
 
         transition_deal(deal, DealStatus.DISPUTED)
         await self._deals.save(deal)
@@ -142,24 +142,24 @@ class AppealService:
 
         return await self._appeals.save(appeal)
 
-    async def get_for_account(self, account_id: uuid.UUID, appeal_id: uuid.UUID) -> DealAppeal:
+    async def get_for_participant(self, account: Account, appeal_id: uuid.UUID) -> DealAppeal:
         appeal = await self._appeals.get_by_id(appeal_id)
-        if appeal is None or appeal.opened_by_account_id != account_id:
+        if appeal is None or appeal.opened_by_account_id != account.id:
             raise AppealNotFoundError("appeal not found")
         return appeal
 
-    async def list_for_account(
-        self, account_id: uuid.UUID, *, status: AppealStatus | None, limit: int, offset: int
+    async def list_for_participant(
+        self, account: Account, *, status: AppealStatus | None, limit: int, offset: int
     ) -> tuple[list[DealAppeal], int]:
         items = await self._appeals.list_for_account(
-            account_id, status=status, limit=limit, offset=offset
+            account.id, status=status, limit=limit, offset=offset
         )
-        total = await self._appeals.count_for_account(account_id, status=status)
+        total = await self._appeals.count_for_account(account.id, status=status)
         return items, total
 
     # -- OWNER ACTIONS ----------------------------------------------------
 
-    async def review_by_owner(
+    async def take_under_review(
         self, owner_id: uuid.UUID, appeal_id: uuid.UUID, owner_note: str | None = None
     ) -> DealAppeal:
         appeal = await self._appeals.get_by_id_for_update(appeal_id)
@@ -183,7 +183,7 @@ class AppealService:
         transition_appeal(appeal, AppealStatus.UNDER_REVIEW)
         return await self._appeals.save(appeal)
 
-    async def resolve_by_owner(
+    async def resolve_appeal(
         self,
         owner_id: uuid.UUID,
         appeal_id: uuid.UUID,
@@ -207,7 +207,7 @@ class AppealService:
         if deal is None or deal.user_id is None or deal.amount_usdt is None:
             raise AppealNotFoundError("associated deal is invalid")
 
-        if resolution == AppealResolution.MERCHANT_WINS:
+        if resolution == AppealResolution.SETTLE_TO_MERCHANT:
             await self._wallet_service.settle_deal(
                 user_account_id=deal.user_id,
                 merchant_account_id=deal.merchant_id,
@@ -216,7 +216,7 @@ class AppealService:
                 actor_id=owner_id,
             )
             transition_deal(deal, DealStatus.COMPLETED)
-        elif resolution == AppealResolution.USER_WINS:
+        elif resolution == AppealResolution.RELEASE_TO_USER:
             await self._wallet_service.release_for_deal(
                 user_account_id=deal.user_id,
                 amount=deal.amount_usdt,
