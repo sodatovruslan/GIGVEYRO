@@ -88,8 +88,3 @@ def downgrade() -> None:
 
     op.drop_constraint('ck_merchant_wallets_held_non_negative', 'merchant_wallets', type_='check')
     op.drop_column('merchant_wallets', 'held_balance')
-```
-
-### 14. Комплексные интеграционные и конкурентные тесты для Stage 10 (`tests/test_stage10_withdrawals.py`)
-
-GIGVEYRO_Backend/tests/test_stage10_withdrawals.py
