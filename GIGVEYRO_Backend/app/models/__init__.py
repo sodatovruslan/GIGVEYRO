@@ -1,6 +1,6 @@
 from app.models.account import Account
 from app.models.deal import Deal
-from app.models.deposit import Deposit
+from app.models.deposit import Deposit, UnmatchedTransfer
 from app.models.ledger import LedgerEntry
 from app.models.payment_requisite import PaymentRequisite
 from app.models.traffic import UserTrafficSettings
@@ -10,6 +10,7 @@ __all__ = [
     "Account",
     "Deal",
     "Deposit",
+    "UnmatchedTransfer",
     "LedgerEntry",
     "PaymentRequisite",
     "UserTrafficSettings",

@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import settings
 from app.enums.account import UserRole
 from app.enums.withdrawal import WithdrawalDestinationType, WithdrawalStatus
 from app.models.account import Account
@@ -38,6 +39,10 @@ class PayoutProviderError(Exception):
     """Base exception for payout provider dispatch failures."""
 
 
+class PayoutDisabledError(PayoutProviderError):
+    """Raised when payout execution is triggered but PAYOUT_ENABLED is False."""
+
+
 class PayoutProvider(ABC):
     """Abstraction for external merchant payout gateways.
     STRICT SAFETY RULE: Never holds real private keys, mnemonics or performs real automatic transfers.
@@ -53,9 +58,10 @@ class PayoutProvider(ABC):
 
 
 class MockPayoutProvider(PayoutProvider):
-    """Safe development/testing mock payout provider."""
-
     async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+        if not settings.PAYOUT_ENABLED:
+            logger.info("PAYOUT_ENABLED is False. Safe mock payout recorded without external call.")
+            return f"MOCK-PAYOUT-SAFETY-DISABLED-{secrets.token_hex(4).upper()}"
         return f"MOCK-PAYOUT-{secrets.token_hex(4).upper()}"
 
     async def check_payout_status(self, external_ref: str) -> str:
@@ -63,15 +69,13 @@ class MockPayoutProvider(PayoutProvider):
 
 
 class ExternalPayoutAdapter(PayoutProvider):
-    """Production-shaped payout adapter for external gateway API.
-    SAFE DESIGN: API-based integration with timeout and error handling. No key signing.
-    """
-
     def __init__(self, api_url: str | None = None, api_key: str | None = None):
         self._api_url = api_url
         self._api_key = api_key
 
     async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+        if not settings.PAYOUT_ENABLED:
+            raise PayoutDisabledError("Real/external payout is disabled by safety configuration (PAYOUT_ENABLED=False)")
         logger.info("Submitting payout request for withdrawal %s to %s", withdrawal_id, self._api_url)
         return f"EXT-PAYOUT-{uuid.uuid4().hex[:8].upper()}"
 
@@ -224,8 +228,6 @@ class WithdrawalService:
         )
         total = await self._withdrawals.count_for_merchant(merchant_id, status=status)
         return items, total
-
-    # -- OWNER ACTIONS ----------------------------------------------------
 
     async def approve_by_owner(
         self, owner_id: uuid.UUID, withdrawal_id: uuid.UUID, comment: str | None = None

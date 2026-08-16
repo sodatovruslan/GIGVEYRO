@@ -23,10 +23,13 @@ class Settings(BaseSettings):
     MAX_ACTIVE_REQUISITES_PER_USER: int = 10
 
     DEAL_TTL_MINUTES: int = 30
-    # Demo/dev-only fixed rate - NOT a production exchange rate source.
-    # A later stage will replace ConfiguredExchangeRateProvider with a live
-    # provider without DealService needing to change.
     DEMO_USDT_TJS_RATE: Decimal = Decimal("10.90")
+
+    # Provider Selector Settings
+    DEPOSIT_PROVIDER_TYPE: str = "mock"  # "mock" or "trongrid"
+    EXCHANGE_RATE_PROVIDER_TYPE: str = "fallback"  # "configured", "external", "fallback"
+    PAYOUT_PROVIDER_TYPE: str = "mock"  # "mock" or "external_adapter"
+    PAYOUT_ENABLED: bool = False  # Production safety switch - Disabled by default!
 
     # Exchange Rate External API Provider Settings
     EXCHANGE_RATE_API_URL: str = "https://api.binance.com/api/v3/ticker/price?symbol=USDTUAH"
@@ -34,9 +37,8 @@ class Settings(BaseSettings):
     EXCHANGE_RATE_MAX_RETRIES: int = 3
     EXCHANGE_RATE_CACHE_TTL_SECONDS: int = 60
 
-    # Mock/dev placeholder - NOT a real wallet address. One shared address
-    # for all USER deposits; see the Stage 8 report for why this requires a
-    # Deposit Intent correlation model rather than amount-based matching.
+    # USDT TRC20 & TRON Settings
+    USDT_TRC20_CONTRACT_ADDRESS: str = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
     USDT_TRC20_DEPOSIT_ADDRESS: str = "TMOCK_GIGVEYRO_DEPOSIT_ADDRESS"
     DEPOSIT_TTL_MINUTES: int = 30
     TRC20_REQUIRED_CONFIRMATIONS: int = 20
@@ -46,8 +48,7 @@ class Settings(BaseSettings):
     TRONGRID_API_KEY: str = ""
     TRON_SCANNER_TIMEOUT_SECONDS: float = 10.0
 
-    # Payout Provider Mock / Adapter Settings
-    PAYOUT_PROVIDER_TYPE: str = "mock"  # "mock" or "external_adapter"
+    # Payout Provider Settings
     PAYOUT_API_URL: str = "https://api.payout-provider-mock.internal"
     PAYOUT_API_KEY: str = ""
 

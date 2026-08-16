@@ -8,9 +8,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.enums.account import UserRole
-from app.enums.deposit import DepositAsset, DepositNetwork, DepositStatus
+from app.enums.deposit import CorrelationStatus, DepositAsset, DepositNetwork, DepositStatus
 from app.models.account import Account
-from app.models.deposit import Deposit
+from app.models.deposit import Deposit, UnmatchedTransfer
 from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
 from app.services.deposit_provider import CryptoDepositProvider
@@ -46,8 +46,7 @@ ALLOWED_TRANSITIONS: dict[DepositStatus, set[DepositStatus]] = {
 
 
 class DepositNotFoundError(Exception):
-    """Covers a missing deposit and one that exists but isn't visible to
-    the caller (wrong account) - one safe 404 either way."""
+    """Covers a missing deposit and one that exists but isn't visible to the caller."""
 
 
 class DepositNotAllowedError(Exception):
@@ -59,8 +58,7 @@ class InvalidDepositTransitionError(Exception):
 
 
 class InvalidTransactionError(Exception):
-    """Raised when an ingested transaction event fails a structural check
-    (wrong network/asset/destination, missing tx_hash, bad amount)."""
+    """Raised when an ingested transaction event fails a structural check."""
 
 
 class DuplicateTransactionError(Exception):
@@ -95,8 +93,6 @@ class DepositService:
         self._wallet_service = wallet_service
         self._provider = provider
 
-    # -- USER ---------------------------------------------------------------
-
     async def create_deposit_intent(self, account: Account, *, amount: Decimal) -> Deposit:
         if account.role != UserRole.USER:
             raise DepositNotAllowedError("only USER accounts can create deposits")
@@ -122,7 +118,7 @@ class DepositService:
                 return await self._deposits.create(deposit)
             except IntegrityError as exc:
                 last_error = exc
-        raise last_error  # pragma: no cover - astronomically unlikely
+        raise last_error
 
     async def get_own(self, account_id: uuid.UUID, deposit_id: uuid.UUID) -> Deposit:
         deposit = await self._get_or_raise(deposit_id)
@@ -139,8 +135,6 @@ class DepositService:
         )
         total = await self._deposits.count_for_account(account_id, status=status)
         return items, total
-
-    # -- OWNER (read-only) ------------------------------------------------
 
     async def get_for_owner(self, deposit_id: uuid.UUID) -> Deposit:
         deposit = await self._get_or_raise(deposit_id)
@@ -179,8 +173,6 @@ class DepositService:
         )
         return items, total
 
-    # -- scanner correlation & ingestion ---------------------------------
-
     async def scan_and_correlate_deposits(self) -> int:
         """Scan deposit address for recent on-chain transfers and correlate with active deposit intents."""
         await self._deposits.expire_stale_waiting()
@@ -189,6 +181,31 @@ class DepositService:
 
         processed_count = 0
         for tx in recent_txs:
+            if not tx.is_success:
+                continue
+            if tx.asset_contract != settings.USDT_TRC20_CONTRACT_ADDRESS:
+                continue
+            if tx.to_address != address:
+                continue
+
+            existing_dep = await self._deposits.get_by_tx_hash(tx.tx_hash)
+            if existing_dep:
+                await self.ingest_transaction_event(
+                    deposit_id=existing_dep.id,
+                    tx_hash=tx.tx_hash,
+                    amount=tx.amount,
+                    confirmations=tx.confirmations,
+                    network=tx.network,
+                    asset=DepositAsset.USDT,
+                    destination_address=tx.to_address,
+                )
+                processed_count += 1
+                continue
+
+            existing_unmatched = await self._deposits.get_unmatched_by_tx_hash(tx.tx_hash)
+            if existing_unmatched:
+                continue
+
             waiting_deposits, _ = await self._deposits.list_all(
                 status=DepositStatus.WAITING,
                 account_id=None,
@@ -199,25 +216,50 @@ class DepositService:
                 limit=100,
                 offset=0,
             )
-            for dep in waiting_deposits:
-                if dep.expected_amount == tx.amount:
-                    try:
-                        await self.ingest_transaction_event(
-                            deposit_id=dep.id,
-                            tx_hash=tx.tx_hash,
-                            amount=tx.amount,
-                            confirmations=tx.confirmations,
-                            network=tx.network,
-                            asset=tx.asset,
-                            destination_address=tx.destination_address,
-                        )
-                        processed_count += 1
-                        break
-                    except (InvalidTransactionError, DuplicateTransactionError) as exc:
-                        logger.warning("Deposit correlation error for tx %s: %s", tx.tx_hash, exc)
-        return processed_count
 
-    # -- transaction ingestion --------------------------------------------
+            matching_deps = [d for d in waiting_deposits if d.expected_amount == tx.amount]
+
+            if len(matching_deps) == 0:
+                await self._deposits.create_unmatched_transfer(
+                    UnmatchedTransfer(
+                        tx_hash=tx.tx_hash,
+                        from_address=tx.from_address,
+                        to_address=tx.to_address,
+                        amount=tx.amount,
+                        asset_contract=tx.asset_contract,
+                        correlation_status=CorrelationStatus.UNMATCHED,
+                        reason="No WAITING Deposit Intent matching amount found",
+                    )
+                )
+            elif len(matching_deps) > 1:
+                await self._deposits.create_unmatched_transfer(
+                    UnmatchedTransfer(
+                        tx_hash=tx.tx_hash,
+                        from_address=tx.from_address,
+                        to_address=tx.to_address,
+                        amount=tx.amount,
+                        asset_contract=tx.asset_contract,
+                        correlation_status=CorrelationStatus.AMBIGUOUS,
+                        reason=f"Ambiguous match: {len(matching_deps)} WAITING deposits share the same amount",
+                    )
+                )
+            else:
+                dep = matching_deps[0]
+                try:
+                    await self.ingest_transaction_event(
+                        deposit_id=dep.id,
+                        tx_hash=tx.tx_hash,
+                        amount=tx.amount,
+                        confirmations=tx.confirmations,
+                        network=tx.network,
+                        asset=DepositAsset.USDT,
+                        destination_address=tx.to_address,
+                    )
+                    processed_count += 1
+                except (InvalidTransactionError, DuplicateTransactionError) as exc:
+                    logger.warning("Deposit correlation error for tx %s: %s", tx.tx_hash, exc)
+
+        return processed_count
 
     async def ingest_transaction_event(
         self,

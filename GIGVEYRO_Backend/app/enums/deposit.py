@@ -18,3 +18,9 @@ class DepositNetwork(StrEnum):
 
 class DepositAsset(StrEnum):
     USDT = "USDT"
+
+
+class CorrelationStatus(StrEnum):
+    MATCHED = "MATCHED"
+    AMBIGUOUS = "AMBIGUOUS"
+    UNMATCHED = "UNMATCHED"

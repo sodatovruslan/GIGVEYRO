@@ -14,19 +14,16 @@ logger = logging.getLogger(__name__)
 class OnChainTransactionDTO:
     tx_hash: str
     network: DepositNetwork
-    asset: DepositAsset
-    destination_address: str
+    asset_contract: str
+    from_address: str
+    to_address: str
     amount: Decimal
     confirmations: int
-    block_timestamp: datetime
+    is_success: bool
+    timestamp: datetime
 
 
 class CryptoDepositProvider(ABC):
-    """DepositService only depends on this abstraction, and only for the
-    one thing it actually needs at intent-creation time: the current
-    platform deposit address. It has no knowledge of Wallet/Ledger.
-    """
-
     @abstractmethod
     def get_deposit_address(self) -> str:
         """The platform's single shared deposit address for this asset/network."""
@@ -37,8 +34,6 @@ class CryptoDepositProvider(ABC):
 
 
 class MockTRC20DepositProvider(CryptoDepositProvider):
-    """Development/test provider - NOT connected to any real blockchain."""
-
     def __init__(self):
         self._simulated_txs: list[OnChainTransactionDTO] = []
 
@@ -49,14 +44,10 @@ class MockTRC20DepositProvider(CryptoDepositProvider):
         self._simulated_txs.append(tx)
 
     async def fetch_recent_transactions(self, address: str) -> list[OnChainTransactionDTO]:
-        return [tx for tx in self._simulated_txs if tx.destination_address == address]
+        return [tx for tx in self._simulated_txs if tx.to_address == address]
 
 
 class TronGridTRC20DepositProvider(CryptoDepositProvider):
-    """Production-shaped read-only TRON / TRC20 scanner provider.
-    Strictly READ-ONLY: never holds private keys, never signs or broadcasts txs.
-    """
-
     def __init__(self, api_url: str | None = None, api_key: str | None = None):
         self._api_url = api_url or settings.TRONGRID_API_URL
         self._api_key = api_key or settings.TRONGRID_API_KEY
@@ -65,7 +56,6 @@ class TronGridTRC20DepositProvider(CryptoDepositProvider):
         return settings.USDT_TRC20_DEPOSIT_ADDRESS
 
     async def fetch_recent_transactions(self, address: str) -> list[OnChainTransactionDTO]:
-        """Fetch read-only transfer events from TronGrid / Tron node API."""
         if not address:
             return []
 

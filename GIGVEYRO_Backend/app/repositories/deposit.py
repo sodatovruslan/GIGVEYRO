@@ -5,7 +5,7 @@ from sqlalchemy import Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.deposit import DepositStatus
-from app.models.deposit import Deposit
+from app.models.deposit import Deposit, UnmatchedTransfer
 
 
 class DepositRepository:
@@ -36,10 +36,19 @@ class DepositRepository:
         await self._session.refresh(deposit)
         return deposit
 
+    async def create_unmatched_transfer(self, transfer: UnmatchedTransfer) -> UnmatchedTransfer:
+        self._session.add(transfer)
+        await self._session.flush()
+        await self._session.refresh(transfer)
+        return transfer
+
+    async def get_unmatched_by_tx_hash(self, tx_hash: str) -> UnmatchedTransfer | None:
+        result = await self._session.execute(
+            select(UnmatchedTransfer).where(UnmatchedTransfer.tx_hash == tx_hash)
+        )
+        return result.scalar_one_or_none()
+
     async def expire_stale_waiting(self) -> None:
-        """Bulk-flip WAITING deposits past their intent TTL to EXPIRED.
-        Anything already detected has moved off WAITING already, so this
-        can never expire a deposit whose transaction has been seen."""
         await self._session.execute(
             update(Deposit)
             .where(Deposit.status == DepositStatus.WAITING, Deposit.expires_at <= func.now())

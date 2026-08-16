@@ -9,16 +9,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from app.db.base import Base
-from app.enums.deposit import DepositAsset, DepositNetwork, DepositStatus
+from app.enums.deposit import CorrelationStatus, DepositAsset, DepositNetwork, DepositStatus
 from app.models.wallet import MONEY
 
 
 class Deposit(Base):
     """A USER's intent to deposit USDT/TRC20 to the platform's single
-    shared address, plus the (mock, in Stage 8) on-chain transaction later
-    matched to it by deposit_id. See the Stage 8 report for why a shared
-    address needs this Deposit Intent correlation model instead of
-    matching incoming transfers by amount alone.
+    shared address, plus the on-chain transaction later matched to it.
     """
 
     __tablename__ = "deposits"
@@ -64,7 +61,6 @@ class Deposit(Base):
     received_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     credited_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
 
-    # Snapshot of the address shown to the USER at intent creation time.
     deposit_address: Mapped[str] = mapped_column(String(128), nullable=False)
     tx_hash: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
 
@@ -97,4 +93,33 @@ class Deposit(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class UnmatchedTransfer(Base):
+    """Stores incoming on-chain transfers that could not be safely correlated to a single Deposit Intent."""
+
+    __tablename__ = "unmatched_transfers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tx_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    from_address: Mapped[str] = mapped_column(String(128), nullable=False)
+    to_address: Mapped[str] = mapped_column(String(128), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    asset_contract: Mapped[str] = mapped_column(String(128), nullable=False)
+    
+    correlation_status: Mapped[CorrelationStatus] = mapped_column(
+        SAEnum(
+            CorrelationStatus,
+            values_callable=lambda enum: [member.value for member in enum],
+            name="correlation_status",
+        ),
+        nullable=False,
+    )
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
