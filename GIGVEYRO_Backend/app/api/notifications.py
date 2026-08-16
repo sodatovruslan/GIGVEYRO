@@ -3,11 +3,13 @@ from typing import Sequence
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_account, get_db
-from app.enums.notification import NotificationType
+from app.api.deps import get_current_account, get_db, require_roles
+from app.enums.account import UserRole
+from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
 from app.models.account import Account
 from app.repositories.notification import NotificationRepository
 from app.schemas.notification import (
+    NotificationDeliveryRead,
     NotificationPreferenceRead,
     NotificationPreferenceUpdate,
     NotificationRead,
@@ -102,3 +104,47 @@ async def mark_notification_as_read(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Notification not found",
         )
+
+
+# --- OWNER MONITORING ENDPOINTS ---
+
+@router.get("/owner/deliveries", response_model=list[NotificationDeliveryRead])
+async def list_deliveries_for_owner(
+    status: NotificationStatus | None = Query(None),
+    channel: NotificationChannel | None = Query(None),
+    account_id: uuid.UUID | None = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    _: Account = Depends(require_roles(UserRole.OWNER)),
+    session: AsyncSession = Depends(get_db),
+):
+    repo = NotificationRepository(session)
+    return await repo.list_deliveries_for_owner(
+        status=status,
+        channel=channel,
+        account_id=account_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.post("/owner/deliveries/{delivery_id}/retry", response_model=NotificationDeliveryRead)
+async def retry_failed_delivery_for_owner(
+    delivery_id: uuid.UUID,
+    _: Account = Depends(require_roles(UserRole.OWNER)),
+    session: AsyncSession = Depends(get_db),
+):
+    repo = NotificationRepository(session)
+    delivery = await repo.get_delivery_by_id(delivery_id)
+    if not delivery:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Delivery record not found")
+    if delivery.status != NotificationStatus.FAILED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only FAILED deliveries can be retried",
+        )
+
+    delivery.status = NotificationStatus.PENDING
+    delivery.last_error = None
+    await session.flush()
+    return delivery

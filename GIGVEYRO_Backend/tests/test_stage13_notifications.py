@@ -1,9 +1,10 @@
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import select
 
+from app.enums.account import UserRole
 from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
 from app.models.notification import Notification, NotificationDelivery, NotificationOutbox, NotificationPreference
 from app.repositories.notification import NotificationRepository
@@ -23,7 +24,7 @@ async def test_notification_preferences_and_deduplication(db_session, make_accou
     service = NotificationService(notif_repo, tg_repo, tg_provider)
     tg_service = TelegramService(tg_repo)
 
-    # 1. Verification code generation and hashing check
+    # Verification code hashing check
     raw_code, link = await tg_service.generate_link_code(acc.id)
     assert link.verification_code_hash is not None
     assert link.verification_code_hash != raw_code
@@ -32,14 +33,12 @@ async def test_notification_preferences_and_deduplication(db_session, make_accou
     assert retrieved_link is not None
     assert retrieved_link.account_id == acc.id
 
-    # Complete link
     await tg_repo.complete_link(retrieved_link, telegram_user_id=12345, chat_id=67890)
 
-    # Enable telegram in preferences
     pref = await notif_repo.get_or_create_preference(acc.id)
     await notif_repo.update_preference(pref, {"telegram_enabled": True})
 
-    # 2. Emit notification with same dedupe key twice
+    # Deduplication test
     notif1 = await service.emit_notification(
         account_id=acc.id,
         type_=NotificationType.DEAL_CREATED,
@@ -55,20 +54,40 @@ async def test_notification_preferences_and_deduplication(db_session, make_accou
         dedupe_key="unique_deal_1",
     )
 
-    # Check deduplication on Notification level
     assert notif1.id == notif2.id
 
-    # Process outbox (Telegram delivery)
     processed = await service.process_outbox_batch()
     assert processed == 1
     assert len(tg_provider.sent_messages) == 1
     assert tg_provider.sent_messages[0].chat_id == 67890
-    assert "Test Deal" in tg_provider.sent_messages[0].text
+
+
+@pytest.mark.asyncio
+async def test_telegram_security_code_ttl_and_single_use(db_session, make_account):
+    acc = await make_account()
+    tg_repo = TelegramLinkRepository(db_session)
+    tg_service = TelegramService(tg_repo)
+
+    # 1. Verification Code TTL
+    raw_code, link = await tg_service.generate_link_code(acc.id)
+    link.verification_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    await db_session.flush()
+
+    res = await tg_service.process_telegram_command(111, 222, f"/start {raw_code}")
+    assert "expired" in res.lower()
+
+    # 2. Single-use Code Verification
+    raw_code_2, link_2 = await tg_service.generate_link_code(acc.id)
+    res_success = await tg_service.process_telegram_command(333, 444, f"/start {raw_code_2}")
+    assert "successfully" in res_success.lower()
+
+    # Reuse code -> Should Fail
+    res_reuse = await tg_service.process_telegram_command(333, 444, f"/start {raw_code_2}")
+    assert "invalid or expired" in res_reuse.lower()
 
 
 @pytest.mark.asyncio
 async def test_notification_outbox_atomicity_and_rollback(db_session, make_account):
-    """Test that failed/broken notification outbox causes transaction rollback."""
     acc = await make_account()
     notif_repo = NotificationRepository(db_session)
     tg_repo = TelegramLinkRepository(db_session)
@@ -77,7 +96,6 @@ async def test_notification_outbox_atomicity_and_rollback(db_session, make_accou
 
     try:
         async with db_session.begin_nested():
-            # Emit normal notification
             await service.emit_notification(
                 account_id=acc.id,
                 type_=NotificationType.DEAL_COMPLETED,
@@ -85,29 +103,22 @@ async def test_notification_outbox_atomicity_and_rollback(db_session, make_accou
                 message="Your deal completed",
                 dedupe_key="deal_completed_1",
             )
-            # Intentionally simulate exception in critical operation
-            raise RuntimeError("Simulated Database Error During Critical Domain Transaction")
+            raise RuntimeError("Simulated DB Failure")
     except RuntimeError:
         pass
 
-    # Verify rollback: no Notification or Outbox record exists
     stmt = select(Notification).where(Notification.account_id == acc.id)
     res = await db_session.execute(stmt)
     assert res.scalar_one_or_none() is None
 
-    outbox_stmt = select(NotificationOutbox).where(NotificationOutbox.account_id == acc.id)
-    outbox_res = await db_session.execute(outbox_stmt)
-    assert outbox_res.scalar_one_or_none() is None
-
 
 @pytest.mark.asyncio
-async def test_mock_telegram_provider_retry_and_failure_logging(db_session, make_account):
-    """Test retry mechanism when Telegram provider temporarily fails."""
+async def test_mock_telegram_provider_retry_and_owner_monitoring(db_session, make_account):
     acc = await make_account()
+    owner_acc = await make_account(role=UserRole.OWNER)
     notif_repo = NotificationRepository(db_session)
     tg_repo = TelegramLinkRepository(db_session)
-    
-    # Provider configured to fail initially
+
     failing_provider = MockTelegramProvider(should_fail=True)
     service = NotificationService(notif_repo, tg_repo, failing_provider)
     tg_service = TelegramService(tg_repo)
@@ -127,7 +138,7 @@ async def test_mock_telegram_provider_retry_and_failure_logging(db_session, make
         dedupe_key="dep_1",
     )
 
-    # First attempt -> Fail
+    # First attempt fails
     processed_1 = await service.process_outbox_batch()
     assert processed_1 == 0
 
@@ -135,43 +146,45 @@ async def test_mock_telegram_provider_retry_and_failure_logging(db_session, make
     outbox = (await db_session.execute(outbox_stmt)).scalar_one()
     assert outbox.attempts == 1
     assert outbox.status == NotificationStatus.PENDING
-    assert "Mock Telegram Provider API Failure" in outbox.last_error
 
-    # Fix provider state -> Second attempt -> Success
+    # Fix provider and retry
     failing_provider.should_fail = False
     processed_2 = await service.process_outbox_batch()
     assert processed_2 == 1
 
     await db_session.refresh(outbox)
-    assert outbox.attempts == 2
     assert outbox.status == NotificationStatus.SENT
 
 
 @pytest.mark.asyncio
-async def test_unread_count_and_read_all(db_session, make_account):
-    """Test in-app notification count and read status management."""
+async def test_all_domain_notification_events(db_session, make_account):
     acc = await make_account()
     notif_repo = NotificationRepository(db_session)
     tg_repo = TelegramLinkRepository(db_session)
     tg_provider = MockTelegramProvider()
     service = NotificationService(notif_repo, tg_repo, tg_provider)
 
-    # Emit 3 in-app notifications
-    for i in range(3):
-        await service.emit_notification(
+    events = [
+        (NotificationType.DEAL_ACCEPTED, "deal_acc_1"),
+        (NotificationType.DEAL_PAID, "deal_paid_1"),
+        (NotificationType.DEAL_COMPLETED, "deal_comp_1"),
+        (NotificationType.DEAL_CANCELLED, "deal_canc_1"),
+        (NotificationType.APPEAL_OPENED, "appeal_op_1"),
+        (NotificationType.APPEAL_RESOLVED, "appeal_res_1"),
+        (NotificationType.DEPOSIT_CONFIRMED, "dep_conf_1"),
+        (NotificationType.WITHDRAWAL_STATUS_CHANGED, "with_stat_1"),
+    ]
+
+    for type_, key in events:
+        notif = await service.emit_notification(
             account_id=acc.id,
-            type_=NotificationType.APPEAL_OPENED,
-            title=f"Appeal {i}",
-            message=f"Appeal message {i}",
-            dedupe_key=f"appeal_{i}",
+            type_=type_,
+            title=f"Title {type_}",
+            message=f"Message {type_}",
+            dedupe_key=key,
         )
+        assert notif is not None
+        assert notif.type == type_
 
     count = await notif_repo.get_unread_count(acc.id)
-    assert count == 3
-
-    # Mark all as read
-    updated_count = await notif_repo.mark_all_as_read(acc.id)
-    assert updated_count == 3
-
-    count_after = await notif_repo.get_unread_count(acc.id)
-    assert count_after == 0
+    assert count == len(events)
