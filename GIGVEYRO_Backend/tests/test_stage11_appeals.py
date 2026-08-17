@@ -25,8 +25,7 @@ from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.traffic import TrafficRepository
 from app.repositories.wallet import WalletRepository
-
-from app.services.appeal import AppealNotAllowedError, AppealService
+from app.services.appeal import AppealService
 from app.services.deal import DealService, InvalidDealTransitionError
 from app.services.exchange_rate import ConfiguredExchangeRateProvider
 from app.services.wallet import WalletService

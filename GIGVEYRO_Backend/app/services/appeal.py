@@ -62,6 +62,9 @@ class AppealService:
         self._deals = deal_repository
         self._wallet_service = wallet_service
 
+    async def get_active_by_deal_id(self, deal_id: uuid.UUID) -> DealAppeal | None:
+        return await self._appeals.get_active_by_deal_id(deal_id)
+
     async def open_appeal(
         self,
         account: Account,
