@@ -19,9 +19,7 @@ class MerchantWallet(Base):
         CheckConstraint(
             "available_balance >= 0", name="ck_merchant_wallets_available_non_negative"
         ),
-        CheckConstraint(
-            "held_balance >= 0", name="ck_merchant_wallets_held_non_negative"
-        ),
+        CheckConstraint("held_balance >= 0", name="ck_merchant_wallets_held_non_negative"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

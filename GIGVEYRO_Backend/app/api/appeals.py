@@ -43,7 +43,9 @@ def _service(db: AsyncSession = Depends(get_db)) -> AppealService:
     )
 
 
-@router.post("/deals/{deal_id}/appeal", response_model=AppealRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/deals/{deal_id}/appeal", response_model=AppealRead, status_code=status.HTTP_201_CREATED
+)
 async def open_appeal(
     deal_id: uuid.UUID,
     payload: AppealCreate,
@@ -86,7 +88,9 @@ async def get_appeal(
     try:
         return await service.get_for_participant(actor, appeal_id)
     except AppealNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"
+        ) from exc
 
 
 @router.post("/{appeal_id}/cancel", response_model=AppealRead)
@@ -98,6 +102,8 @@ async def cancel_appeal(
     try:
         return await service.cancel_appeal(actor, appeal_id=appeal_id)
     except AppealNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"
+        ) from exc
     except (AppealNotAllowedError, InvalidAppealTransitionError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

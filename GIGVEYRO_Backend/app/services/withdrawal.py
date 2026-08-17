@@ -45,11 +45,14 @@ class PayoutDisabledError(PayoutProviderError):
 
 class PayoutProvider(ABC):
     """Abstraction for external merchant payout gateways.
-    STRICT SAFETY RULE: Never holds real private keys, mnemonics or performs real automatic transfers.
+    STRICT SAFETY RULE: Never holds real private keys or mnemonics and never
+    performs real automatic transfers.
     """
 
     @abstractmethod
-    async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+    async def request_payout(
+        self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str
+    ) -> str:
         """Submit payout request to provider. Returns provider external reference ID."""
 
     @abstractmethod
@@ -58,7 +61,9 @@ class PayoutProvider(ABC):
 
 
 class MockPayoutProvider(PayoutProvider):
-    async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+    async def request_payout(
+        self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str
+    ) -> str:
         if not settings.PAYOUT_ENABLED:
             logger.info("PAYOUT_ENABLED is False. Safe mock payout recorded without external call.")
             return f"MOCK-PAYOUT-SAFETY-DISABLED-{secrets.token_hex(4).upper()}"
@@ -73,10 +78,16 @@ class ExternalPayoutAdapter(PayoutProvider):
         self._api_url = api_url
         self._api_key = api_key
 
-    async def request_payout(self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str) -> str:
+    async def request_payout(
+        self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str
+    ) -> str:
         if not settings.PAYOUT_ENABLED:
-            raise PayoutDisabledError("Real/external payout is disabled by safety configuration (PAYOUT_ENABLED=False)")
-        logger.info("Submitting payout request for withdrawal %s to %s", withdrawal_id, self._api_url)
+            raise PayoutDisabledError(
+                "Real/external payout is disabled by safety configuration (PAYOUT_ENABLED=False)"
+            )
+        logger.info(
+            "Submitting payout request for withdrawal %s to %s", withdrawal_id, self._api_url
+        )
         return f"EXT-PAYOUT-{uuid.uuid4().hex[:8].upper()}"
 
     async def check_payout_status(self, external_ref: str) -> str:
@@ -145,7 +156,9 @@ class WithdrawalService:
         comment: str | None = None,
     ) -> MerchantWithdrawal:
         if merchant.role != UserRole.MERCHANT or not merchant.is_active:
-            raise WithdrawalCreationNotAllowedError("only active MERCHANT accounts can create withdrawals")
+            raise WithdrawalCreationNotAllowedError(
+                "only active MERCHANT accounts can create withdrawals"
+            )
 
         if not amount.is_finite() or amount <= 0:
             raise WithdrawalCreationNotAllowedError("amount must be a positive, finite number")
@@ -300,7 +313,9 @@ class WithdrawalService:
             payout_ref = await self._payout_provider.request_payout(
                 withdrawal.id, withdrawal.amount, withdrawal.destination
             )
-            logger.info("Payout provider accepted withdrawal %s with ref %s", withdrawal.id, payout_ref)
+            logger.info(
+                "Payout provider accepted withdrawal %s with ref %s", withdrawal.id, payout_ref
+            )
         except Exception as exc:
             logger.error("Payout provider request failed for withdrawal %s: %s", withdrawal.id, exc)
 

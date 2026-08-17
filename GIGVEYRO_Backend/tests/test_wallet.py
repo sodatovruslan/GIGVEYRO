@@ -240,9 +240,7 @@ async def test_insurance_decrease_below_zero_rejected(client, make_account, make
     assert response.status_code == 409
 
 
-async def test_insurance_ledger_entries_have_correct_snapshots(
-    client, make_account, make_wallet
-):
+async def test_insurance_ledger_entries_have_correct_snapshots(client, make_account, make_wallet):
     owner = await make_account(role=UserRole.OWNER)
     user = await make_account(role=UserRole.USER)
     await make_wallet(user)
@@ -405,9 +403,7 @@ async def test_owner_gets_user_wallet(client, make_account, make_wallet):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("42"))
 
-    response = await client.get(
-        f"/owner/accounts/{user.id}/wallet", headers=_auth_headers(owner)
-    )
+    response = await client.get(f"/owner/accounts/{user.id}/wallet", headers=_auth_headers(owner))
 
     assert response.status_code == 200
     assert response.json()["available_balance"] == "42.00000000"

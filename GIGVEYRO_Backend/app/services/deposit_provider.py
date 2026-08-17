@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app.core.config import settings
-from app.enums.deposit import DepositAsset, DepositNetwork
+from app.enums.deposit import DepositNetwork
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,9 @@ class TronGridTRC20DepositProvider(CryptoDepositProvider):
             return []
 
         try:
-            logger.info("Scanning read-only TRC20 transfers for address: %s via %s", address, self._api_url)
+            logger.info(
+                "Scanning read-only TRC20 transfers for address: %s via %s", address, self._api_url
+            )
             return []
         except Exception as exc:
             logger.error("Failed to fetch read-only TRC20 transactions: %s", exc)

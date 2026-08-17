@@ -97,7 +97,7 @@ class Deposit(Base):
 
 
 class UnmatchedTransfer(Base):
-    """Stores incoming on-chain transfers that could not be safely correlated to a single Deposit Intent."""
+    """Stores incoming transfers that could not be safely correlated to a deposit intent."""
 
     __tablename__ = "unmatched_transfers"
 
@@ -109,7 +109,7 @@ class UnmatchedTransfer(Base):
     to_address: Mapped[str] = mapped_column(String(128), nullable=False)
     amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     asset_contract: Mapped[str] = mapped_column(String(128), nullable=False)
-    
+
     correlation_status: Mapped[CorrelationStatus] = mapped_column(
         SAEnum(
             CorrelationStatus,

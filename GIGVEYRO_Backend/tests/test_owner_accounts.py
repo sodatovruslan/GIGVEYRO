@@ -328,9 +328,7 @@ async def test_get_owner_account_via_managed_endpoint_returns_404(client, make_a
     owner = await make_account(role=UserRole.OWNER)
     other_owner = await make_account(role=UserRole.OWNER)
 
-    response = await client.get(
-        f"/owner/accounts/{other_owner.id}", headers=_auth_headers(owner)
-    )
+    response = await client.get(f"/owner/accounts/{other_owner.id}", headers=_auth_headers(owner))
 
     assert response.status_code == 404
 
@@ -449,9 +447,7 @@ async def test_block_user_prevents_login_and_invalidates_access(client, make_acc
     )
     assert login_response.status_code == 401
 
-    me_response = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {target_token}"}
-    )
+    me_response = await client.get("/auth/me", headers={"Authorization": f"Bearer {target_token}"})
     assert me_response.status_code == 401
 
 

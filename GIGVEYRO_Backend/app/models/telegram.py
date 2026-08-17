@@ -11,9 +11,7 @@ from app.db.base import Base
 class TelegramAccountLink(Base):
     __tablename__ = "telegram_account_links"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("accounts.id", ondelete="CASCADE"),
@@ -24,9 +22,7 @@ class TelegramAccountLink(Base):
     telegram_user_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True, unique=True, index=True
     )
-    chat_id: Mapped[int | None] = mapped_column(
-        BigInteger, nullable=True, unique=True, index=True
-    )
+    chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, unique=True, index=True)
     verification_code_hash: Mapped[str | None] = mapped_column(
         String(64), nullable=True, index=True
     )

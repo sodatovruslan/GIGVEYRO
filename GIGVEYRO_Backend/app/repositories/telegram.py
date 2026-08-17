@@ -1,6 +1,7 @@
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +23,9 @@ class TelegramLinkRepository:
 
     async def get_by_verification_code(self, code: str) -> TelegramAccountLink | None:
         code_hash = self.hash_code(code)
-        stmt = select(TelegramAccountLink).where(TelegramAccountLink.verification_code_hash == code_hash)
+        stmt = select(TelegramAccountLink).where(
+            TelegramAccountLink.verification_code_hash == code_hash
+        )
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()
 

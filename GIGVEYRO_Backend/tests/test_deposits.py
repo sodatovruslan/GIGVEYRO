@@ -75,9 +75,7 @@ async def test_user_creates_deposit(client, make_account):
 async def test_create_deposit_rejects_zero_amount(client, make_account):
     user = await make_account(role=UserRole.USER)
 
-    response = await client.post(
-        "/deposits", json={"amount": "0"}, headers=_auth_headers(user)
-    )
+    response = await client.post("/deposits", json={"amount": "0"}, headers=_auth_headers(user))
 
     assert response.status_code == 422
 
@@ -85,9 +83,7 @@ async def test_create_deposit_rejects_zero_amount(client, make_account):
 async def test_create_deposit_rejects_negative_amount(client, make_account):
     user = await make_account(role=UserRole.USER)
 
-    response = await client.post(
-        "/deposits", json={"amount": "-10"}, headers=_auth_headers(user)
-    )
+    response = await client.post("/deposits", json={"amount": "-10"}, headers=_auth_headers(user))
 
     assert response.status_code == 422
 
@@ -105,9 +101,7 @@ async def test_merchant_cannot_create_deposit(client, make_account):
 async def test_owner_cannot_create_deposit(client, make_account):
     owner = await make_account(role=UserRole.OWNER)
 
-    response = await client.post(
-        "/deposits", json={"amount": "100"}, headers=_auth_headers(owner)
-    )
+    response = await client.post("/deposits", json={"amount": "100"}, headers=_auth_headers(owner))
 
     assert response.status_code == 403
 
@@ -172,9 +166,7 @@ async def test_waiting_deposit_expires(client, make_account, make_deposit):
     assert response.json()["status"] == DepositStatus.EXPIRED.value
 
 
-async def test_detected_deposit_does_not_expire_from_intent_ttl(
-    client, make_account, make_deposit
-):
+async def test_detected_deposit_does_not_expire_from_intent_ttl(client, make_account, make_deposit):
     user = await make_account(role=UserRole.USER)
     deposit = await make_deposit(
         user,
@@ -525,8 +517,12 @@ async def test_confirmed_event_replayed_many_times_does_not_double_credit(
 
     for _ in range(5):
         await _simulate(
-            client, owner, deposit.id,
-            tx_hash="tx_replay_many", amount=Decimal("100"), confirmations=1,
+            client,
+            owner,
+            deposit.id,
+            tx_hash="tx_replay_many",
+            amount=Decimal("100"),
+            confirmations=1,
         )
 
     wallet_resp = await client.get("/wallet", headers=_auth_headers(user))

@@ -1,5 +1,6 @@
 import logging
-from fastapi import FastAPI, Depends, status, HTTPException
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text

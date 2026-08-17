@@ -87,9 +87,7 @@ async def test_duplicate_tx_hash_rejected_by_db(make_account, db_session):
     user = await make_account(role=UserRole.USER)
     shared_tx_hash = "dup_db_level_tx"
 
-    first = Deposit(
-        **_base_kwargs(user.id), expected_amount=Decimal("100"), tx_hash=shared_tx_hash
-    )
+    first = Deposit(**_base_kwargs(user.id), expected_amount=Decimal("100"), tx_hash=shared_tx_hash)
     db_session.add(first)
     await db_session.flush()
 

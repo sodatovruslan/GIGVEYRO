@@ -2,7 +2,18 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,9 +24,7 @@ from app.enums.notification import NotificationChannel, NotificationStatus, Noti
 class NotificationPreference(Base):
     __tablename__ = "notification_preferences"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("accounts.id", ondelete="CASCADE"),
@@ -42,9 +51,7 @@ class NotificationPreference(Base):
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("accounts.id", ondelete="CASCADE"),
@@ -56,9 +63,7 @@ class Notification(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    payload: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True
-    )
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     dedupe_hash: Mapped[str | None] = mapped_column(
         String(64), nullable=True, unique=True, index=True
     )
@@ -68,15 +73,15 @@ class Notification(Base):
     )
 
     account = relationship("Account", back_populates="notifications")
-    deliveries = relationship("NotificationDelivery", back_populates="notification", cascade="all, delete-orphan")
+    deliveries = relationship(
+        "NotificationDelivery", back_populates="notification", cascade="all, delete-orphan"
+    )
 
 
 class NotificationDelivery(Base):
     __tablename__ = "notification_deliveries"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     notification_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("notifications.id", ondelete="CASCADE"),
@@ -94,9 +99,7 @@ class NotificationDelivery(Base):
     )
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -114,9 +117,7 @@ class NotificationDelivery(Base):
 class NotificationOutbox(Base):
     __tablename__ = "notification_outbox"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False
     )
@@ -125,12 +126,8 @@ class NotificationOutbox(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    payload: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB, nullable=True
-    )
-    dedupe_hash: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, index=True
-    )
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    dedupe_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     status: Mapped[NotificationStatus] = mapped_column(
         Enum(NotificationStatus, native_enum=False),
         nullable=False,
@@ -143,10 +140,6 @@ class NotificationOutbox(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    processed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (
-        Index("idx_outbox_pending_retry", "status", "attempts", "created_at"),
-    )
+    __table_args__ = (Index("idx_outbox_pending_retry", "status", "attempts", "created_at"),)

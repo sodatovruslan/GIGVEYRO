@@ -56,9 +56,7 @@ class AppealRepository:
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
-    async def count_for_account(
-        self, account_id: uuid.UUID, *, status: AppealStatus | None
-    ) -> int:
+    async def count_for_account(self, account_id: uuid.UUID, *, status: AppealStatus | None) -> int:
         query = (
             select(func.count())
             .select_from(DealAppeal)

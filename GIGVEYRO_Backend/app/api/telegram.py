@@ -34,7 +34,7 @@ async def telegram_webhook(
     if getattr(settings, "APP_ENV", "development").lower() == "production":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Telegram webhook endpoint is disabled in production."
+            detail="Telegram webhook endpoint is disabled in production.",
         )
 
     if not payload.message:

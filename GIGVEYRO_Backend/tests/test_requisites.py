@@ -214,9 +214,7 @@ async def test_archive_requisite(client, make_account, make_requisite):
     user = await make_account(role=UserRole.USER)
     requisite = await make_requisite(user)
 
-    response = await client.post(
-        f"/requisites/{requisite.id}/archive", headers=_auth_headers(user)
-    )
+    response = await client.post(f"/requisites/{requisite.id}/archive", headers=_auth_headers(user))
 
     assert response.status_code == 200
     body = response.json()

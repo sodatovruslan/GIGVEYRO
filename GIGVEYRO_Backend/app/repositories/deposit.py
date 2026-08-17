@@ -68,9 +68,7 @@ class DepositRepository:
     async def count_for_account(
         self, account_id: uuid.UUID, *, status: DepositStatus | None
     ) -> int:
-        query = (
-            select(func.count()).select_from(Deposit).where(Deposit.account_id == account_id)
-        )
+        query = select(func.count()).select_from(Deposit).where(Deposit.account_id == account_id)
         if status is not None:
             query = query.where(Deposit.status == status)
         result = await self._session.execute(query)

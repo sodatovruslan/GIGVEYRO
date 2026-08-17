@@ -73,9 +73,7 @@ async def list_deals(
 
 
 @router.get("/{deal_id}", response_model=DealRead)
-async def get_deal(
-    deal_id: uuid.UUID, service: DealService = Depends(_service)
-) -> DealRead:
+async def get_deal(deal_id: uuid.UUID, service: DealService = Depends(_service)) -> DealRead:
     try:
         return await service.get_for_owner(deal_id)
     except DealNotFoundError as exc:

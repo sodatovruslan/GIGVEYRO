@@ -1,6 +1,6 @@
+import uuid
 from datetime import datetime
 from typing import Annotated
-import uuid
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession

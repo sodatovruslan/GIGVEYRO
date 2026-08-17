@@ -210,9 +210,7 @@ async def test_blocking_user_disables_traffic(
     await make_traffic_settings(user, is_enabled=True)
     await make_requisite(user)
 
-    block_resp = await client.post(
-        f"/owner/accounts/{user.id}/block", headers=_auth_headers(owner)
-    )
+    block_resp = await client.post(f"/owner/accounts/{user.id}/block", headers=_auth_headers(owner))
     assert block_resp.status_code == 200
 
     traffic_resp = await client.get(
@@ -248,9 +246,7 @@ async def test_owner_reads_user_traffic(client, make_account, make_traffic_setti
     user = await make_account(role=UserRole.USER)
     await make_traffic_settings(user, is_enabled=False)
 
-    response = await client.get(
-        f"/owner/accounts/{user.id}/traffic", headers=_auth_headers(owner)
-    )
+    response = await client.get(f"/owner/accounts/{user.id}/traffic", headers=_auth_headers(owner))
 
     assert response.status_code == 200
 
@@ -258,9 +254,7 @@ async def test_owner_reads_user_traffic(client, make_account, make_traffic_setti
 async def test_owner_traffic_view_rejected_for_user(client, make_account):
     user = await make_account(role=UserRole.USER)
 
-    response = await client.get(
-        f"/owner/accounts/{user.id}/traffic", headers=_auth_headers(user)
-    )
+    response = await client.get(f"/owner/accounts/{user.id}/traffic", headers=_auth_headers(user))
 
     assert response.status_code == 403
 

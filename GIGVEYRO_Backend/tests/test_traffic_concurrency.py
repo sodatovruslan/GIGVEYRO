@@ -59,7 +59,8 @@ async def test_enable_traffic_races_last_requisite_deactivation_without_violatin
     async def try_enable() -> None:
         async with AsyncSessionLocal() as session:
             service = TrafficService(
-                TrafficRepository(session), PaymentRequisiteRepository(session),
+                TrafficRepository(session),
+                PaymentRequisiteRepository(session),
                 AccountRepository(session),
             )
             try:
@@ -71,7 +72,8 @@ async def test_enable_traffic_races_last_requisite_deactivation_without_violatin
     async def deactivate_requisite() -> None:
         async with AsyncSessionLocal() as session:
             traffic_service = TrafficService(
-                TrafficRepository(session), PaymentRequisiteRepository(session),
+                TrafficRepository(session),
+                PaymentRequisiteRepository(session),
                 AccountRepository(session),
             )
             requisite_service = PaymentRequisiteService(

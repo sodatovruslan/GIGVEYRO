@@ -99,9 +99,7 @@ async def test_merchant_cannot_see_another_merchants_deal(client, make_account, 
 async def test_merchant_gets_nonexistent_deal_returns_404(client, make_account):
     merchant = await make_account(role=UserRole.MERCHANT)
 
-    response = await client.get(
-        f"/merchant/deals/{uuid.uuid4()}", headers=_auth_headers(merchant)
-    )
+    response = await client.get(f"/merchant/deals/{uuid.uuid4()}", headers=_auth_headers(merchant))
 
     assert response.status_code == 404
 

@@ -5,9 +5,11 @@ Revises: f92b38c4d1e2
 Create Date: 2026-03-31 14:00:00.000000
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "stage12_deal_payment_workflow"

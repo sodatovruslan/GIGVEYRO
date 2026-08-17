@@ -1,5 +1,9 @@
 from app.core.config import settings
-from app.services.deposit_provider import CryptoDepositProvider, MockTRC20DepositProvider, TronGridTRC20DepositProvider
+from app.services.deposit_provider import (
+    CryptoDepositProvider,
+    MockTRC20DepositProvider,
+    TronGridTRC20DepositProvider,
+)
 from app.services.exchange_rate import (
     ConfiguredExchangeRateProvider,
     ExchangeRateProvider,

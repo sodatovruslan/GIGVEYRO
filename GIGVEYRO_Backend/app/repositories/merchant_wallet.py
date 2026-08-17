@@ -18,9 +18,7 @@ class MerchantWalletRepository:
 
     async def get_by_account_id_for_update(self, account_id: uuid.UUID) -> MerchantWallet | None:
         result = await self._session.execute(
-            select(MerchantWallet)
-            .where(MerchantWallet.account_id == account_id)
-            .with_for_update()
+            select(MerchantWallet).where(MerchantWallet.account_id == account_id).with_for_update()
         )
         return result.scalar_one_or_none()
 

@@ -97,4 +97,6 @@ class FallbackExchangeRateProvider(ExchangeRateProvider):
             if self._cached_rate is not None:
                 logger.warning("Fallback provider failed. Returning stale cached exchange rate.")
                 return self._cached_rate
-            raise ExchangeRateError("Both primary and fallback exchange rate providers failed") from exc
+            raise ExchangeRateError(
+                "Both primary and fallback exchange rate providers failed"
+            ) from exc

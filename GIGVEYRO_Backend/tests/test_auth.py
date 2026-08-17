@@ -81,9 +81,7 @@ async def test_me_with_valid_access_token_returns_account(client, make_account):
 
 
 async def test_me_with_invalid_token_returns_401(client):
-    response = await client.get(
-        "/auth/me", headers={"Authorization": "Bearer not-a-real-token"}
-    )
+    response = await client.get("/auth/me", headers={"Authorization": "Bearer not-a-real-token"})
     assert response.status_code == 401
 
 

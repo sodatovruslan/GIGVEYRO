@@ -15,7 +15,8 @@ from app.models.wallet import MONEY
 
 class LedgerEntry(Base):
     """Append-only financial audit trail for both UserWallets and MerchantWallets.
-    Never updated or deleted by the application - a mistaken operation gets a compensating entry instead.
+    Never updated or deleted by the application. A mistaken operation gets a
+    compensating entry instead.
 
     For UserWallet entries: wallet_id is populated.
     For MerchantWallet entries: merchant_wallet_id is populated.

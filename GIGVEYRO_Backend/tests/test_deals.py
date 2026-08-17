@@ -328,9 +328,7 @@ async def test_accept_expired_deal_rejected(
 
     assert response.status_code == 409
 
-    merchant_view = await client.get(
-        f"/merchant/deals/{deal.id}", headers=_auth_headers(merchant)
-    )
+    merchant_view = await client.get(f"/merchant/deals/{deal.id}", headers=_auth_headers(merchant))
     assert merchant_view.json()["status"] == DealStatus.EXPIRED.value
 
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 
 class TelegramMessage(NamedTuple):

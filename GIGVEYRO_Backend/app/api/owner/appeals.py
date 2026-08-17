@@ -83,7 +83,9 @@ async def get_appeal(
     try:
         return await service.get_for_owner(appeal_id)
     except AppealNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"
+        ) from exc
 
 
 @router.post("/{appeal_id}/review", response_model=AppealRead)
@@ -97,7 +99,9 @@ async def review_appeal(
     try:
         return await service.take_under_review(owner.id, appeal_id, owner_note=owner_note)
     except AppealNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"
+        ) from exc
     except InvalidAppealTransitionError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -117,6 +121,8 @@ async def resolve_appeal(
             owner_note=payload.owner_note,
         )
     except AppealNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"
+        ) from exc
     except (InvalidAppealTransitionError, AppealNotAllowedError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

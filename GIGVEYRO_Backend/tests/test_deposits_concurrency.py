@@ -98,8 +98,12 @@ async def test_two_simultaneous_credit_attempts_credit_exactly_once():
             assert wallet.available_balance == Decimal("100")
 
             entries = await LedgerRepository(verify_session).list_for_account(
-                account_id=user_id, entry_type=None, date_from=None, date_to=None,
-                limit=10, offset=0,
+                account_id=user_id,
+                entry_type=None,
+                date_from=None,
+                date_to=None,
+                limit=10,
+                offset=0,
             )
             assert len(entries) == 1
             assert entries[0].reference_id == deposit_id

@@ -1,6 +1,6 @@
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.models.telegram import TelegramAccountLink
 from app.repositories.telegram import TelegramLinkRepository
@@ -12,13 +12,13 @@ class TelegramService:
 
     async def generate_link_code(self, account_id: uuid.UUID) -> tuple[str, TelegramAccountLink]:
         raw_code = secrets.token_hex(16)
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
-        link = await self.telegram_repo.create_or_update_verification_code(account_id, raw_code, expires_at)
+        expires_at = datetime.now(UTC) + timedelta(minutes=15)
+        link = await self.telegram_repo.create_or_update_verification_code(
+            account_id, raw_code, expires_at
+        )
         return raw_code, link
 
-    async def process_telegram_command(
-        self, telegram_user_id: int, chat_id: int, text: str
-    ) -> str:
+    async def process_telegram_command(self, telegram_user_id: int, chat_id: int, text: str) -> str:
         parts = text.strip().split()
         if not parts:
             return "Invalid command"
@@ -29,7 +29,7 @@ class TelegramService:
             link = await self.telegram_repo.get_by_verification_code(code)
             if not link:
                 return "Invalid or expired link code."
-            if link.verification_expires_at and link.verification_expires_at < datetime.now(timezone.utc):
+            if link.verification_expires_at and link.verification_expires_at < datetime.now(UTC):
                 return "Link code has expired."
 
             await self.telegram_repo.complete_link(link, telegram_user_id, chat_id)
