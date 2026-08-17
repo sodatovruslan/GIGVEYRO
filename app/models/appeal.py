@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,10 +20,7 @@ class DealAppeal(Base):
             "uq_deal_appeals_active_deal",
             "deal_id",
             unique=True,
-            postgresql_where=(
-                (mapped_column("status", String) == AppealStatus.OPEN.value)
-                | (mapped_column("status", String) == AppealStatus.UNDER_REVIEW.value)
-            ),
+            postgresql_where=text("status IN ('open', 'under_review')"),
         ),
     )
 
