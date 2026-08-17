@@ -1,0 +1,1 @@
+git commit -m "fix(migrations): удалить несовместимый параметр as_scalar в JSONB в миграции stage13"
