@@ -295,7 +295,7 @@ class DealService:
         if deal.status == DealStatus.DISPUTED:
             appeal = None
             if self._appeal_service is not None:
-                appeal = await self._appeal_service.get_for_participant(user, deal.id)
+                appeal = await self._appeal_service.get_active_by_deal_id(deal.id)
             return deal, appeal
 
         if deal.status != DealStatus.PAYMENT_PENDING:
