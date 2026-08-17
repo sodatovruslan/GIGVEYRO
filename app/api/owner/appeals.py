@@ -117,6 +117,6 @@ async def resolve_appeal(
             owner_note=payload.owner_note,
         )
     except AppealNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="appeal not found") from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found") from exc
     except (InvalidAppealTransitionError, AppealNotAllowedError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
