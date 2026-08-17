@@ -27,7 +27,7 @@ def upgrade() -> None:
         'merchant_wallets',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('account_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('currency', sa.Enum('USDT', name='wallet_currency'), nullable=False),
+        sa.Column('currency', sa.Enum('USDT', name='wallet_currency', create_type=False), nullable=False),
         sa.Column('available_balance', sa.Numeric(precision=20, scale=8), server_default='0', nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
