@@ -174,7 +174,7 @@ class DepositService:
         return items, total
 
     async def scan_and_correlate_deposits(self) -> int:
-        """Scan deposit address for recent on-chain transfers and correlate with active deposit intents."""
+        """Scan recent on-chain transfers and correlate them with active deposit intents."""
         await self._deposits.expire_stale_waiting()
         address = self._provider.get_deposit_address()
         recent_txs = await self._provider.fetch_recent_transactions(address)
@@ -206,7 +206,7 @@ class DepositService:
             if existing_unmatched:
                 continue
 
-            waiting_deposits, _ = await self._deposits.list_all(
+            waiting_deposits = await self._deposits.list_all(
                 status=DepositStatus.WAITING,
                 account_id=None,
                 search=None,
@@ -240,7 +240,10 @@ class DepositService:
                         amount=tx.amount,
                         asset_contract=tx.asset_contract,
                         correlation_status=CorrelationStatus.AMBIGUOUS,
-                        reason=f"Ambiguous match: {len(matching_deps)} WAITING deposits share the same amount",
+                        reason=(
+                            f"Ambiguous match: {len(matching_deps)} WAITING deposits "
+                            "share the same amount"
+                        ),
                     )
                 )
             else:
@@ -318,9 +321,9 @@ class DepositService:
         if deposit.status == DepositStatus.DETECTED and deposit.confirmations > 0:
             transition_deposit(deposit, DepositStatus.CONFIRMING)
 
-        if (
-            deposit.confirmations >= deposit.required_confirmations
-            and deposit.status in (DepositStatus.DETECTED, DepositStatus.CONFIRMING)
+        if deposit.confirmations >= deposit.required_confirmations and deposit.status in (
+            DepositStatus.DETECTED,
+            DepositStatus.CONFIRMING,
         ):
             transition_deposit(deposit, DepositStatus.CONFIRMED)
             deposit = await self._deposits.save(deposit)

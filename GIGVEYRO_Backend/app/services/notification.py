@@ -1,6 +1,6 @@
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
@@ -61,9 +61,7 @@ class NotificationService:
             return None
 
         dedupe_hash = (
-            self.generate_dedupe_hash(account_id, type_, dedupe_key)
-            if dedupe_key
-            else None
+            self.generate_dedupe_hash(account_id, type_, dedupe_key) if dedupe_key else None
         )
 
         if dedupe_hash:
@@ -84,14 +82,14 @@ class NotificationService:
                 is_read=False,
             )
             notification = await self.notification_repo.create_notification(notification)
-            
+
             # Delivery record for IN_APP
             delivery = NotificationDelivery(
                 notification_id=notification.id,
                 channel=NotificationChannel.IN_APP,
                 status=NotificationStatus.SENT,
                 attempts=1,
-                sent_at=datetime.now(timezone.utc),
+                sent_at=datetime.now(UTC),
             )
             await self.notification_repo.create_delivery(delivery)
 
@@ -133,7 +131,7 @@ class NotificationService:
 
                 if sent_ok:
                     entry.status = NotificationStatus.SENT
-                    entry.processed_at = datetime.now(timezone.utc)
+                    entry.processed_at = datetime.now(UTC)
                     processed_count += 1
                 else:
                     entry.last_error = err_msg
@@ -145,4 +143,5 @@ class NotificationService:
                 if entry.attempts >= entry.max_attempts:
                     entry.status = NotificationStatus.FAILED
 
+        await self.notification_repo.flush_outbox_updates()
         return processed_count

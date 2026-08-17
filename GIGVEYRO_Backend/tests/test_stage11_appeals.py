@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
@@ -49,7 +49,12 @@ def make_appeal_service(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_open_appeal_user_success(
-    db_session: AsyncSession, make_account, make_wallet, make_merchant_wallet, make_deal, make_appeal_service
+    db_session: AsyncSession,
+    make_account,
+    make_wallet,
+    make_merchant_wallet,
+    make_deal,
+    make_appeal_service,
 ):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("0"), frozen=Decimal("20"))
@@ -57,7 +62,9 @@ async def test_open_appeal_user_success(
     merchant = await make_account(role=UserRole.MERCHANT)
     await make_merchant_wallet(merchant, available=Decimal("0"))
 
-    deal = await make_deal(merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20"))
+    deal = await make_deal(
+        merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20")
+    )
 
     appeal = await make_appeal_service.open_appeal(
         user,
@@ -78,7 +85,12 @@ async def test_open_appeal_user_success(
 
 @pytest.mark.asyncio
 async def test_disputed_deal_cannot_complete_or_release_directly(
-    db_session: AsyncSession, make_account, make_wallet, make_merchant_wallet, make_deal, make_appeal_service
+    db_session: AsyncSession,
+    make_account,
+    make_wallet,
+    make_merchant_wallet,
+    make_deal,
+    make_appeal_service,
 ):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("0"), frozen=Decimal("20"))
@@ -86,7 +98,9 @@ async def test_disputed_deal_cannot_complete_or_release_directly(
     merchant = await make_account(role=UserRole.MERCHANT)
     await make_merchant_wallet(merchant, available=Decimal("0"))
 
-    deal = await make_deal(merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20"))
+    deal = await make_deal(
+        merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20")
+    )
 
     await make_appeal_service.open_appeal(
         user,
@@ -120,7 +134,12 @@ async def test_disputed_deal_cannot_complete_or_release_directly(
 
 @pytest.mark.asyncio
 async def test_cancel_appeal_restores_previous_deal_status(
-    db_session: AsyncSession, make_account, make_wallet, make_merchant_wallet, make_deal, make_appeal_service
+    db_session: AsyncSession,
+    make_account,
+    make_wallet,
+    make_merchant_wallet,
+    make_deal,
+    make_appeal_service,
 ):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("0"), frozen=Decimal("20"))
@@ -128,7 +147,9 @@ async def test_cancel_appeal_restores_previous_deal_status(
     merchant = await make_account(role=UserRole.MERCHANT)
     await make_merchant_wallet(merchant, available=Decimal("0"))
 
-    deal = await make_deal(merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20"))
+    deal = await make_deal(
+        merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20")
+    )
 
     appeal = await make_appeal_service.open_appeal(
         user,
@@ -146,7 +167,12 @@ async def test_cancel_appeal_restores_previous_deal_status(
 
 @pytest.mark.asyncio
 async def test_resolve_release_to_user(
-    db_session: AsyncSession, make_account, make_wallet, make_merchant_wallet, make_deal, make_appeal_service
+    db_session: AsyncSession,
+    make_account,
+    make_wallet,
+    make_merchant_wallet,
+    make_deal,
+    make_appeal_service,
 ):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("0"), frozen=Decimal("20"))
@@ -156,7 +182,9 @@ async def test_resolve_release_to_user(
 
     owner = await make_account(role=UserRole.OWNER)
 
-    deal = await make_deal(merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20"))
+    deal = await make_deal(
+        merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20")
+    )
 
     appeal = await make_appeal_service.open_appeal(
         user,
@@ -178,14 +206,21 @@ async def test_resolve_release_to_user(
     d = await db_session.get(Deal, deal.id)
     assert d.status == DealStatus.CANCELLED
 
-    u_w = (await db_session.execute(select(UserWallet).where(UserWallet.account_id == user.id))).scalar_one()
+    u_w = (
+        await db_session.execute(select(UserWallet).where(UserWallet.account_id == user.id))
+    ).scalar_one()
     assert u_w.frozen_balance == Decimal("0")
     assert u_w.available_balance == Decimal("20")
 
 
 @pytest.mark.asyncio
 async def test_resolve_settle_to_merchant(
-    db_session: AsyncSession, make_account, make_wallet, make_merchant_wallet, make_deal, make_appeal_service
+    db_session: AsyncSession,
+    make_account,
+    make_wallet,
+    make_merchant_wallet,
+    make_deal,
+    make_appeal_service,
 ):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("0"), frozen=Decimal("20"))
@@ -195,7 +230,9 @@ async def test_resolve_settle_to_merchant(
 
     owner = await make_account(role=UserRole.OWNER)
 
-    deal = await make_deal(merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20"))
+    deal = await make_deal(
+        merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20")
+    )
 
     appeal = await make_appeal_service.open_appeal(
         merchant,
@@ -217,10 +254,16 @@ async def test_resolve_settle_to_merchant(
     d = await db_session.get(Deal, deal.id)
     assert d.status == DealStatus.COMPLETED
 
-    u_w = (await db_session.execute(select(UserWallet).where(UserWallet.account_id == user.id))).scalar_one()
+    u_w = (
+        await db_session.execute(select(UserWallet).where(UserWallet.account_id == user.id))
+    ).scalar_one()
     assert u_w.frozen_balance == Decimal("0")
 
-    m_w = (await db_session.execute(select(MerchantWallet).where(MerchantWallet.account_id == merchant.id))).scalar_one()
+    m_w = (
+        await db_session.execute(
+            select(MerchantWallet).where(MerchantWallet.account_id == merchant.id)
+        )
+    ).scalar_one()
     assert m_w.available_balance == Decimal("20")
 
 
@@ -252,7 +295,9 @@ async def test_concurrency_double_open_appeal():
             s1.add_all([user, merchant])
             await s1.flush()
 
-            u_wallet = UserWallet(account_id=user.id, available_balance=Decimal("0"), frozen_balance=Decimal("20"))
+            u_wallet = UserWallet(
+                account_id=user.id, available_balance=Decimal("0"), frozen_balance=Decimal("20")
+            )
             m_wallet = MerchantWallet(account_id=merchant.id, available_balance=Decimal("0"))
             deal = Deal(
                 public_id=f"D-{uuid.uuid4().hex[:6].upper()}",
@@ -303,29 +348,63 @@ async def test_concurrency_double_open_appeal():
             assert len(successes) == 1
             assert len(failures) == 1
 
+            if not isinstance(results[0], Exception):
+                await tx2.rollback()
+                await tx1.commit()
+            else:
+                await tx1.rollback()
+                await tx2.commit()
+
             async with AsyncSession(bind=engine) as verify_session:
                 appeals = (
-                    await verify_session.execute(
-                        select(DealAppeal).where(DealAppeal.deal_id == deal_id)
+                    (
+                        await verify_session.execute(
+                            select(DealAppeal).where(DealAppeal.deal_id == deal_id)
+                        )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 assert len(appeals) == 1
+                await verify_session.execute(
+                    delete(DealAppeal).where(DealAppeal.deal_id == deal_id)
+                )
+                await verify_session.execute(delete(Deal).where(Deal.id == deal_id))
+                await verify_session.execute(
+                    delete(UserWallet).where(UserWallet.account_id == u_id)
+                )
+                await verify_session.execute(
+                    delete(MerchantWallet).where(MerchantWallet.account_id == m_id)
+                )
+                await verify_session.execute(delete(Account).where(Account.id.in_([u_id, m_id])))
+                await verify_session.commit()
         finally:
             await s1.close()
             await s2.close()
-            await tx1.rollback()
-            await tx2.rollback()
+            if tx1.is_active:
+                await tx1.rollback()
+            if tx2.is_active:
+                await tx2.rollback()
 
 
 @pytest.mark.asyncio
-async def test_api_appeal_flow(client: AsyncClient, db_session: AsyncSession, make_account, make_wallet, make_merchant_wallet, make_deal):
+async def test_api_appeal_flow(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    make_account,
+    make_wallet,
+    make_merchant_wallet,
+    make_deal,
+):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("0"), frozen=Decimal("20"))
 
     merchant = await make_account(role=UserRole.MERCHANT)
     await make_merchant_wallet(merchant, available=Decimal("0"))
 
-    deal = await make_deal(merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20"))
+    deal = await make_deal(
+        merchant, status=DealStatus.ACCEPTED, user=user, amount_usdt=Decimal("20")
+    )
 
     token = create_access_token(user.id, role=UserRole.USER)
     headers = {"Authorization": f"Bearer {token}"}

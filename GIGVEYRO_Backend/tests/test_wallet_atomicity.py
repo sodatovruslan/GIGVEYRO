@@ -24,8 +24,8 @@ async def test_wallet_and_ledger_changes_roll_back_together(make_account, make_w
             wallet.available_balance = Decimal("150")
 
             bad_entry = LedgerEntry(
-                wallet_id=None,  # NOT NULL violation - simulates the ledger insert failing
-                account_id=user.id,
+                wallet_id=wallet.id,
+                account_id=None,  # NOT NULL violation - simulates the ledger insert failing
                 type=LedgerEntryType.OWNER_ALLOCATION,
                 balance_bucket=BalanceBucket.AVAILABLE,
                 currency=Currency.USDT,

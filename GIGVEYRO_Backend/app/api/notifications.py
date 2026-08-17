@@ -1,5 +1,5 @@
 import uuid
-from typing import Sequence
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from app.schemas.notification import (
 )
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+require_owner = require_roles(UserRole.OWNER)
 
 
 @router.get("/preferences", response_model=NotificationPreferenceRead)
@@ -108,6 +109,7 @@ async def mark_notification_as_read(
 
 # --- OWNER MONITORING ENDPOINTS ---
 
+
 @router.get("/owner/deliveries", response_model=list[NotificationDeliveryRead])
 async def list_deliveries_for_owner(
     status: NotificationStatus | None = Query(None),
@@ -115,7 +117,7 @@ async def list_deliveries_for_owner(
     account_id: uuid.UUID | None = Query(None),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    _: Account = Depends(require_roles(UserRole.OWNER)),
+    _: Account = Depends(require_owner),
     session: AsyncSession = Depends(get_db),
 ):
     repo = NotificationRepository(session)
@@ -131,13 +133,15 @@ async def list_deliveries_for_owner(
 @router.post("/owner/deliveries/{delivery_id}/retry", response_model=NotificationDeliveryRead)
 async def retry_failed_delivery_for_owner(
     delivery_id: uuid.UUID,
-    _: Account = Depends(require_roles(UserRole.OWNER)),
+    _: Account = Depends(require_owner),
     session: AsyncSession = Depends(get_db),
 ):
     repo = NotificationRepository(session)
     delivery = await repo.get_delivery_by_id(delivery_id)
     if not delivery:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Delivery record not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Delivery record not found"
+        )
     if delivery.status != NotificationStatus.FAILED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

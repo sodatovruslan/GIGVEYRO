@@ -1,11 +1,17 @@
 import uuid
-from typing import Sequence
+from collections.abc import Sequence
+
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
-from app.models.notification import Notification, NotificationDelivery, NotificationOutbox, NotificationPreference
+from app.models.notification import (
+    Notification,
+    NotificationDelivery,
+    NotificationOutbox,
+    NotificationPreference,
+)
 
 
 class NotificationRepository:
@@ -41,7 +47,9 @@ class NotificationRepository:
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()
 
-    async def get_by_id_and_account(self, notification_id: uuid.UUID, account_id: uuid.UUID) -> Notification | None:
+    async def get_by_id_and_account(
+        self, notification_id: uuid.UUID, account_id: uuid.UUID
+    ) -> Notification | None:
         stmt = (
             select(Notification)
             .options(selectinload(Notification.deliveries))
@@ -73,9 +81,8 @@ class NotificationRepository:
         return res.scalars().all()
 
     async def get_unread_count(self, account_id: uuid.UUID) -> int:
-        stmt = (
-            select(func.count(Notification.id))
-            .where(Notification.account_id == account_id, Notification.is_read.is_(False))
+        stmt = select(func.count(Notification.id)).where(
+            Notification.account_id == account_id, Notification.is_read.is_(False)
         )
         res = await self.session.execute(stmt)
         return res.scalar_one() or 0
@@ -105,6 +112,9 @@ class NotificationRepository:
         self.session.add(entry)
         await self.session.flush()
         return entry
+
+    async def flush_outbox_updates(self) -> None:
+        await self.session.flush()
 
     async def get_pending_outbox_entries(self, limit: int = 100) -> Sequence[NotificationOutbox]:
         stmt = (

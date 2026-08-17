@@ -14,7 +14,7 @@ def test_dev_simulate_route_not_mounted_when_app_env_is_production():
     is imported, the same way a real production deployment would set it.
     """
     script = (
-        "import os; os.environ['APP_ENV'] = 'production'; "
+        "import os; os.environ['APP_ENV'] = 'production'; os.environ['DEBUG'] = 'false'; "
         "from app.main import app; "
         "schema = app.openapi(); "
         "paths = list(schema['paths'].keys()); "

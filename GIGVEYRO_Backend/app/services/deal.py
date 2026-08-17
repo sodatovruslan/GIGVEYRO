@@ -43,7 +43,12 @@ ALLOWED_TRANSITIONS: dict[DealStatus, set[DealStatus]] = {
     DealStatus.COMPLETED: set(),
     DealStatus.CANCELLED: set(),
     DealStatus.EXPIRED: set(),
-    DealStatus.DISPUTED: set(),
+    DealStatus.DISPUTED: {
+        DealStatus.COMPLETED,
+        DealStatus.CANCELLED,
+        DealStatus.ACCEPTED,
+        DealStatus.PAYMENT_PENDING,
+    },
 }
 
 

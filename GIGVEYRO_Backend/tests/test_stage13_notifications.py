@@ -1,12 +1,11 @@
-import asyncio
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from sqlalchemy import select
 
 from app.enums.account import UserRole
-from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
-from app.models.notification import Notification, NotificationDelivery, NotificationOutbox, NotificationPreference
+from app.enums.notification import NotificationStatus, NotificationType
+from app.models.notification import Notification, NotificationOutbox
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.services.notification import NotificationService
@@ -70,7 +69,7 @@ async def test_telegram_security_code_ttl_and_single_use(db_session, make_accoun
 
     # 1. Verification Code TTL
     raw_code, link = await tg_service.generate_link_code(acc.id)
-    link.verification_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    link.verification_expires_at = datetime.now(UTC) - timedelta(minutes=1)
     await db_session.flush()
 
     res = await tg_service.process_telegram_command(111, 222, f"/start {raw_code}")
@@ -115,7 +114,7 @@ async def test_notification_outbox_atomicity_and_rollback(db_session, make_accou
 @pytest.mark.asyncio
 async def test_mock_telegram_provider_retry_and_owner_monitoring(db_session, make_account):
     acc = await make_account()
-    owner_acc = await make_account(role=UserRole.OWNER)
+    await make_account(role=UserRole.OWNER)
     notif_repo = NotificationRepository(db_session)
     tg_repo = TelegramLinkRepository(db_session)
 

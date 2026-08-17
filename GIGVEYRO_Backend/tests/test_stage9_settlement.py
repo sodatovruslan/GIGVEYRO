@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
@@ -67,7 +67,7 @@ async def test_successful_settlement_flow(
     await make_wallet(user, available=Decimal("0"), frozen=Decimal("50"))
 
     merchant = await make_account(role=UserRole.MERCHANT)
-    m_wallet = await make_merchant_wallet(merchant, available=Decimal("100"))
+    await make_merchant_wallet(merchant, available=Decimal("100"))
 
     deal = await make_deal(
         merchant,
@@ -103,7 +103,12 @@ async def test_successful_settlement_flow(
     assert updated_m_wallet.available_balance == Decimal("120")
 
     u_ledger, _ = await wallet_service.get_ledger_for_account(
-        user.id, entry_type=LedgerEntryType.DEAL_SETTLEMENT, date_from=None, date_to=None, limit=10, offset=0
+        user.id,
+        entry_type=LedgerEntryType.DEAL_SETTLEMENT,
+        date_from=None,
+        date_to=None,
+        limit=10,
+        offset=0,
     )
     assert len(u_ledger) == 1
     assert u_ledger[0].amount == Decimal("-20")
@@ -212,12 +217,11 @@ async def test_settlement_idempotency(
 
 
 @pytest.mark.asyncio
-async def test_concurrency_two_completes(make_account, make_wallet, make_merchant_wallet, make_deal):
+async def test_concurrency_two_completes(
+    make_account, make_wallet, make_merchant_wallet, make_deal
+):
     """Real concurrency test using isolated database sessions for completion."""
     async with engine.connect() as conn1, engine.connect() as conn2:
-        tx1 = await conn1.begin()
-        tx2 = await conn2.begin()
-
         s1 = AsyncSession(bind=conn1, expire_on_commit=False)
         s2 = AsyncSession(bind=conn2, expire_on_commit=False)
 
@@ -298,15 +302,30 @@ async def test_concurrency_two_completes(make_account, make_wallet, make_merchan
 
                 assert final_u_wallet.frozen_balance == Decimal("0")
                 assert final_m_wallet.available_balance == Decimal("20")
+
+                await verify_session.execute(
+                    delete(LedgerEntry).where(LedgerEntry.account_id.in_([user.id, merchant.id]))
+                )
+                await verify_session.execute(delete(Deal).where(Deal.id == deal_id))
+                await verify_session.execute(
+                    delete(UserWallet).where(UserWallet.account_id == user.id)
+                )
+                await verify_session.execute(
+                    delete(MerchantWallet).where(MerchantWallet.account_id == merchant.id)
+                )
+                await verify_session.execute(
+                    delete(Account).where(Account.id.in_([user.id, merchant.id]))
+                )
+                await verify_session.commit()
         finally:
             await s1.close()
             await s2.close()
-            await tx1.rollback()
-            await tx2.rollback()
 
 
 @pytest.mark.asyncio
-async def test_merchant_wallet_endpoints(client: AsyncClient, db_session: AsyncSession, make_account, make_merchant_wallet):
+async def test_merchant_wallet_endpoints(
+    client: AsyncClient, db_session: AsyncSession, make_account, make_merchant_wallet
+):
     merchant = await make_account(role=UserRole.MERCHANT)
     await make_merchant_wallet(merchant, available=Decimal("150.5"))
 

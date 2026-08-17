@@ -87,9 +87,7 @@ class AppealService:
             raise AppealNotAllowedError("only participating USER or MERCHANT can open appeal")
 
         if deal.status not in (DealStatus.ACCEPTED, DealStatus.PAYMENT_PENDING):
-            raise AppealNotAllowedError(
-                f"cannot open appeal for deal in status {deal.status}"
-            )
+            raise AppealNotAllowedError(f"cannot open appeal for deal in status {deal.status}")
 
         active_appeal = await self._appeals.get_active_by_deal_id(deal.id)
         if active_appeal is not None:
@@ -115,7 +113,9 @@ class AppealService:
             except IntegrityError as exc:
                 last_error = exc
         else:
-            raise AppealNotAllowedError("an active appeal already exists for this deal") from last_error
+            raise AppealNotAllowedError(
+                "an active appeal already exists for this deal"
+            ) from last_error
 
         transition_deal(deal, DealStatus.DISPUTED)
         await self._deals.save(deal)
@@ -176,9 +176,7 @@ class AppealService:
             return appeal
 
         if appeal.status != AppealStatus.OPEN:
-            raise InvalidAppealTransitionError(
-                f"cannot review appeal in status {appeal.status}"
-            )
+            raise InvalidAppealTransitionError(f"cannot review appeal in status {appeal.status}")
 
         if owner_note:
             appeal.owner_note = owner_note
@@ -201,7 +199,9 @@ class AppealService:
         if appeal.status == AppealStatus.RESOLVED:
             return appeal
 
-        if appeal.status != AppealStatus.UNDER_REVIEW:
+        if appeal.status == AppealStatus.OPEN:
+            transition_appeal(appeal, AppealStatus.UNDER_REVIEW)
+        elif appeal.status != AppealStatus.UNDER_REVIEW:
             raise InvalidAppealTransitionError(
                 f"cannot resolve appeal in status {appeal.status}, must be UNDER_REVIEW"
             )

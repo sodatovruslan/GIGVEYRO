@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings as app_settings
+from app.core.middleware import in_memory_rate_limiter
 from app.core.security import hash_password
 from app.db.session import engine, get_db
 from app.enums.account import UserRole
@@ -24,6 +25,13 @@ from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
 from app.services.deal import generate_public_id
 from app.services.deposit import generate_deposit_public_id
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    in_memory_rate_limiter._hits.clear()
+    yield
+    in_memory_rate_limiter._hits.clear()
 
 
 @pytest.fixture

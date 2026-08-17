@@ -32,43 +32,57 @@ async def test_health_live_and_ready():
 async def test_rate_limiting_login_brute_force():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         for _ in range(5):
-            await client.post("/auth/login", json={"username": "invalid", "password": "wrongpassword"})
+            await client.post(
+                "/auth/login", json={"username": "invalid", "password": "wrongpassword"}
+            )
 
-        res_limited = await client.post("/auth/login", json={"username": "invalid", "password": "wrongpassword"})
+        res_limited = await client.post(
+            "/auth/login", json={"username": "invalid", "password": "wrongpassword"}
+        )
         assert res_limited.status_code == 429
         assert "Too many login attempts" in res_limited.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_audit_logs_owner_only(make_account):
+async def test_audit_logs_owner_only(client, make_account):
     owner = await make_account(role=UserRole.OWNER, username="audit_owner")
     user = await make_account(role=UserRole.USER, username="audit_user")
 
     from app.core.security import create_access_token
+
     owner_token = create_access_token(subject=owner.id, role=owner.role.value)
     user_token = create_access_token(subject=user.id, role=user.role.value)
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        res_unauth = await client.get("/api/v1/owner/audit-logs")
-        assert res_unauth.status_code == 401
+    res_unauth = await client.get("/api/v1/owner/audit-logs")
+    assert res_unauth.status_code == 401
 
-        res_user = await client.get(
-            "/api/v1/owner/audit-logs",
-            headers={"Authorization": f"Bearer {user_token}"},
-        )
-        assert res_user.status_code == 403
+    res_user = await client.get(
+        "/api/v1/owner/audit-logs",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert res_user.status_code == 403
 
-        res_owner = await client.get(
-            "/api/v1/owner/audit-logs",
-            headers={"Authorization": f"Bearer {owner_token}"},
-        )
-        assert res_owner.status_code == 200
-        assert "items" in res_owner.json()
+    res_owner = await client.get(
+        "/api/v1/owner/audit-logs",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert res_owner.status_code == 200
+    assert "items" in res_owner.json()
 
 
 def test_production_settings_validation():
     with pytest.raises(ValueError, match="DEBUG must be False in production"):
-        Settings(APP_ENV="production", DEBUG=True, DATABASE_URL="postgresql+asyncpg://user:pass@localhost/db", JWT_SECRET_KEY="a"*32)
+        Settings(
+            APP_ENV="production",
+            DEBUG=True,
+            DATABASE_URL="postgresql+asyncpg://user:pass@localhost/db",
+            JWT_SECRET_KEY="a" * 32,
+        )
 
     with pytest.raises(ValueError, match="JWT_SECRET_KEY must be strong"):
-        Settings(APP_ENV="production", DEBUG=False, DATABASE_URL="postgresql+asyncpg://user:pass@localhost/db", JWT_SECRET_KEY="CHANGE_ME")
+        Settings(
+            APP_ENV="production",
+            DEBUG=False,
+            DATABASE_URL="postgresql+asyncpg://user:pass@localhost/db",
+            JWT_SECRET_KEY="CHANGE_ME",
+        )
