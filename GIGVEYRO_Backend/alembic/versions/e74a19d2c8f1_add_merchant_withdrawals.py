@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column('merchant_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('merchant_wallet_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('amount', sa.Numeric(precision=20, scale=8), nullable=False),
-        sa.Column('currency', sa.Enum('USDT', name='wallet_currency'), nullable=False),
+        sa.Column('currency', postgresql.ENUM('USDT', name='wallet_currency', create_type=False), nullable=False),
         sa.Column('destination_type', postgresql.ENUM('usdt_trc20_address', 'bybit_uid', name='withdrawal_destination_type', create_type=False), nullable=False),
         sa.Column('destination', sa.String(length=255), nullable=False),
         sa.Column('status', postgresql.ENUM('pending', 'approved', 'paid', 'rejected', 'cancelled', name='withdrawal_status', create_type=False), nullable=False),
