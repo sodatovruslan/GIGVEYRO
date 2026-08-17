@@ -1,4 +1,7 @@
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import delete
@@ -6,6 +9,41 @@ from sqlalchemy import delete
 from app.enums.account import UserRole
 from app.models.account import Account
 from app.scripts.create_owner import OwnerBootstrapError, bootstrap_owner
+
+
+def test_standalone_create_owner_registers_all_orm_models():
+    project_root = Path(__file__).resolve().parents[1]
+    code = """
+from sqlalchemy.orm import configure_mappers
+
+import app.scripts.create_owner  # noqa: F401
+from app.db.base import Base
+
+configure_mappers()
+
+expected_tables = {
+    "accounts",
+    "notification_preferences",
+    "notifications",
+    "notification_deliveries",
+    "notification_outbox",
+    "telegram_account_links",
+}
+missing_tables = expected_tables.difference(Base.metadata.tables)
+if missing_tables:
+    raise RuntimeError(f"Missing ORM tables: {sorted(missing_tables)}")
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 async def _clear_owners(db_session) -> None:

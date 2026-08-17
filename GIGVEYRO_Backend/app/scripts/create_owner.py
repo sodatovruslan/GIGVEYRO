@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, hash_password
 from app.db.session import AsyncSessionLocal
 from app.enums.account import UserRole
-from app.models.account import Account
+from app.models import Account
 from app.repositories.account import AccountRepository
 
 

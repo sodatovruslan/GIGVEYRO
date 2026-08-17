@@ -6,6 +6,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.models  # noqa: F401  (register all ORM models before application startup)
 from app.api.appeals import router as appeals_router
 from app.api.auth import router as auth_router
 from app.api.deals import router as deals_router
