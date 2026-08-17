@@ -1,7 +1,7 @@
 """stage15_integrations
 
 Revision ID: 0015
-Revises: stage13_notifications_telegram
+Revises: stage13_notif
 Create Date: 2025-02-23 00:00:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision: str = '0015'
-down_revision: Union[str, None] = 'stage13_notifications_telegram'
+down_revision: Union[str, None] = 'stage13_notif'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
