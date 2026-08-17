@@ -1,1 +1,1 @@
-git commit -m "fix(migrations): удалить несовместимый параметр as_scalar в JSONB в миграции stage13"
+git commit -m "fix(migrations): отключить повторное создание ENUM correlation_status в миграции 0015"

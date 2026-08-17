@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.Column('asset_contract', sa.String(length=128), nullable=False),
         sa.Column(
             'correlation_status',
-            sa.Enum('MATCHED', 'AMBIGUOUS', 'UNMATCHED', name='correlation_status'),
+            postgresql.ENUM('MATCHED', 'AMBIGUOUS', 'UNMATCHED', name='correlation_status', create_type=False),
             nullable=False
         ),
         sa.Column('reason', sa.String(length=255), nullable=False),
