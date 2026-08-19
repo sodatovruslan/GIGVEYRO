@@ -68,3 +68,22 @@ export interface LedgerEntry {
   created_by_account_id: string | null;
   created_at: string;
 }
+
+export interface PaymentRequisite {
+  id: string;
+  type: "bank_card";
+  bank_name: string;
+  holder_name: string;
+  phone_number: string | null;
+  masked_card_number: string;
+  is_active: boolean;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrafficSettings {
+  is_enabled: boolean;
+  enabled_at: string | null;
+  disabled_at: string | null;
+}
