@@ -13,11 +13,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Введите логин и пароль" }, { status: 400 });
   }
 
-  const tokenResponse = await backendFetch("/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  let tokenResponse: Response;
+  try {
+    tokenResponse = await backendFetch("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    return NextResponse.json({ detail: "Backend временно недоступен" }, { status: 502 });
+  }
   if (!tokenResponse.ok) {
     return new NextResponse(await tokenResponse.arrayBuffer(), {
       status: tokenResponse.status,
@@ -26,9 +31,14 @@ export async function POST(request: NextRequest) {
   }
 
   const tokens = (await tokenResponse.json()) as TokenResponse;
-  const accountResponse = await backendFetch("/auth/me", {
-    headers: { Authorization: `Bearer ${tokens.access_token}` },
-  });
+  let accountResponse: Response;
+  try {
+    accountResponse = await backendFetch("/auth/me", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+  } catch {
+    return NextResponse.json({ detail: "Backend временно недоступен" }, { status: 502 });
+  }
   if (!accountResponse.ok) {
     return NextResponse.json({ detail: "Не удалось получить профиль аккаунта" }, { status: 502 });
   }

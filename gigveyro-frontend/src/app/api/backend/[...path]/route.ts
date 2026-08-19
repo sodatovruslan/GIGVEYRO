@@ -40,12 +40,15 @@ async function forward(request: NextRequest, context: RouteContext) {
     return backendFetch(pathname, { method: request.method, headers, body });
   };
 
-  let backendResponse = await makeRequest(accessToken);
+  let backendResponse: Response;
+  try { backendResponse = await makeRequest(accessToken); }
+  catch { return NextResponse.json({ detail: "Backend временно недоступен" }, { status: 502 }); }
   if (backendResponse.status === 401 && refreshToken) {
     renewed = await refreshTokens(refreshToken);
     if (renewed) {
       accessToken = renewed.access_token;
-      backendResponse = await makeRequest(accessToken);
+      try { backendResponse = await makeRequest(accessToken); }
+      catch { return NextResponse.json({ detail: "Backend временно недоступен" }, { status: 502 }); }
     }
   }
 

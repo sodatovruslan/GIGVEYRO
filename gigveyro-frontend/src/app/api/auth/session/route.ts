@@ -17,13 +17,16 @@ export async function GET(request: NextRequest) {
   let accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
   let renewed = null;
-  let accountResponse = accessToken ? await readAccount(accessToken) : null;
+  let accountResponse: Response | null = null;
+  try { accountResponse = accessToken ? await readAccount(accessToken) : null; }
+  catch { return NextResponse.json({ detail: "Backend временно недоступен" }, { status: 502 }); }
 
   if ((!accountResponse || accountResponse.status === 401) && refreshToken) {
     renewed = await refreshTokens(refreshToken);
     if (renewed) {
       accessToken = renewed.access_token;
-      accountResponse = await readAccount(accessToken);
+      try { accountResponse = await readAccount(accessToken); }
+      catch { return NextResponse.json({ detail: "Backend временно недоступен" }, { status: 502 }); }
     }
   }
 

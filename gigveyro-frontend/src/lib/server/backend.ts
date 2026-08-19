@@ -9,17 +9,23 @@ const backendUrl = process.env.BACKEND_API_URL || "http://127.0.0.1:8000";
 
 export function backendFetch(path: string, init: RequestInit = {}) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return fetch(`${backendUrl.replace(/\/$/, "")}${normalizedPath}`, { ...init, cache: "no-store" });
+  return fetch(`${backendUrl.replace(/\/$/, "")}${normalizedPath}`, {
+    ...init,
+    cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(15_000),
+  });
 }
 
 export async function refreshTokens(refreshToken: string): Promise<TokenResponse | null> {
-  const response = await backendFetch("/auth/refresh", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  if (!response.ok) return null;
-  return (await response.json()) as TokenResponse;
+  try {
+    const response = await backendFetch("/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as TokenResponse;
+  } catch { return null; }
 }
 
 export const authCookieOptions = {
