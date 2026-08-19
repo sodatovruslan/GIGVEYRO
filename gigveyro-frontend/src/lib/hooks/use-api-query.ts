@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 
 import { ApiError } from "@/lib/api/error";
 
-export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default") {
+export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default", enabled = true) {
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
 
   async function load() {
+    if (!enabled) return;
     setLoading(true);
     setError("");
     try {
@@ -22,6 +23,7 @@ export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default") {
   }
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     void Promise.resolve()
       .then(loader)
@@ -37,6 +39,6 @@ export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default") {
     return () => { active = false; };
   // The caller supplies a semantic key for each loader input.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey]);
+  }, [queryKey, enabled]);
   return { data, loading, error, refetch: load, setData };
 }

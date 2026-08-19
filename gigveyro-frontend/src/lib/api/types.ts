@@ -107,3 +107,27 @@ export interface MerchantWithdrawal {
   paid_at: string | null;
   cancelled_at: string | null;
 }
+
+export type DealStatus = "created" | "available" | "accepted" | "payment_pending" | "completed" | "cancelled" | "expired" | "disputed";
+
+export interface Deal {
+  id: string;
+  public_id: string;
+  merchant_id: string;
+  user_id: string | null;
+  payment_requisite_id: string | null;
+  status: DealStatus;
+  amount_tjs: string;
+  exchange_rate: string | null;
+  amount_usdt: string | null;
+  requisite_type: "bank_card" | null;
+  requisite_bank_name: string | null;
+  requisite_holder_name: string | null;
+  requisite_masked_card_number: string | null;
+  expires_at: string;
+  accepted_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
