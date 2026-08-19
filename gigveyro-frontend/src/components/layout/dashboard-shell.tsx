@@ -6,6 +6,7 @@ import { type ReactNode, useState } from "react";
 
 import { useAuth } from "@/features/auth/auth-provider";
 import type { UserRole } from "@/lib/api/types";
+import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 
 import styles from "./dashboard-shell.module.css";
 
@@ -85,7 +86,7 @@ export function DashboardShell({ role, children }: { role: UserRole; children: R
         <header className={styles.header}>
           <button className={styles.menuButton} onClick={() => setMenuOpen(true)} aria-label="Открыть меню">☰</button>
           <div><span className={styles.liveDot} /> Система работает штатно</div>
-          <div className={styles.headerUser}><span>{account?.username}</span><div>{account?.full_name?.slice(0, 1).toUpperCase()}</div></div>
+          <div className={styles.headerActions}><ThemeSwitcher /><div className={styles.headerUser}><span>{account?.username}</span><div>{account?.full_name?.slice(0, 1).toUpperCase()}</div></div></div>
         </header>
         <main className={styles.content}>{children}</main>
       </div>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/auth-provider";
 import { dashboardPath } from "@/features/auth/roles";
 import { ApiError } from "@/lib/api/error";
+import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 
 import styles from "./page.module.css";
 
@@ -38,6 +39,7 @@ export default function LoginPage() {
   return (
     <main className={styles.page}>
       <section className={styles.panel}>
+        <ThemeSwitcher className={styles.themeSwitcher} />
         <div className={styles.brand}>
           <div className={styles.logo}>G</div>
           <div><strong>GIGVEYRO</strong><span>PAYMENT GATEWAY</span></div>

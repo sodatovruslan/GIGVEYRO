@@ -4,16 +4,16 @@
 .brand > span:last-child { display: grid; }
 .brand strong { font: 800 17px/1 var(--font-display); letter-spacing: .08em; }
 .brand small { margin-top: 5px; color: var(--text-muted); font-size: 8px; letter-spacing: .19em; }
-.logo { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(135deg, var(--primary), #b0120b); box-shadow: 0 0 24px var(--primary-glow); font: 800 19px/1 var(--font-display); }
+.logo { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 12px; color: var(--on-accent); background: linear-gradient(135deg, var(--primary), var(--accent-logo-deep)); box-shadow: 0 0 24px var(--primary-glow); font: 800 19px/1 var(--font-display); }
 .nav { display: grid; gap: 5px; margin-top: 48px; }
 .nav p { padding: 0 12px 9px; color: var(--text-muted); font-size: 9px; font-weight: 700; letter-spacing: .16em; }
 .nav a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 13px; border-radius: 11px; color: var(--text-secondary); font-size: 13px; font-weight: 500; transition: color var(--transition), background var(--transition); }
-.nav a:hover { color: var(--text); background: rgba(255, 255, 255, .04); }
-.nav a.active { color: #fff; background: var(--primary-soft); }
+.nav a:hover { color: var(--text); background: var(--surface-action); }
+.nav a.active { color: var(--active-nav-text); background: var(--primary-soft); }
 .nav a.active::before { content: ""; position: absolute; left: -17px; width: 3px; height: 22px; border-radius: 0 4px 4px 0; background: var(--primary); box-shadow: 0 0 14px var(--primary); }
 .glyph { width: 21px; color: inherit; font-size: 19px; text-align: center; }
 .profile { display: grid; grid-template-columns: 36px 1fr 30px; align-items: center; gap: 10px; margin-top: auto; padding: 12px 9px 0; border-top: 1px solid var(--border); }
-.avatar, .headerUser div { display: grid; place-items: center; border: 1px solid rgba(255, 59, 48, .25); border-radius: 11px; color: var(--primary); background: var(--primary-soft); font-weight: 700; }
+.avatar, .headerUser div { display: grid; place-items: center; border: 1px solid var(--accent-border); border-radius: 11px; color: var(--primary); background: var(--primary-soft); font-weight: 700; }
 .avatar { width: 36px; height: 36px; }
 .profile div:nth-child(2) { min-width: 0; display: grid; }
 .profile strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -21,9 +21,10 @@
 .profile button { width: 30px; height: 30px; border-radius: 8px; color: var(--text-muted); background: transparent; cursor: pointer; }
 .profile button:hover { color: var(--primary); background: var(--primary-soft); }
 .workspace { min-height: 100vh; padding-left: var(--sidebar-width); }
-.header { position: sticky; top: 0; z-index: 20; height: var(--header-height); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border); background: rgba(7, 9, 13, .72); color: var(--text-muted); font-size: 11px; backdrop-filter: blur(18px); }
+.header { position: sticky; top: 0; z-index: 20; height: var(--header-height); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border); background: var(--header-bg); color: var(--text-muted); font-size: 11px; backdrop-filter: blur(18px); }
 .liveDot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 10px var(--success); }
 .headerUser { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); }
+.headerActions { display: flex; align-items: center; gap: 12px; }
 .headerUser div { width: 32px; height: 32px; }
 .content { width: min(100%, 1600px); margin: 0 auto; padding: 30px 32px 56px; }
 .menuButton { display: none; color: var(--text); background: transparent; font-size: 21px; cursor: pointer; }
@@ -36,5 +37,5 @@
   .header { padding: 0 18px; }
   .header > div:first-of-type { display: none; }
   .content { padding: 24px 18px 44px; }
-  .backdrop { position: fixed; inset: 0; z-index: 25; display: block; background: rgba(0, 0, 0, .66); backdrop-filter: blur(3px); }
+  .backdrop { position: fixed; inset: 0; z-index: 25; display: block; background: var(--overlay-mobile); backdrop-filter: blur(3px); }
 }

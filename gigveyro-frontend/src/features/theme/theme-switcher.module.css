@@ -1,0 +1,4 @@
+.switcher{display:flex;align-items:center;gap:3px;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--surface-subtle);box-shadow:var(--shadow-sm)}
+.switcher button{width:30px;height:30px;display:grid;place-content:center;border-radius:7px;color:var(--text-muted);background:transparent;font-size:14px;cursor:pointer;transition:color var(--transition),background var(--transition),box-shadow var(--transition)}
+.switcher button:hover{color:var(--text);background:var(--surface-hover)}.switcher button.active{color:var(--primary);background:var(--surface-elevated);box-shadow:var(--shadow-sm)}
+@media(max-width:520px){.switcher{gap:1px}.switcher button{width:28px;height:28px}}
