@@ -87,3 +87,23 @@ export interface TrafficSettings {
   enabled_at: string | null;
   disabled_at: string | null;
 }
+
+export interface MerchantWithdrawal {
+  id: string;
+  public_id: string;
+  merchant_id: string;
+  merchant_wallet_id: string;
+  amount: string;
+  currency: string;
+  destination_type: "usdt_trc20_address" | "bybit_uid";
+  destination: string;
+  status: "pending" | "approved" | "paid" | "rejected" | "cancelled";
+  comment: string | null;
+  owner_comment: string | null;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+  rejected_at: string | null;
+  paid_at: string | null;
+  cancelled_at: string | null;
+}
