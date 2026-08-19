@@ -131,3 +131,23 @@ export interface Deal {
   created_at: string;
   updated_at: string;
 }
+
+export type AppealStatus = "open" | "under_review" | "resolved" | "cancelled";
+export type AppealReason = "payment_not_received" | "wrong_amount" | "payment_proof_issue" | "timeout_dispute" | "other";
+export interface Appeal {
+  id: string;
+  public_id: string;
+  deal_id: string;
+  opened_by_account_id: string;
+  opened_by_role: UserRole;
+  reason_code: AppealReason;
+  message: string;
+  status: AppealStatus;
+  resolution: "settle_to_merchant" | "release_to_user" | null;
+  owner_note: string | null;
+  previous_deal_status: DealStatus;
+  resolved_by_account_id: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+}
