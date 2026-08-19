@@ -16,6 +16,7 @@ const navigation: Record<UserRole, NavigationItem[]> = {
     { href: "/owner", label: "Обзор", glyph: "◇" },
     { href: "/owner/accounts", label: "Аккаунты", glyph: "◎" },
     { href: "/owner/deals", label: "Сделки", glyph: "⇄" },
+    { href: "/owner/deposits", label: "Депозиты", glyph: "↓" },
     { href: "/owner/withdrawals", label: "Выводы", glyph: "↗" },
     { href: "/owner/appeals", label: "Апелляции", glyph: "!" },
     { href: "/owner/notifications", label: "Уведомления", glyph: "○" },
@@ -26,6 +27,7 @@ const navigation: Record<UserRole, NavigationItem[]> = {
   user: [
     { href: "/user", label: "Главная", glyph: "◇" },
     { href: "/user/wallet", label: "Баланс", glyph: "₮" },
+    { href: "/user/deposits", label: "Пополнение", glyph: "↓" },
     { href: "/user/requisites", label: "Реквизиты", glyph: "▣" },
     { href: "/user/deals", label: "Сделки", glyph: "⇄" },
     { href: "/user/appeals", label: "Апелляции", glyph: "!" },

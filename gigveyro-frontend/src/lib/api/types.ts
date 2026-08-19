@@ -204,3 +204,27 @@ export interface AuditLogEntry {
   request_id: string | null;
   created_at: string;
 }
+
+export type DepositStatus = "waiting" | "detected" | "confirming" | "confirmed" | "credited" | "expired" | "failed" | "amount_mismatch";
+export interface Deposit {
+  id: string;
+  public_id: string;
+  account_id: string;
+  network: string;
+  asset: string;
+  expected_amount: string;
+  received_amount: string | null;
+  credited_amount: string | null;
+  deposit_address: string;
+  tx_hash: string | null;
+  confirmations: number;
+  required_confirmations: number;
+  status: DepositStatus;
+  expires_at: string;
+  detected_at: string | null;
+  confirmed_at: string | null;
+  credited_at: string | null;
+  failed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
