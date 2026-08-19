@@ -178,3 +178,29 @@ export interface TelegramLinkCode {
   expires_at: string;
   bot_username: string;
 }
+
+export interface IntegrationDiagnostics {
+  status: string;
+  environment: string;
+  providers: {
+    deposit_provider: string;
+    exchange_rate_provider: string;
+    payout_provider: string;
+  };
+  safety: {
+    payout_enabled: boolean;
+    usdt_contract_address: string;
+    required_confirmations: number;
+  };
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_account_id: string | null;
+  actor_role: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  request_id: string | null;
+  created_at: string;
+}
