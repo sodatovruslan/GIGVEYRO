@@ -1,0 +1,13 @@
+"use client";
+
+import { useState } from "react";
+
+import { analyticsApi } from "@/lib/api/analytics";
+import { useApiQuery } from "@/lib/hooks/use-api-query";
+
+import { Heading } from "../owner-components";
+import styles from "../owner.module.css";
+
+type Period="today"|"7d"|"30d"|"90d";
+export default function OwnerAnalyticsPage(){const[period,setPeriod]=useState<Period>("30d");const query=useApiQuery(()=>analyticsApi.bundle(period),`analytics:${period}`);const data=query.data;return <section><div style={{display:"flex",justifyContent:"space-between",alignItems:"end",gap:16}}><Heading title="Аналитика" text="Метрики Backend V1 без клиентских финансовых расчётов"/><select value={period} onChange={(e)=>setPeriod(e.target.value as Period)}><option value="today">Сегодня</option><option value="7d">7 дней</option><option value="30d">30 дней</option><option value="90d">90 дней</option></select></div>{query.loading?<div className={styles.state}>Загрузка аналитики…</div>:query.error?<div className={styles.error}>{query.error}</div>:data&&<><div className={styles.kpiGrid}><K label="Всего сделок" value={data.deals.total_deals}/><K label="Завершено" value={data.deals.completed_deals}/><K label="Completion rate" value={`${data.deals.completion_rate}%`}/><K label="Dispute rate" value={`${data.deals.dispute_rate}%`}/></div><div className={styles.financeGrid}><F label="Объём TJS" value={data.deals.total_volume_tjs} unit="TJS"/><F label="Объём USDT" value={data.deals.total_volume_usdt}/><F label="Зачислено депозитов" value={data.flow.deposits_credited_usdt}/><F label="Выплачено выводов" value={data.flow.withdrawals_paid_usdt}/></div><div className={styles.dashboardGrid}><article className={styles.quick}><span>ACCOUNTS</span><h2>Аккаунты</h2><K label="Активные USER" value={data.accounts.users_active}/><K label="Активные MERCHANT" value={data.accounts.merchants_active}/><K label="Traffic enabled" value={data.accounts.traffic_enabled_users}/></article><article className={styles.quick}><span>BALANCE INTEGRITY</span><h2>Контроль балансов</h2><F label="USER wallets" value={data.integrity.user_wallet_total_usdt}/><F label="MERCHANT wallets" value={data.integrity.merchant_wallet_total_usdt}/><p style={{color:"var(--success)",marginTop:15}}>● {data.integrity.status.toUpperCase()}</p></article></div></>}</section>}
+function K({label,value}:{label:string;value:number|string}){return <div className={styles.kpi}><span>{label}</span><strong>{value}</strong></div>}function F({label,value,unit="USDT"}:{label:string;value:string;unit?:string}){return <div><span>{label}</span><strong>{value}</strong><small>{unit}</small></div>}
