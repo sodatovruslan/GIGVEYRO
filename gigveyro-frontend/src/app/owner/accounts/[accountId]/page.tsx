@@ -31,6 +31,8 @@ export default function OwnerAccountDetailsPage() {
     () => ownerAccountsApi.ledger(accountId, account?.role === "merchant"),
     `ledger:${accountId}:${account?.role || "unknown"}`,
   );
+  const requisitesQuery = useApiQuery(() => ownerAccountsApi.requisites(accountId), `owner-requisites:${accountId}`, account?.role === "user");
+  const trafficQuery = useApiQuery(() => ownerAccountsApi.traffic(accountId), `owner-traffic:${accountId}`, account?.role === "user");
 
   function open(nextDialog: Dialog) {
     setMutationError(""); setAmount(""); setDescription(""); setPassword(""); setDialog(nextDialog);
@@ -91,6 +93,10 @@ export default function OwnerAccountDetailsPage() {
             {"held_balance" in wallet && <WalletCard label="Удерживается" value={wallet.held_balance} />}
           </>}
         </div>
+        {!isMerchant && <div className={styles.userOperations}>
+          <article><span>TRAFFIC</span><h2>Приём сделок</h2>{trafficQuery.loading ? <p>Загрузка…</p> : trafficQuery.error ? <p className={styles.error}>{trafficQuery.error}</p> : <strong className={trafficQuery.data?.is_enabled ? styles.success : styles.danger}>{trafficQuery.data?.is_enabled ? "Включён" : "Выключен"}</strong>}</article>
+          <article><span>REQUISITES</span><h2>Реквизиты</h2>{requisitesQuery.loading ? <p>Загрузка…</p> : requisitesQuery.error ? <p className={styles.error}>{requisitesQuery.error}</p> : !requisitesQuery.data?.length ? <p>Реквизитов нет</p> : <div className={styles.requisiteList}>{requisitesQuery.data.map((item) => <div key={item.id}><strong>{item.masked_card_number}</strong><small>{item.bank_name} · {item.holder_name} · {item.is_active ? "активен" : "выключен"}</small></div>)}</div>}</article>
+        </div>}
         <div className={styles.ledgerCard}><div className={styles.ledgerHeader}><div><span>TRANSACTIONS</span><h2>История операций</h2></div><button onClick={ledgerQuery.refetch}>Обновить</button></div>
           {ledgerQuery.loading ? <div className={styles.ledgerState}>Загрузка операций…</div> : ledgerQuery.error ? <div className={`${styles.ledgerState} ${styles.error}`}>{ledgerQuery.error}</div> : !ledgerQuery.data?.items.length ? <div className={styles.ledgerState}>Операций пока нет</div> : <div className={styles.tableScroll}><table><thead><tr><th>Дата</th><th>Тип</th><th>Описание</th><th>Сумма</th></tr></thead><tbody>{ledgerQuery.data.items.map((entry) => <tr key={entry.id}><td>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.created_at))}</td><td>{entry.type}</td><td>{entry.description || "—"}</td><td className={Number(entry.amount) >= 0 ? styles.positive : styles.negative}>{Number(entry.amount) >= 0 ? "+" : ""}{entry.amount} {entry.currency.toUpperCase()}</td></tr>)}</tbody></table></div>}
         </div>

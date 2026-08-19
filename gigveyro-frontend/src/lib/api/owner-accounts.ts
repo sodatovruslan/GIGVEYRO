@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { Account, LedgerEntry, MerchantWallet, Paginated, UserRole, Wallet } from "@/lib/api/types";
+import type { Account, LedgerEntry, MerchantWallet, Paginated, PaymentRequisite, TrafficSettings, UserRole, Wallet } from "@/lib/api/types";
 
 export interface AccountFilters {
   search?: string;
@@ -38,6 +38,8 @@ export const ownerAccountsApi = {
   userWallet: (id: string) => apiFetch<Wallet>(`/owner/accounts/${id}/wallet`),
   merchantWallet: (id: string) => apiFetch<MerchantWallet>(`/owner/accounts/${id}/merchant-wallet`),
   ledger: (id: string, merchant: boolean) => apiFetch<Paginated<LedgerEntry>>(`/owner/accounts/${id}/${merchant ? "merchant-wallet/ledger" : "wallet/ledger"}?limit=20&offset=0`),
+  requisites: (id: string) => apiFetch<PaymentRequisite[]>(`/owner/accounts/${id}/requisites`),
+  traffic: (id: string) => apiFetch<TrafficSettings>(`/owner/accounts/${id}/traffic`),
   adjustWallet: (id: string, action: "allocate" | "insurance" | "adjust", amount: string, description: string) =>
     apiFetch<Wallet>(`/owner/accounts/${id}/wallet/${action}`, {
       method: "POST",
