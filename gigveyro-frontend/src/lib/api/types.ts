@@ -151,3 +151,30 @@ export interface Appeal {
   updated_at: string;
   resolved_at: string | null;
 }
+
+export interface NotificationItem {
+  id: string;
+  account_id: string;
+  type: string;
+  title: string;
+  message: string;
+  payload: Record<string, unknown> | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationPreferences {
+  account_id: string;
+  in_app_enabled: boolean;
+  telegram_enabled: boolean;
+  deal_notifications: boolean;
+  deposit_notifications: boolean;
+  appeal_notifications: boolean;
+  withdrawal_notifications: boolean;
+}
+
+export interface TelegramLinkCode {
+  verification_code: string;
+  expires_at: string;
+  bot_username: string;
+}

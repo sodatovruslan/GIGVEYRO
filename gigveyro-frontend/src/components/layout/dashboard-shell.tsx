@@ -18,6 +18,7 @@ const navigation: Record<UserRole, NavigationItem[]> = {
     { href: "/owner/deals", label: "Сделки", glyph: "⇄" },
     { href: "/owner/withdrawals", label: "Выводы", glyph: "↗" },
     { href: "/owner/appeals", label: "Апелляции", glyph: "!" },
+    { href: "/owner/notifications", label: "Уведомления", glyph: "○" },
     { href: "/owner/analytics", label: "Аналитика", glyph: "⌁" },
     { href: "/owner/integrations", label: "Интеграции", glyph: "⌘" },
     { href: "/owner/audit", label: "Журнал", glyph: "≡" },
