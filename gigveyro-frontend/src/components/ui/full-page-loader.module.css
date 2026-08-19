@@ -1,0 +1,11 @@
+.page { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 18px; color: var(--text-secondary); }
+.mark {
+  width: 54px; height: 54px; display: grid; place-items: center; border-radius: 16px;
+  color: #fff; background: linear-gradient(135deg, var(--primary), #b61610);
+  box-shadow: 0 0 32px var(--primary-glow); font: 800 25px/1 var(--font-display);
+}
+.spinner {
+  width: 24px; height: 24px; border: 2px solid var(--border-strong); border-top-color: var(--primary);
+  border-radius: 50%; animation: spin 700ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
