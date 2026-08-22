@@ -5,17 +5,25 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { AuthOperationGate } from "@/features/auth/auth-operation-gate";
 import { ApiError, apiErrorFromPayload } from "@/lib/api/error";
 import { abortApiGeneration } from "@/lib/api/client";
-import type { Account, LoginInput, TwoFactorRequiredResponse } from "@/lib/api/types";
+import type {
+  Account,
+  LoginInput,
+  TwoFactorRequiredResponse,
+  TwoFactorSetupRequiredResponse,
+} from "@/lib/api/types";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
 export type LoginResult =
   | { kind: "authenticated"; account: Account }
-  | { kind: "two_factor_required"; challengeToken: string; expiresIn: number };
+  | { kind: "two_factor_required"; challengeToken: string; expiresIn: number }
+  | { kind: "two_factor_setup_required"; setupToken: string; expiresIn: number };
+export interface ForcedSetupConfirmResult { account: Account; recoveryCodes: string[] }
 interface AuthContextValue {
   account: Account | null;
   status: AuthStatus;
   login: (input: LoginInput) => Promise<LoginResult>;
   verifyTwoFactor: (challengeToken: string, code: string) => Promise<Account>;
+  confirmForcedTwoFactorSetup: (setupToken: string, code: string) => Promise<ForcedSetupConfirmResult>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
 }
@@ -78,6 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const challenge = payload as TwoFactorRequiredResponse;
       return { kind: "two_factor_required", challengeToken: challenge.challenge_token, expiresIn: challenge.expires_in };
     }
+    if (payload && typeof payload === "object" && "two_factor_setup_required" in payload) {
+      const setup = payload as TwoFactorSetupRequiredResponse;
+      return { kind: "two_factor_setup_required", setupToken: setup.setup_token, expiresIn: setup.expires_in };
+    }
     const nextAccount = payload as Account;
     setAccount(nextAccount);
     setStatus("authenticated");
@@ -107,6 +119,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextAccount;
   }, []);
 
+  const confirmForcedTwoFactorSetup = useCallback(async (setupToken: string, code: string) => {
+    const operation = gateRef.current.startExclusive();
+    abortApiGeneration();
+    let response: Response;
+    try {
+      response = await fetch("/api/auth/2fa/setup-required/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setup_token: setupToken, totp_code: code }),
+        cache: "no-store",
+      });
+    } catch {
+      throw new ApiError(0, "Connection failed");
+    }
+    const payload = await response.json().catch(() => null) as unknown;
+    if (!gateRef.current.isCurrent(operation)) throw new ApiError(409, "Authentication request was superseded");
+    if (!response.ok) throw apiErrorFromPayload(response.status, payload);
+    const result = payload as { account: Account; recovery_codes: string[] };
+    setAccount(result.account);
+    setStatus("authenticated");
+    return { account: result.account, recoveryCodes: result.recovery_codes };
+  }, []);
+
   const logout = useCallback(async () => {
     gateRef.current.startExclusive();
     abortApiGeneration();
@@ -116,8 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ account, status, login, verifyTwoFactor, logout, restoreSession }),
-    [account, login, verifyTwoFactor, logout, restoreSession, status],
+    () => ({ account, status, login, verifyTwoFactor, confirmForcedTwoFactorSetup, logout, restoreSession }),
+    [account, login, verifyTwoFactor, confirmForcedTwoFactorSetup, logout, restoreSession, status],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

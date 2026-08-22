@@ -28,6 +28,12 @@ export interface TwoFactorRequiredResponse {
   expires_in: number;
 }
 
+export interface TwoFactorSetupRequiredResponse {
+  two_factor_setup_required: true;
+  setup_token: string;
+  expires_in: number;
+}
+
 export interface TwoFactorStatus {
   enabled: boolean;
   enabled_at: string | null;
@@ -43,10 +49,32 @@ export interface TwoFactorSetupStart {
 export interface TwoFactorSetupConfirmResult {
   enabled_at: string;
   recovery_codes: string[];
+  // Populated only when confirming via a forced-onboarding setup_token -
+  // no session existed before this call, so one is created here.
+  access_token?: string;
+  refresh_token?: string;
+  access_expires_in?: number;
 }
 
 export interface TwoFactorRegenerateResult {
   recovery_codes: string[];
+}
+
+export interface AuthSessionInfo {
+  id: string;
+  created_at: string;
+  last_used_at: string;
+  expires_at: string;
+  device_name: string | null;
+  is_current: boolean;
+}
+
+export interface AuthSessionListResponse {
+  items: AuthSessionInfo[];
+}
+
+export interface LogoutAllResult {
+  revoked_count: number;
 }
 
 export interface ValidationIssue {

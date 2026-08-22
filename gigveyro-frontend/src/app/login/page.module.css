@@ -19,6 +19,14 @@
 .error { padding: 11px 13px; border: 1px solid var(--danger-border); border-radius: var(--radius-sm); color: var(--danger-text); background: var(--danger-soft); font-size: 12px; }
 .security { margin-top: 26px; color: var(--text-muted); font-size: 10px; text-align: center; }
 .linkButton { color: var(--primary); font-size: 10px; font-weight: 600; text-decoration: underline; cursor: pointer; background: none; border: 0; padding: 0; }
+.setupHint { color: var(--text-secondary); font-size: 12px; }
+.qrWrap { display: grid; justify-items: center; padding: 16px; border-radius: var(--radius-sm); background: var(--surface-control); }
+.qrWrap img { width: 180px; height: 180px; border-radius: 8px; background: #fff; padding: 8px; }
+.manualKey { margin-top: 8px; font-family: monospace; letter-spacing: .08em; font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-control); word-break: break-all; text-align: center; }
+.recoveryGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: monospace; }
+.recoveryGrid span { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-control); text-align: center; font-size: 13px; letter-spacing: .05em; }
+.recoveryActions { display: flex; gap: 10px; }
+.recoveryActions button { height: 42px; flex: 1; border-radius: var(--radius-sm); background: var(--surface-control); color: var(--text-primary); font-weight: 600; cursor: pointer; }
 .visual { position: relative; display: grid; place-content: center; justify-items: center; gap: 36px; overflow: hidden; background: radial-gradient(circle, var(--accent-visual), transparent 46%); color: var(--text-secondary); letter-spacing: .18em; text-transform: uppercase; font-size: 11px; }
 .visual::before { content: ""; position: absolute; inset: 12%; border: 1px solid var(--surface-action); border-radius: 50%; }
 .orbit { width: min(34vw, 360px); aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; box-shadow: inset 0 0 80px var(--accent-decorative), 0 0 80px var(--orbit-shadow); }
