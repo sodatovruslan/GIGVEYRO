@@ -29,6 +29,7 @@ export const ownerOperationsApi = {
     offset: filters.offset ?? 0,
   })}`),
   withdrawals: (status?: MerchantWithdrawal["status"], limit = 20, offset = 0) => apiFetch<Paginated<MerchantWithdrawal>>(`/owner/withdrawals?${queryString({ status, limit, offset })}`),
+  getWithdrawal: (id: string) => apiFetch<MerchantWithdrawal>(`/owner/withdrawals/${id}`),
   approveWithdrawal: (id: string, comment: string | null) => apiFetch<MerchantWithdrawal>(`/owner/withdrawals/${id}/approve`, { method: "POST", body: { comment } }),
   rejectWithdrawal: (id: string, comment: string | null) => apiFetch<MerchantWithdrawal>(`/owner/withdrawals/${id}/reject`, { method: "POST", body: { comment } }),
   markWithdrawalPaid: (id: string, comment: string | null) => apiFetch<MerchantWithdrawal>(`/owner/withdrawals/${id}/mark-paid`, { method: "POST", body: { comment } }),

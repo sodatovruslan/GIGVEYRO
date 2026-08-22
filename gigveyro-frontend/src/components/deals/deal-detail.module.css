@@ -1,0 +1,8 @@
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:18px}
+.grid>div{min-width:0;padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card-bg);box-shadow:var(--shadow)}
+.grid span{display:block;margin-bottom:8px;color:var(--text-muted);font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.grid strong{overflow-wrap:anywhere;font-size:12px;color:var(--text)}
+.grid small{display:block;margin-top:4px;color:var(--text-muted)}
+.grid code{overflow-wrap:anywhere;font-size:10px;color:var(--text-secondary)}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
