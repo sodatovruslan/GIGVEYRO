@@ -14,6 +14,7 @@ Worker Architecture:
   - scan_deposits               : every SCAN_INTERVAL_SECONDS (default 60s)
   - expire_stale_deals          : every 5 minutes
   - process_approved_payouts    : every 10 minutes (NO-OP when PAYOUT_ENABLED=False)
+  - cleanup_expired_sessions    : hourly (prunes expired AuthSession / 2FA challenge rows)
 
 WebSocket Note:
   The ARQ worker runs in a SEPARATE process from the FastAPI web server.
@@ -32,6 +33,7 @@ from app.workers.jobs.deal_expiry import expire_stale_deals
 from app.workers.jobs.deposit_scanner import scan_deposits
 from app.workers.jobs.notification_outbox import process_notification_outbox
 from app.workers.jobs.payout_orchestrator import process_approved_payouts
+from app.workers.jobs.session_cleanup import cleanup_expired_sessions
 
 
 def _redis_settings() -> RedisSettings:
@@ -123,6 +125,7 @@ class WorkerSettings:
         scan_deposits,
         expire_stale_deals,
         process_approved_payouts,
+        cleanup_expired_sessions,
     ]
 
     # Cron schedule definitions
@@ -147,6 +150,12 @@ class WorkerSettings:
         cron(
             process_approved_payouts,
             minute={0, 10, 20, 30, 40, 50},  # every 10 minutes
+            second={0},
+            unique=True,
+        ),
+        cron(
+            cleanup_expired_sessions,
+            minute={0},  # hourly
             second={0},
             unique=True,
         ),
