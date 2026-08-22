@@ -1,6 +1,7 @@
 from app.models.account import Account
 from app.models.appeal import DealAppeal
 from app.models.audit import AuditLog
+from app.models.auth_session import AuthSession
 from app.models.deal import Deal
 from app.models.deposit import Deposit, UnmatchedTransfer
 from app.models.ledger import LedgerEntry
@@ -22,6 +23,7 @@ __all__ = [
     "Account",
     "DealAppeal",
     "AuditLog",
+    "AuthSession",
     "Deal",
     "Deposit",
     "UnmatchedTransfer",
