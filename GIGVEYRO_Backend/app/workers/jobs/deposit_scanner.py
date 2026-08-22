@@ -124,6 +124,7 @@ async def _run_scan(job_id: str, attempt: int) -> dict:
                 notification_service=notification_service,
             )
             processed = await service.scan_and_correlate_deposits()
+            await session.commit()
 
         record_worker_success(JOB_NAME)
         logger.info(

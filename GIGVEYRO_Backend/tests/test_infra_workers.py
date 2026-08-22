@@ -12,7 +12,7 @@ Tests:
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -178,6 +178,37 @@ class TestDepositScannerSafety:
 
         assert result["status"] == "skipped"
         assert result["reason"] == "mock_provider"
+
+    async def test_deposit_scanner_commits_processed_results(self):
+        """The worker persists the service transaction before closing its session."""
+        from app.workers.jobs.deposit_scanner import _run_scan
+
+        session = MagicMock()
+        session.commit = AsyncMock()
+        session_context = MagicMock()
+        session_context.__aenter__ = AsyncMock(return_value=session)
+        session_context.__aexit__ = AsyncMock(return_value=None)
+
+        provider = MagicMock()
+        provider.get_deposit_address.return_value = "test-deposit-address"
+        service = MagicMock()
+        service.scan_and_correlate_deposits = AsyncMock(return_value=2)
+
+        with (
+            patch(
+                "app.workers.jobs.deposit_scanner.AsyncSessionLocal",
+                return_value=session_context,
+            ),
+            patch(
+                "app.workers.jobs.deposit_scanner.get_deposit_provider",
+                return_value=provider,
+            ),
+            patch("app.workers.jobs.deposit_scanner.DepositService", return_value=service),
+        ):
+            result = await _run_scan("scanner-test", 1)
+
+        assert result == {"status": "ok", "processed": 2}
+        session.commit.assert_awaited_once()
 
 
 class TestWorkerSettings:
