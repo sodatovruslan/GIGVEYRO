@@ -1,5 +1,7 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
+  AuthSessionListResponse,
+  LogoutAllResult,
   TwoFactorRegenerateResult,
   TwoFactorSetupConfirmResult,
   TwoFactorSetupStart,
@@ -22,4 +24,8 @@ export const securityApi = {
       method: "POST",
       body: { password, totp_code: totpCode },
     }),
+  sessions: () => apiFetch<AuthSessionListResponse>("/auth/sessions"),
+  revokeSession: (sessionId: string) =>
+    apiFetch<void>(`/auth/sessions/${sessionId}`, { method: "DELETE" }),
+  logoutAll: () => apiFetch<LogoutAllResult>("/auth/logout-all", { method: "POST" }),
 };

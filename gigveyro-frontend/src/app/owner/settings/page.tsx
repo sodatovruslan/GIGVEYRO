@@ -1,9 +1,11 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import QRCode from "qrcode";
 
+import { useAuth } from "@/features/auth/auth-provider";
 import { useAppFormat } from "@/features/i18n/use-app-format";
 import { useLocalizedError } from "@/features/i18n/use-localized-error";
 import { securityApi } from "@/lib/api/security";
@@ -19,8 +21,15 @@ export default function OwnerSettingsPage() {
   const common = useTranslations("common");
   const format = useAppFormat();
   const localizeError = useLocalizedError();
+  const router = useRouter();
+  const { logout } = useAuth();
 
   const statusQuery = useApiQuery(() => securityApi.status(), "two-factor-status");
+  const sessionsQuery = useApiQuery(() => securityApi.sessions(), "auth-sessions");
+
+  const [sessionActionError, setSessionActionError] = useState("");
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
 
   const [dialog, setDialog] = useState<Dialog>(null);
   const [saving, setSaving] = useState(false);
@@ -155,7 +164,44 @@ export default function OwnerSettingsPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function revokeSession(sessionId: string, isCurrent: boolean) {
+    setSessionActionError("");
+    setRevokingSessionId(sessionId);
+    try {
+      await securityApi.revokeSession(sessionId);
+      if (isCurrent) {
+        // The backend has already invalidated this session's access token
+        // too (checked on every request) - clear local cookies/state and
+        // return to login rather than leaving the UI in a stale
+        // authenticated state.
+        await logout();
+        router.replace("/login");
+        return;
+      }
+      await sessionsQuery.refetch();
+    } catch (reason) {
+      setSessionActionError(localizeError(reason));
+    } finally {
+      setRevokingSessionId(null);
+    }
+  }
+
+  async function logoutAllOtherSessions() {
+    setSessionActionError("");
+    setLoggingOutAll(true);
+    try {
+      await securityApi.logoutAll();
+      await sessionsQuery.refetch();
+    } catch (reason) {
+      setSessionActionError(localizeError(reason));
+    } finally {
+      setLoggingOutAll(false);
+    }
+  }
+
   const status = statusQuery.data;
+  const sessions = sessionsQuery.data?.items ?? [];
+  const hasOtherSessions = sessions.some((session) => !session.is_current);
 
   return (
     <section className={styles.page}>
@@ -203,6 +249,62 @@ export default function OwnerSettingsPage() {
                 </button>
               )}
             </div>
+          </>
+        )}
+      </div>
+
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <div>
+            <h2>{t("sessionsTitle")}</h2>
+            <p>{t("sessionsDescription")}</p>
+          </div>
+          {hasOtherSessions && (
+            <button
+              className={styles.dangerButton}
+              onClick={() => void logoutAllOtherSessions()}
+              disabled={loggingOutAll}
+            >
+              {loggingOutAll ? common("saving") : t("logoutAllDevices")}
+            </button>
+          )}
+        </div>
+
+        {sessionsQuery.loading ? (
+          <p className={styles.meta}>{common("loading")}</p>
+        ) : sessionsQuery.error ? (
+          <p className={styles.formError}>{sessionsQuery.error}</p>
+        ) : sessions.length === 0 ? (
+          <p className={styles.meta}>{t("noSessions")}</p>
+        ) : (
+          <>
+            {sessionActionError && <div className={styles.formError}>{sessionActionError}</div>}
+            <ul className={styles.sessionList}>
+              {sessions.map((session) => (
+                <li key={session.id} className={styles.sessionRow}>
+                  <div>
+                    <strong>
+                      {session.device_name || t("unknownDevice")}
+                      {session.is_current && <span className={styles.currentBadge}>{t("currentDevice")}</span>}
+                    </strong>
+                    <span className={styles.meta}>
+                      {t("lastActive", { date: format.dateTime(session.last_used_at) })}
+                    </span>
+                    <span className={styles.meta}>
+                      {t("sessionCreated", { date: format.date(session.created_at) })}
+                    </span>
+                  </div>
+                  <button
+                    className={styles.dangerButton}
+                    onClick={() => void revokeSession(session.id, session.is_current)}
+                    disabled={revokingSessionId === session.id}
+                    aria-label={t("revokeSessionLabel")}
+                  >
+                    {revokingSessionId === session.id ? common("saving") : t("revokeSession")}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </>
         )}
       </div>
