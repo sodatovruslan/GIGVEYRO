@@ -7,10 +7,10 @@ Tests:
   - Distributed lock acquire/release
   - Redis rate limiter behavior when Redis unavailable
 """
+
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -59,7 +59,7 @@ class TestDistributedLock:
 
         mock_redis = AsyncMock()
         mock_redis.set = AsyncMock(return_value=True)  # SET NX succeeded
-        mock_redis.eval = AsyncMock(return_value=1)    # Release succeeded
+        mock_redis.eval = AsyncMock(return_value=1)  # Release succeeded
 
         async with DistributedLock(mock_redis, "test_lock", ttl_ms=5000) as acquired:
             assert acquired is True
@@ -137,8 +137,10 @@ class TestRedisRateLimiter:
 
         limiter = RedisRateLimiter()
 
-        with patch("app.infra.redis_rate_limiter.get_redis", side_effect=RuntimeError("not init")), \
-             patch("app.core.config.settings.RATE_LIMIT_FAIL_MODE", "closed"):
+        with (
+            patch("app.infra.redis_rate_limiter.get_redis", side_effect=RuntimeError("not init")),
+            patch("app.core.config.settings.RATE_LIMIT_FAIL_MODE", "closed"),
+        ):
             result = await limiter.is_rate_limited("test:key", max_requests=1, window_seconds=60)
 
         # Fail-closed: block the request
@@ -150,13 +152,18 @@ class TestRedisRateLimiter:
 
         limiter = RedisRateLimiter()
 
-        with patch("app.infra.redis_rate_limiter.get_redis", side_effect=RuntimeError("not init")), \
-             patch("app.core.config.settings.RATE_LIMIT_FAIL_MODE", "fallback"):
+        with (
+            patch("app.infra.redis_rate_limiter.get_redis", side_effect=RuntimeError("not init")),
+            patch("app.core.config.settings.RATE_LIMIT_FAIL_MODE", "fallback"),
+        ):
             # 1st request should be allowed
-            res1 = await limiter.is_rate_limited("test:fallback_key", max_requests=1, window_seconds=60)
+            res1 = await limiter.is_rate_limited(
+                "test:fallback_key", max_requests=1, window_seconds=60
+            )
             assert res1 is False
 
             # 2nd request should be blocked
-            res2 = await limiter.is_rate_limited("test:fallback_key", max_requests=1, window_seconds=60)
+            res2 = await limiter.is_rate_limited(
+                "test:fallback_key", max_requests=1, window_seconds=60
+            )
             assert res2 is True
-

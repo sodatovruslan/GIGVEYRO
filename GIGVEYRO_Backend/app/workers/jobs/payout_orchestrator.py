@@ -18,6 +18,7 @@ real provider credentials and PAYOUTS_ENABLED=True to do anything.
 
 Schedule: every 10 minutes (if enabled).
 """
+
 from __future__ import annotations
 
 import logging
@@ -59,7 +60,8 @@ async def process_approved_payouts(ctx: dict) -> dict:
 
     if not settings.PAYOUT_ENABLED:
         logger.info(
-            "event=worker.job.completed job=%s job_id=%s attempt=%d status=disabled reason=PAYOUT_ENABLED_False",
+            "event=worker.job.completed job=%s job_id=%s attempt=%d "
+            "status=disabled reason=PAYOUT_ENABLED_False",
             JOB_NAME,
             job_id,
             attempt,
@@ -101,6 +103,7 @@ async def process_approved_payouts(ctx: dict) -> dict:
             for withdrawal in approved:
                 try:
                     import uuid
+
                     SYSTEM_ACTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
                     await service.mark_paid_by_owner(
                         owner_id=SYSTEM_ACTOR_ID,
@@ -110,7 +113,8 @@ async def process_approved_payouts(ctx: dict) -> dict:
                     processed += 1
                 except PayoutDisabledError:
                     logger.error(
-                        "event=worker.job.aborted job=%s job_id=%s attempt=%d reason=PayoutDisabledError",
+                        "event=worker.job.aborted job=%s job_id=%s attempt=%d "
+                        "reason=PayoutDisabledError",
                         JOB_NAME,
                         job_id,
                         attempt,
@@ -119,7 +123,8 @@ async def process_approved_payouts(ctx: dict) -> dict:
                 except Exception as exc:
                     failed += 1
                     logger.error(
-                        "event=worker.job.item_failed job=%s job_id=%s attempt=%d item_id=%s error=%s",
+                        "event=worker.job.item_failed job=%s job_id=%s attempt=%d "
+                        "item_id=%s error=%s",
                         JOB_NAME,
                         job_id,
                         attempt,

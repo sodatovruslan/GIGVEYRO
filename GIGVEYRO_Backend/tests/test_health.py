@@ -58,8 +58,9 @@ async def test_health_db_failure():
 
 
 async def test_lifespan_startup_and_health_endpoints():
-    from app.main import app
     from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
 
     transport = ASGITransport(app=app)
     async with app.router.lifespan_context(app):
@@ -73,8 +74,9 @@ async def test_lifespan_startup_and_health_endpoints():
 
 
 async def test_health_diagnostics():
-    from app.main import app
     from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
 
     transport = ASGITransport(app=app)
     async with app.router.lifespan_context(app):
@@ -88,5 +90,3 @@ async def test_health_diagnostics():
     assert "workers" in data
     assert "providers" in data
     assert "redis" in data
-
-

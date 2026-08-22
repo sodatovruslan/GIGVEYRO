@@ -12,6 +12,7 @@ Design:
   (TronGrid, exchange rate API) — transient external outage should NOT
   take down the entire service's readiness probe.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response, status
@@ -99,7 +100,9 @@ async def health_diagnostics():
     worker_alive = False
     if redis_client:
         try:
-            worker_alive = bool(await redis_client.exists(f"{settings.REDIS_KEY_PREFIX}:worker:heartbeat"))
+            worker_alive = bool(
+                await redis_client.exists(f"{settings.REDIS_KEY_PREFIX}:worker:heartbeat")
+            )
         except Exception:
             pass
 

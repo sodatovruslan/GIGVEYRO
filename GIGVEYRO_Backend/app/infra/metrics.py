@@ -14,6 +14,7 @@ If prometheus-client is not installed, the module is a no-op.
 
 NOTE: No high-cardinality UUID labels are used in any metric.
 """
+
 from __future__ import annotations
 
 import logging
@@ -109,6 +110,7 @@ else:
 
 # ── FastAPI instrumentator setup ───────────────────────────────────────────
 
+
 def setup_metrics(app) -> None:  # noqa: ANN001
     """Attach Prometheus HTTP instrumentation and secure /metrics endpoint to the app.
 
@@ -134,14 +136,14 @@ def setup_metrics(app) -> None:  # noqa: ANN001
     except ImportError:
         logger.warning("prometheus-fastapi-instrumentator not installed.")
 
-    from fastapi import Response, HTTPException, status, Header
     from typing import Annotated
+
+    from fastapi import Header, HTTPException, Response, status
+
     from app.core.config import settings
 
     @app.get("/metrics", include_in_schema=False)
-    async def metrics_endpoint(
-        authorization: Annotated[str | None, Header()] = None
-    ) -> Response:
+    async def metrics_endpoint(authorization: Annotated[str | None, Header()] = None) -> Response:
         if not settings.METRICS_ENABLED:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -201,5 +203,3 @@ def set_outbox_metrics(pending: int, failed: int, oldest_age_seconds: float) -> 
     NOTIFICATION_OUTBOX_PENDING.set(pending)
     NOTIFICATION_OUTBOX_FAILED.set(failed)
     NOTIFICATION_OUTBOX_OLDEST_AGE.set(oldest_age_seconds)
-
-

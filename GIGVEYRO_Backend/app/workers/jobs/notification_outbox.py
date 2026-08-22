@@ -14,8 +14,10 @@ Guarantees:
 Telegram provider: uses MockTelegramProvider in development.
 For production Telegram, configure TELEGRAM_BOT_TOKEN and use a real provider.
 """
+
 import logging
 from datetime import UTC, datetime
+
 from sqlalchemy import func, select
 
 from app.core.config import settings
@@ -111,7 +113,8 @@ async def process_notification_outbox(ctx: dict) -> dict:
 
         record_worker_success(JOB_NAME)
         logger.info(
-            "event=worker.job.completed job=%s job_id=%s attempt=%d processed=%d pending_approx=%d failed=%d oldest_age=%d",
+            "event=worker.job.completed job=%s job_id=%s attempt=%d "
+            "processed=%d pending_approx=%d failed=%d oldest_age=%d",
             JOB_NAME,
             job_id,
             attempt,

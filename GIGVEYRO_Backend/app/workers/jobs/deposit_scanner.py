@@ -15,6 +15,7 @@ STRICT SAFETY RULES:
 
 Schedule: every SCAN_INTERVAL_SECONDS (default 60s via cron).
 """
+
 from __future__ import annotations
 
 import logging
@@ -73,7 +74,8 @@ async def scan_deposits(ctx: dict) -> dict:
 
     if settings.DEPOSIT_PROVIDER_TYPE == "mock":
         logger.info(
-            "event=worker.job.completed job=%s job_id=%s attempt=%d status=skipped reason=mock_provider",
+            "event=worker.job.completed job=%s job_id=%s attempt=%d "
+            "status=skipped reason=mock_provider",
             JOB_NAME,
             job_id,
             attempt,
@@ -85,7 +87,8 @@ async def scan_deposits(ctx: dict) -> dict:
     async with DistributedLock(redis, LOCK_NAME, ttl_ms=LOCK_TTL_MS) as acquired:
         if not acquired:
             logger.info(
-                "event=worker.job.completed job=%s job_id=%s attempt=%d status=skipped reason=lock_held",
+                "event=worker.job.completed job=%s job_id=%s attempt=%d "
+                "status=skipped reason=lock_held",
                 JOB_NAME,
                 job_id,
                 attempt,
@@ -145,4 +148,3 @@ async def _run_scan(job_id: str, attempt: int) -> dict:
             exc_info=True,
         )
         raise
-

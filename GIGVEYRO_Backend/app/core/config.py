@@ -119,7 +119,6 @@ class Settings(BaseSettings):
     METRICS_ENABLED: bool = True
     METRICS_AUTH_TOKEN: str = ""
 
-
     @model_validator(mode="after")
     def validate_totp_encryption_key(self) -> "Settings":
         # A malformed key is a hard functional bug (every TOTP encrypt/decrypt
@@ -130,7 +129,7 @@ class Settings(BaseSettings):
         except Exception as exc:
             raise ValueError(
                 "TOTP_ENCRYPTION_KEY must be a valid urlsafe-base64-encoded 32-byte Fernet key "
-                "(generate with: python -c \"from cryptography.fernet import Fernet; "
+                '(generate with: python -c "from cryptography.fernet import Fernet; '
                 'print(Fernet.generate_key().decode())")'
             ) from exc
         return self
@@ -155,11 +154,12 @@ class Settings(BaseSettings):
             # Production Redis requirement
             if "localhost" in self.REDIS_URL or "127.0.0.1" in self.REDIS_URL:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "REDIS_URL points to localhost in production — "
                     "ensure this is intentional (e.g. Docker internal network)."
                 )
-            
+
             # Realtime horizontal scaling check
             if self.REALTIME_BROKER == "inmemory" and self.WEB_CONCURRENCY > 1:
                 raise ValueError(
@@ -172,17 +172,20 @@ class Settings(BaseSettings):
                 if self.DEPOSIT_PROVIDER_TYPE == "mock":
                     raise ValueError(
                         "DEPOSIT_PROVIDER_TYPE=mock is forbidden in production. "
-                        "Configure a real deposit provider or set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
+                        "Configure a real deposit provider or set "
+                        "ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
                     )
                 if self.PAYOUT_PROVIDER_TYPE == "mock" and self.PAYOUT_ENABLED:
                     raise ValueError(
-                        "PAYOUT_ENABLED=True with PAYOUT_PROVIDER_TYPE=mock is forbidden in production. "
-                        "Configure a real payout provider or set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
+                        "PAYOUT_ENABLED=True with PAYOUT_PROVIDER_TYPE=mock is "
+                        "forbidden in production. Configure a real payout provider "
+                        "or set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
                     )
                 if self.PAYOUT_ENABLED:
                     if not self.PAYOUT_API_KEY or "mock" in self.PAYOUT_API_URL:
                         raise ValueError(
-                            "PAYOUT_ENABLED=True requires real payout provider settings (PAYOUT_API_KEY and real PAYOUT_API_URL) in production"
+                            "PAYOUT_ENABLED=True requires real payout provider settings "
+                            "(PAYOUT_API_KEY and real PAYOUT_API_URL) in production"
                         )
         return self
 

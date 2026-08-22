@@ -8,9 +8,10 @@ Tests:
   - Deposit scanner skips mock provider
   - Worker settings reference valid job functions
 """
+
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -100,8 +101,10 @@ class TestProductionConfigValidation:
             )
 
     def test_production_rejects_mock_deposit_provider(self):
-        """Production rejects DEPOSIT_PROVIDER_TYPE=mock when ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False."""
-        with pytest.raises(ValueError, match="DEPOSIT_PROVIDER_TYPE=mock is forbidden in production"):
+        """Production rejects a mock deposit provider unless explicitly allowed."""
+        with pytest.raises(
+            ValueError, match="DEPOSIT_PROVIDER_TYPE=mock is forbidden in production"
+        ):
             Settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
@@ -113,7 +116,9 @@ class TestProductionConfigValidation:
 
     def test_production_rejects_horizontal_inmemory_broker(self):
         """Production rejects horizontal scaling (WEB_CONCURRENCY > 1) with inmemory broker."""
-        with pytest.raises(ValueError, match="REALTIME_BROKER must be set to 'redis' in production"):
+        with pytest.raises(
+            ValueError, match="REALTIME_BROKER must be set to 'redis' in production"
+        ):
             Settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
@@ -126,7 +131,9 @@ class TestProductionConfigValidation:
 
     def test_production_rejects_enabled_payout_missing_credentials(self):
         """Production rejects PAYOUT_ENABLED=True with missing provider credentials."""
-        with pytest.raises(ValueError, match="PAYOUT_ENABLED=True requires real payout provider settings"):
+        with pytest.raises(
+            ValueError, match="PAYOUT_ENABLED=True requires real payout provider settings"
+        ):
             Settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
@@ -138,7 +145,6 @@ class TestProductionConfigValidation:
                 PAYOUT_API_KEY="",  # missing key
                 ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
             )
-
 
 
 class TestPayoutOrchestratorSafety:
