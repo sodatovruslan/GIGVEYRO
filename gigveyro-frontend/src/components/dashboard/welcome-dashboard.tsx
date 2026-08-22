@@ -1,39 +1,28 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useAuth } from "@/features/auth/auth-provider";
+import { useEnumLabels } from "@/features/i18n/use-enum-labels";
 import type { UserRole } from "@/lib/api/types";
 
 import styles from "./welcome-dashboard.module.css";
 
-const copy: Record<UserRole, { eyebrow: string; title: string; text: string }> = {
-  owner: { eyebrow: "OWNER CONTROL CENTER", title: "Панель управления", text: "Управляйте аккаунтами, финансовыми операциями и состоянием платформы." },
-  user: { eyebrow: "PERSONAL WORKSPACE", title: "Главная", text: "Ваш защищённый кабинет для работы с балансом, реквизитами и сделками." },
-  merchant: { eyebrow: "MERCHANT WORKSPACE", title: "Кабинет мерчанта", text: "Создавайте сделки и контролируйте расчёты с платформой." },
-};
-
 export function WelcomeDashboard({ role }: { role: UserRole }) {
+  const t = useTranslations("dashboard");
+  const labels = useEnumLabels();
   const { account } = useAuth();
-  const content = copy[role];
-  return (
-    <section>
-      <div className={styles.heading}>
-        <div><span>{content.eyebrow}</span><h1>{content.title}</h1><p>{content.text}</p></div>
-        <div className={styles.accountState}><i /> Аккаунт активен</div>
-      </div>
-      <div className={styles.grid}>
-        <article className={styles.hero}>
-          <div className={styles.heroGlow} />
-          <span>ДОБРО ПОЖАЛОВАТЬ</span>
-          <h2>{account?.full_name}</h2>
-          <p>Данные профиля получены из Backend V1 через защищённую сессию.</p>
-          <dl><div><dt>Логин</dt><dd>{account?.username}</dd></div><div><dt>Роль</dt><dd>{account?.role}</dd></div></dl>
-        </article>
-        <article className={styles.info}>
-          <span>SECURITY</span><h3>Защищённая сессия</h3>
-          <p>Токены хранятся в HttpOnly cookies и автоматически обновляются через FastAPI.</p>
-          <div><i /> Backend connected</div>
-        </article>
-      </div>
-    </section>
-  );
+  const content = role === "owner"
+    ? { eyebrow: t("ownerEyebrow"), title: t("ownerTitle"), text: t("ownerSubtitle") }
+    : role === "merchant"
+      ? { eyebrow: t("merchantEyebrow"), title: t("merchantTitle"), text: t("merchantSubtitle") }
+      : { eyebrow: t("userEyebrow"), title: t("userTitle"), text: t("userSubtitle") };
+
+  return <section>
+    <div className={styles.heading}><div><span>{content.eyebrow}</span><h1>{content.title}</h1><p>{content.text}</p></div><div className={styles.accountState}><i /> {t("accountActive")}</div></div>
+    <div className={styles.grid}>
+      <article className={styles.hero}><div className={styles.heroGlow} /><span>{t("welcomeBack")}</span><h2>{account?.full_name}</h2><p>{t("profileLoaded")}</p><dl><div><dt>{t("username")}</dt><dd>{account?.username}</dd></div><div><dt>{t("role")}</dt><dd>{account ? labels.role(account.role) : "—"}</dd></div></dl></article>
+      <article className={styles.info}><span>{t("securityEyebrow")}</span><h3>{t("secureSession")}</h3><p>{t("secureText")}</p><div><i /> {t("backendConnected")}</div></article>
+    </div>
+  </section>;
 }

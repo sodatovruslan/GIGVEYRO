@@ -515,6 +515,27 @@ async def test_reset_password_changes_login(client, make_account):
     assert new_login.status_code == 200
 
 
+async def test_reset_password_creates_server_side_audit_record(client, make_account):
+    owner = await make_account(role=UserRole.OWNER)
+    target = await make_account(role=UserRole.USER)
+
+    response = await client.post(
+        f"/owner/accounts/{target.id}/reset-password",
+        json={"new_password": "AuditedPassword123"},
+        headers=_auth_headers(owner),
+    )
+    assert response.status_code == 204
+
+    audit_response = await client.get(
+        "/api/v1/owner/audit-logs",
+        params={"actor_account_id": str(owner.id), "action": "account.reset_password"},
+        headers=_auth_headers(owner),
+    )
+    assert audit_response.status_code == 200
+    records = audit_response.json()["items"]
+    assert any(item["entity_id"] == str(target.id) for item in records)
+
+
 async def test_reset_password_owner_account_returns_404(client, make_account):
     owner = await make_account(role=UserRole.OWNER)
     other_owner = await make_account(role=UserRole.OWNER)

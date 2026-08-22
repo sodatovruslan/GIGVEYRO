@@ -1,3 +1,7 @@
+"use client";
+
+import { useAppFormat } from "@/features/i18n/use-app-format";
+
 import styles from "./user.module.css";
 
 export function PageHeading({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) {
@@ -5,5 +9,6 @@ export function PageHeading({ eyebrow, title, text }: { eyebrow: string; title: 
 }
 
 export function BalanceCard({ label, value, loading, accent = false }: { label: string; value?: string; loading: boolean; accent?: boolean }) {
-  return <article className={styles.balanceCard}><span>{label}</span><div><strong className={accent ? styles.accent : ""}>{loading ? "—" : value || "0.00000000"}</strong><small>USDT</small></div></article>;
+  const format = useAppFormat();
+  return <article className={styles.balanceCard}><span>{label}</span><div><strong className={accent ? styles.accent : ""}>{loading ? "—" : format.number(value || 0)}</strong><small>USDT</small></div></article>;
 }

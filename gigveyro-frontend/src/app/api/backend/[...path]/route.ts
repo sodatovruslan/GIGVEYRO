@@ -57,7 +57,9 @@ async function forward(request: NextRequest, context: RouteContext) {
     const value = backendResponse.headers.get(name);
     if (value) headers.set(name, value);
   }
-  const response = new NextResponse(await backendResponse.arrayBuffer(), {
+  const contentLength = backendResponse.headers.get("content-length");
+  const hasNoContent = backendResponse.status === 204 || request.method === "HEAD" || contentLength === "0";
+  const response = new NextResponse(hasNoContent ? null : await backendResponse.arrayBuffer(), {
     status: backendResponse.status,
     headers,
   });
@@ -70,9 +72,6 @@ async function forward(request: NextRequest, context: RouteContext) {
       ...authCookieOptions,
       maxAge: 60 * 60 * 24 * 30,
     });
-  } else if (backendResponse.status === 401) {
-    response.cookies.set(ACCESS_COOKIE, "", { ...authCookieOptions, maxAge: 0 });
-    response.cookies.set(REFRESH_COOKIE, "", { ...authCookieOptions, maxAge: 0 });
   }
   return response;
 }

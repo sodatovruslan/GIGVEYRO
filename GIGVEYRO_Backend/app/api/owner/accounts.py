@@ -4,11 +4,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_roles
+from app.api.deps import get_current_account, require_roles
 from app.db.session import get_db
 from app.enums.account import UserRole
 from app.enums.wallet import LedgerEntryType
+from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
@@ -29,6 +31,7 @@ from app.services.account import (
     DuplicateAccountError,
     OwnerCreationNotAllowedError,
 )
+from app.services.audit import AuditService
 from app.services.traffic import TrafficService
 from app.services.wallet import WalletNotFoundError, WalletService
 
@@ -62,16 +65,23 @@ def _wallet_service(db: AsyncSession = Depends(get_db)) -> WalletService:
     )
 
 
+def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
+    return AuditService(AuditRepository(db))
+
+
 def _not_found() -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="account not found")
 
 
 @router.post("", response_model=AccountRead, status_code=status.HTTP_201_CREATED)
 async def create_account(
-    payload: OwnerAccountCreate, service: AccountService = Depends(_service)
+    payload: OwnerAccountCreate,
+    actor: Account = Depends(get_current_account),
+    service: AccountService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AccountRead:
     try:
-        return await service.create_managed_account(
+        account = await service.create_managed_account(
             username=payload.username,
             password=payload.password,
             role=payload.role,
@@ -79,6 +89,14 @@ async def create_account(
             email=payload.email,
             phone=payload.phone,
         )
+        await audit.log_action(
+            action="account.create",
+            entity_type="account",
+            entity_id=str(account.id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+        )
+        return account
     except OwnerCreationNotAllowedError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except DuplicateAccountError as exc:
@@ -152,11 +170,22 @@ async def get_merchant_ledger_for_owner(
 async def update_account(
     account_id: uuid.UUID,
     payload: OwnerAccountUpdate,
+    actor: Account = Depends(get_current_account),
     service: AccountService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AccountRead:
     changes = payload.model_dump(exclude_unset=True)
     try:
-        return await service.update_managed_account(account_id, changes)
+        account = await service.update_managed_account(account_id, changes)
+        await audit.log_action(
+            action="account.update",
+            entity_type="account",
+            entity_id=str(account_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+            audit_metadata={"fields": sorted(changes)},
+        )
+        return account
     except AccountNotFoundError as exc:
         raise _not_found() from exc
     except DuplicateAccountError as exc:
@@ -165,20 +194,42 @@ async def update_account(
 
 @router.post("/{account_id}/block", response_model=AccountRead)
 async def block_account(
-    account_id: uuid.UUID, service: AccountService = Depends(_service)
+    account_id: uuid.UUID,
+    actor: Account = Depends(get_current_account),
+    service: AccountService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AccountRead:
     try:
-        return await service.set_account_active(account_id, is_active=False)
+        account = await service.set_account_active(account_id, is_active=False)
+        await audit.log_action(
+            action="account.block",
+            entity_type="account",
+            entity_id=str(account_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+        )
+        return account
     except AccountNotFoundError as exc:
         raise _not_found() from exc
 
 
 @router.post("/{account_id}/unblock", response_model=AccountRead)
 async def unblock_account(
-    account_id: uuid.UUID, service: AccountService = Depends(_service)
+    account_id: uuid.UUID,
+    actor: Account = Depends(get_current_account),
+    service: AccountService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AccountRead:
     try:
-        return await service.set_account_active(account_id, is_active=True)
+        account = await service.set_account_active(account_id, is_active=True)
+        await audit.log_action(
+            action="account.unblock",
+            entity_type="account",
+            entity_id=str(account_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+        )
+        return account
     except AccountNotFoundError as exc:
         raise _not_found() from exc
 
@@ -187,9 +238,18 @@ async def unblock_account(
 async def reset_password(
     account_id: uuid.UUID,
     payload: OwnerPasswordReset,
+    actor: Account = Depends(get_current_account),
     service: AccountService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> None:
     try:
         await service.reset_password(account_id, payload.new_password)
+        await audit.log_action(
+            action="account.reset_password",
+            entity_type="account",
+            entity_id=str(account_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+        )
     except AccountNotFoundError as exc:
         raise _not_found() from exc

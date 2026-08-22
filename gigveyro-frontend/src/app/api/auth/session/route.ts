@@ -31,10 +31,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!accountResponse?.ok) {
-    const response = NextResponse.json({ detail: "Сессия отсутствует" }, { status: 401 });
-    response.cookies.set(ACCESS_COOKIE, "", { ...authCookieOptions, maxAge: 0 });
-    response.cookies.set(REFRESH_COOKIE, "", { ...authCookieOptions, maxAge: 0 });
-    return response;
+    return NextResponse.json({ detail: "Сессия отсутствует" }, { status: 401 });
   }
 
   const account = (await accountResponse.json()) as Account;

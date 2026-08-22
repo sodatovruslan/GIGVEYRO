@@ -11,6 +11,7 @@ from app.enums.wallet import LedgerEntryType
 from app.models.account import Account
 from app.models.ledger import LedgerEntry
 from app.repositories.account import AccountRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.ledger import LedgerListResponse
@@ -20,6 +21,7 @@ from app.schemas.wallet import (
     ManualAdjustRequest,
     WalletRead,
 )
+from app.services.audit import AuditService
 from app.services.wallet import (
     InactiveAccountError,
     InsufficientBalanceError,
@@ -37,6 +39,10 @@ router = APIRouter(
 
 def _service(db: AsyncSession = Depends(get_db)) -> WalletService:
     return WalletService(WalletRepository(db), LedgerRepository(db), AccountRepository(db))
+
+
+def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
+    return AuditService(AuditRepository(db))
 
 
 def _wallet_error_response(exc: Exception) -> HTTPException:
@@ -99,6 +105,7 @@ async def allocate(
     payload: AllocateRequest,
     actor: Account = Depends(get_current_account),
     service: WalletService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> WalletRead:
     try:
         entry = await service.allocate(
@@ -111,6 +118,14 @@ async def allocate(
     except (WalletNotFoundError, InactiveAccountError, InvalidAmountError) as exc:
         raise _wallet_error_response(exc) from exc
 
+    await audit.log_action(
+        action="wallet.allocate",
+        entity_type="wallet",
+        entity_id=str(account_id),
+        actor_account_id=actor.id,
+        actor_role=actor.role.value,
+        audit_metadata={"ledger_entry_id": str(entry.id)},
+    )
     return _wallet_response(entry)
 
 
@@ -120,6 +135,7 @@ async def adjust_insurance(
     payload: InsuranceAdjustRequest,
     actor: Account = Depends(get_current_account),
     service: WalletService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> WalletRead:
     try:
         entry = await service.adjust_insurance(
@@ -137,6 +153,14 @@ async def adjust_insurance(
     ) as exc:
         raise _wallet_error_response(exc) from exc
 
+    await audit.log_action(
+        action="wallet.adjust_insurance",
+        entity_type="wallet",
+        entity_id=str(account_id),
+        actor_account_id=actor.id,
+        actor_role=actor.role.value,
+        audit_metadata={"ledger_entry_id": str(entry.id)},
+    )
     return _wallet_response(entry)
 
 
@@ -146,6 +170,7 @@ async def manual_adjust(
     payload: ManualAdjustRequest,
     actor: Account = Depends(get_current_account),
     service: WalletService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> WalletRead:
     try:
         entry = await service.manual_adjust(
@@ -163,4 +188,12 @@ async def manual_adjust(
     ) as exc:
         raise _wallet_error_response(exc) from exc
 
+    await audit.log_action(
+        action="wallet.manual_adjust",
+        entity_type="wallet",
+        entity_id=str(account_id),
+        actor_account_id=actor.id,
+        actor_role=actor.role.value,
+        audit_metadata={"ledger_entry_id": str(entry.id)},
+    )
     return _wallet_response(entry)

@@ -10,6 +10,7 @@ from app.enums.account import UserRole
 from app.enums.deal import DealStatus
 from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.deal import DealRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
@@ -17,6 +18,7 @@ from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.traffic import TrafficRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.deal import DealListResponse, DealRead
+from app.services.audit import AuditService
 from app.services.deal import (
     DealNotFoundError,
     DealService,
@@ -45,6 +47,10 @@ def _service(db: AsyncSession = Depends(get_db)) -> DealService:
         wallet_service=wallet_service,
         rate_provider=ConfiguredExchangeRateProvider(),
     )
+
+
+def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
+    return AuditService(AuditRepository(db))
 
 
 @router.get("", response_model=DealListResponse)
@@ -85,10 +91,19 @@ async def complete_deal(
     deal_id: uuid.UUID,
     actor: Account = Depends(get_current_account),
     service: DealService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> DealRead:
     """Owner-controlled settlement: completes deal, moves frozen USDT to merchant available USDT."""
     try:
-        return await service.complete_deal(deal_id, actor_id=actor.id)
+        deal = await service.complete_deal(deal_id, actor_id=actor.id)
+        await audit.log_action(
+            action="deal.complete",
+            entity_type="deal",
+            entity_id=str(deal_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+        )
+        return deal
     except DealNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="deal not found") from exc
     except (InvalidDealTransitionError, InsufficientBalanceError, WalletNotFoundError) as exc:
@@ -100,10 +115,19 @@ async def release_deal(
     deal_id: uuid.UUID,
     actor: Account = Depends(get_current_account),
     service: DealService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> DealRead:
     """Owner-controlled release: cancels deal, releases frozen USDT back to user available USDT."""
     try:
-        return await service.cancel_or_release_deal(deal_id, actor_id=actor.id)
+        deal = await service.cancel_or_release_deal(deal_id, actor_id=actor.id)
+        await audit.log_action(
+            action="deal.release",
+            entity_type="deal",
+            entity_id=str(deal_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+        )
+        return deal
     except DealNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="deal not found") from exc
     except (InvalidDealTransitionError, InsufficientBalanceError, WalletNotFoundError) as exc:

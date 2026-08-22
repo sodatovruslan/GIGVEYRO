@@ -11,6 +11,7 @@ from app.enums.appeal import AppealReason, AppealStatus
 from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.appeal import AppealRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.deal import DealRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
@@ -27,6 +28,7 @@ from app.services.appeal import (
     AppealService,
     InvalidAppealTransitionError,
 )
+from app.services.audit import AuditService
 from app.services.wallet import WalletService
 
 router = APIRouter(
@@ -46,6 +48,10 @@ def _service(db: AsyncSession = Depends(get_db)) -> AppealService:
         deal_repository=DealRepository(db),
         wallet_service=wallet_service,
     )
+
+
+def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
+    return AuditService(AuditRepository(db))
 
 
 @router.get("", response_model=AppealListResponse)
@@ -94,10 +100,19 @@ async def review_appeal(
     payload: AppealReviewRequest | None = None,
     owner: Account = Depends(get_current_account),
     service: AppealService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AppealRead:
     owner_note = payload.note if payload else None
     try:
-        return await service.take_under_review(owner.id, appeal_id, owner_note=owner_note)
+        appeal = await service.take_under_review(owner.id, appeal_id, owner_note=owner_note)
+        await audit.log_action(
+            action="appeal.review",
+            entity_type="appeal",
+            entity_id=str(appeal_id),
+            actor_account_id=owner.id,
+            actor_role=owner.role.value,
+        )
+        return appeal
     except AppealNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"
@@ -112,14 +127,24 @@ async def resolve_appeal(
     payload: AppealResolveRequest,
     owner: Account = Depends(get_current_account),
     service: AppealService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AppealRead:
     try:
-        return await service.resolve_appeal(
+        appeal = await service.resolve_appeal(
             owner.id,
             appeal_id,
             resolution=payload.resolution,
             owner_note=payload.owner_note,
         )
+        await audit.log_action(
+            action="appeal.resolve",
+            entity_type="appeal",
+            entity_id=str(appeal_id),
+            actor_account_id=owner.id,
+            actor_role=owner.role.value,
+            audit_metadata={"resolution": payload.resolution.value},
+        )
+        return appeal
     except AppealNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"

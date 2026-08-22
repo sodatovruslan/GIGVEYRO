@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { ApiError } from "@/lib/api/error";
+import { useLocalizedError } from "@/features/i18n/use-localized-error";
 
 export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default", enabled = true) {
+  const localizeError = useLocalizedError();
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
@@ -16,7 +17,7 @@ export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default", e
     try {
       setData(await loader());
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Не удалось загрузить данные.");
+      setError(localizeError(reason));
     } finally {
       setLoading(false);
     }
@@ -32,7 +33,7 @@ export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default", e
       })
       .catch((reason: unknown) => {
         if (active) {
-          setError(reason instanceof ApiError ? reason.message : "Не удалось загрузить данные.");
+          setError(localizeError(reason));
           setLoading(false);
         }
       });

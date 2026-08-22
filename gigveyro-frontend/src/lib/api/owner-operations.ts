@@ -1,6 +1,9 @@
 import { apiFetch } from "@/lib/api/client";
 import type { AuditLogEntry, IntegrationDiagnostics, MerchantWithdrawal, Paginated } from "@/lib/api/types";
 
+export const auditActions = ["account.create", "account.update", "account.block", "account.unblock", "account.reset_password", "wallet.allocate", "wallet.adjust_insurance", "wallet.manual_adjust", "deal.complete", "deal.release", "appeal.review", "appeal.resolve", "withdrawal.approve", "withdrawal.reject", "withdrawal.mark_paid"] as const;
+export const auditEntityTypes = ["account", "wallet", "deal", "appeal", "withdrawal"] as const;
+
 interface AuditFilters {
   actorAccountId?: string;
   action?: string;

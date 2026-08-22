@@ -10,6 +10,7 @@ from app.enums.account import UserRole
 from app.enums.withdrawal import WithdrawalStatus
 from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.wallet import WalletRepository
@@ -19,6 +20,7 @@ from app.schemas.withdrawal import (
     MerchantWithdrawalRead,
     OwnerWithdrawalAction,
 )
+from app.services.audit import AuditService
 from app.services.wallet import InsufficientBalanceError, WalletService
 from app.services.withdrawal import (
     InvalidWithdrawalTransitionError,
@@ -43,6 +45,10 @@ def _service(db: AsyncSession = Depends(get_db)) -> WithdrawalService:
         wallet_service=wallet_service,
         account_repository=account_repo,
     )
+
+
+def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
+    return AuditService(AuditRepository(db))
 
 
 @router.get("", response_model=MerchantWithdrawalListResponse)
@@ -87,10 +93,19 @@ async def approve_withdrawal(
     payload: OwnerWithdrawalAction | None = None,
     owner: Account = Depends(get_current_account),
     service: WithdrawalService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> MerchantWithdrawalRead:
     comment = payload.comment if payload else None
     try:
-        return await service.approve_by_owner(owner.id, withdrawal_id, comment=comment)
+        withdrawal = await service.approve_by_owner(owner.id, withdrawal_id, comment=comment)
+        await audit.log_action(
+            action="withdrawal.approve",
+            entity_type="withdrawal",
+            entity_id=str(withdrawal_id),
+            actor_account_id=owner.id,
+            actor_role=owner.role.value,
+        )
+        return withdrawal
     except WithdrawalNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="withdrawal not found"
@@ -105,10 +120,19 @@ async def reject_withdrawal(
     payload: OwnerWithdrawalAction | None = None,
     owner: Account = Depends(get_current_account),
     service: WithdrawalService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> MerchantWithdrawalRead:
     comment = payload.comment if payload else None
     try:
-        return await service.reject_by_owner(owner.id, withdrawal_id, comment=comment)
+        withdrawal = await service.reject_by_owner(owner.id, withdrawal_id, comment=comment)
+        await audit.log_action(
+            action="withdrawal.reject",
+            entity_type="withdrawal",
+            entity_id=str(withdrawal_id),
+            actor_account_id=owner.id,
+            actor_role=owner.role.value,
+        )
+        return withdrawal
     except WithdrawalNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="withdrawal not found"
@@ -123,10 +147,19 @@ async def mark_paid_withdrawal(
     payload: OwnerWithdrawalAction | None = None,
     owner: Account = Depends(get_current_account),
     service: WithdrawalService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> MerchantWithdrawalRead:
     comment = payload.comment if payload else None
     try:
-        return await service.mark_paid_by_owner(owner.id, withdrawal_id, comment=comment)
+        withdrawal = await service.mark_paid_by_owner(owner.id, withdrawal_id, comment=comment)
+        await audit.log_action(
+            action="withdrawal.mark_paid",
+            entity_type="withdrawal",
+            entity_id=str(withdrawal_id),
+            actor_account_id=owner.id,
+            actor_role=owner.role.value,
+        )
+        return withdrawal
     except WithdrawalNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="withdrawal not found"

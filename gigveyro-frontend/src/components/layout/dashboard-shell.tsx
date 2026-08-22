@@ -3,54 +3,36 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { useAuth } from "@/features/auth/auth-provider";
 import type { UserRole } from "@/lib/api/types";
 import { ThemeSwitcher } from "@/features/theme/theme-switcher";
+import { LanguageSwitcher } from "@/features/i18n/language-switcher";
 
 import styles from "./dashboard-shell.module.css";
 
-interface NavigationItem { href: string; label: string; glyph: string }
+type NavigationKey = "overview"|"home"|"accounts"|"deals"|"deposits"|"funding"|"withdrawals"|"appeals"|"notifications"|"analytics"|"integrations"|"audit"|"wallet"|"requisites";
+interface NavigationItem { href: string; label: NavigationKey; glyph: string }
 
 const navigation: Record<UserRole, NavigationItem[]> = {
   owner: [
-    { href: "/owner", label: "Обзор", glyph: "◇" },
-    { href: "/owner/accounts", label: "Аккаунты", glyph: "◎" },
-    { href: "/owner/deals", label: "Сделки", glyph: "⇄" },
-    { href: "/owner/deposits", label: "Депозиты", glyph: "↓" },
-    { href: "/owner/withdrawals", label: "Выводы", glyph: "↗" },
-    { href: "/owner/appeals", label: "Апелляции", glyph: "!" },
-    { href: "/owner/notifications", label: "Уведомления", glyph: "○" },
-    { href: "/owner/analytics", label: "Аналитика", glyph: "⌁" },
-    { href: "/owner/integrations", label: "Интеграции", glyph: "⌘" },
-    { href: "/owner/audit", label: "Журнал", glyph: "≡" },
+    { href: "/owner", label: "overview", glyph: "◇" }, { href: "/owner/accounts", label: "accounts", glyph: "◎" }, { href: "/owner/deals", label: "deals", glyph: "⇄" }, { href: "/owner/deposits", label: "deposits", glyph: "↓" }, { href: "/owner/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/owner/appeals", label: "appeals", glyph: "!" }, { href: "/owner/notifications", label: "notifications", glyph: "○" }, { href: "/owner/analytics", label: "analytics", glyph: "⌁" }, { href: "/owner/integrations", label: "integrations", glyph: "⌘" }, { href: "/owner/audit", label: "audit", glyph: "≡" },
   ],
   user: [
-    { href: "/user", label: "Главная", glyph: "◇" },
-    { href: "/user/wallet", label: "Баланс", glyph: "₮" },
-    { href: "/user/deposits", label: "Пополнение", glyph: "↓" },
-    { href: "/user/requisites", label: "Реквизиты", glyph: "▣" },
-    { href: "/user/deals", label: "Сделки", glyph: "⇄" },
-    { href: "/user/appeals", label: "Апелляции", glyph: "!" },
-    { href: "/user/notifications", label: "Уведомления", glyph: "○" },
+    { href: "/user", label: "home", glyph: "◇" }, { href: "/user/wallet", label: "wallet", glyph: "₮" }, { href: "/user/deposits", label: "funding", glyph: "↓" }, { href: "/user/requisites", label: "requisites", glyph: "▣" }, { href: "/user/deals", label: "deals", glyph: "⇄" }, { href: "/user/appeals", label: "appeals", glyph: "!" }, { href: "/user/notifications", label: "notifications", glyph: "○" },
   ],
   merchant: [
-    { href: "/merchant", label: "Главная", glyph: "◇" },
-    { href: "/merchant/wallet", label: "Баланс", glyph: "₮" },
-    { href: "/merchant/deals", label: "Сделки", glyph: "⇄" },
-    { href: "/merchant/withdrawals", label: "Выводы", glyph: "↗" },
-    { href: "/merchant/appeals", label: "Апелляции", glyph: "!" },
-    { href: "/merchant/notifications", label: "Уведомления", glyph: "○" },
+    { href: "/merchant", label: "home", glyph: "◇" }, { href: "/merchant/wallet", label: "wallet", glyph: "₮" }, { href: "/merchant/deals", label: "deals", glyph: "⇄" }, { href: "/merchant/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/merchant/appeals", label: "appeals", glyph: "!" }, { href: "/merchant/notifications", label: "notifications", glyph: "○" },
   ],
 };
-
-const roleLabels: Record<UserRole, string> = { owner: "Владелец", user: "Пользователь", merchant: "Мерчант" };
 
 export function DashboardShell({ role, children }: { role: UserRole; children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { account, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const t = useTranslations("navigation"); const tRoles = useTranslations("roles"); const tHeader = useTranslations("header"); const common = useTranslations("common");
 
   async function handleLogout() {
     await logout();
@@ -59,34 +41,34 @@ export function DashboardShell({ role, children }: { role: UserRole; children: R
 
   return (
     <div className={styles.shell}>
-      {menuOpen && <button className={styles.backdrop} aria-label="Закрыть меню" onClick={() => setMenuOpen(false)} />}
+      {menuOpen && <button className={styles.backdrop} aria-label={t("closeMenu")} onClick={() => setMenuOpen(false)} />}
       <aside className={`${styles.sidebar} ${menuOpen ? styles.open : ""}`}>
         <Link href={`/${role}`} className={styles.brand} onClick={() => setMenuOpen(false)}>
           <span className={styles.logo}>G</span>
-          <span><strong>GIGVEYRO</strong><small>PAYMENT GATEWAY</small></span>
+          <span><strong>GIGVEYRO</strong><small>{common("paymentGateway")}</small></span>
         </Link>
-        <nav className={styles.nav} aria-label="Основная навигация">
-          <p>РАБОЧЕЕ ПРОСТРАНСТВО</p>
+        <nav className={styles.nav} aria-label={t("workspace")}>
+          <p>{t("workspace")}</p>
           {navigation[role].map((item) => {
             const active = pathname === item.href || (item.href !== `/${role}` && pathname.startsWith(`${item.href}/`));
             return (
               <Link key={item.href} href={item.href} className={active ? styles.active : ""} onClick={() => setMenuOpen(false)}>
-                <span className={styles.glyph}>{item.glyph}</span>{item.label}
+                <span className={styles.glyph}>{item.glyph}</span>{t(item.label)}
               </Link>
             );
           })}
         </nav>
         <div className={styles.profile}>
           <div className={styles.avatar}>{account?.full_name?.slice(0, 1).toUpperCase()}</div>
-          <div><strong>{account?.full_name}</strong><span>{roleLabels[role]}</span></div>
-          <button onClick={handleLogout} title="Выйти" aria-label="Выйти">↪</button>
+          <div><strong>{account?.full_name}</strong><span>{tRoles(role)}</span></div>
+          <button onClick={handleLogout} title={t("logout")} aria-label={t("logout")}>↪</button>
         </div>
       </aside>
       <div className={styles.workspace}>
         <header className={styles.header}>
-          <button className={styles.menuButton} onClick={() => setMenuOpen(true)} aria-label="Открыть меню">☰</button>
-          <div><span className={styles.liveDot} /> Система работает штатно</div>
-          <div className={styles.headerActions}><ThemeSwitcher /><div className={styles.headerUser}><span>{account?.username}</span><div>{account?.full_name?.slice(0, 1).toUpperCase()}</div></div></div>
+          <button className={styles.menuButton} onClick={() => setMenuOpen(true)} aria-label={t("openMenu")}>☰</button>
+          <div><span className={styles.liveDot} /> {tHeader("healthy")}</div>
+          <div className={styles.headerActions}><LanguageSwitcher /><ThemeSwitcher /><div className={styles.headerUser}><span>{account?.username}</span><div>{account?.full_name?.slice(0, 1).toUpperCase()}</div></div></div>
         </header>
         <main className={styles.content}>{children}</main>
       </div>
