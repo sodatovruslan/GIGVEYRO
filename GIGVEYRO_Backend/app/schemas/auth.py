@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.schemas.common import PasswordStr
@@ -13,6 +15,12 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     access_expires_in: int
+
+
+class TwoFactorRequiredResponse(BaseModel):
+    two_factor_required: Literal[True] = True
+    challenge_token: str
+    expires_in: int
 
 
 class RefreshTokenRequest(BaseModel):

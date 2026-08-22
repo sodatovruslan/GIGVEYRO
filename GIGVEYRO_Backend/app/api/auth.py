@@ -1,18 +1,50 @@
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_account
-from app.core.security import TokenError, TokenType, decode_token
+from app.api.deps import get_current_account, require_roles
+from app.core.config import settings
+from app.core.security import (
+    TokenError,
+    TokenType,
+    create_two_factor_challenge_token,
+    decode_token,
+)
+from app.core.totp_crypto import decrypt_totp_secret
 from app.db.session import get_db
+from app.enums.account import UserRole
+from app.infra.redis_rate_limiter import RedisRateLimiter
 from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.auth_session import AuthSessionRepository
+from app.repositories.two_factor import (
+    AccountTwoFactorRepository,
+    PendingTwoFactorSetupRepository,
+    TwoFactorChallengeRepository,
+    TwoFactorRecoveryCodeRepository,
+)
 from app.schemas.account import AccountRead
-from app.schemas.auth import LoginRequest, RefreshTokenRequest, TokenResponse
+from app.schemas.auth import (
+    LoginRequest,
+    RefreshTokenRequest,
+    TokenResponse,
+    TwoFactorRequiredResponse,
+)
 from app.schemas.auth_session import AuthSessionListResponse, AuthSessionRead, LogoutAllResponse
+from app.schemas.two_factor import (
+    TwoFactorDisableRequest,
+    TwoFactorRegenerateRequest,
+    TwoFactorRegenerateResponse,
+    TwoFactorSetupConfirmRequest,
+    TwoFactorSetupConfirmResponse,
+    TwoFactorSetupStartRequest,
+    TwoFactorSetupStartResponse,
+    TwoFactorStatusResponse,
+    TwoFactorVerifyRequest,
+)
 from app.services.audit import AuditService
 from app.services.auth import (
     AuthenticationError,
@@ -21,8 +53,20 @@ from app.services.auth import (
     TokenPair,
     TokenReuseError,
 )
+from app.services.two_factor import (
+    ChallengeInvalidError,
+    ChallengeLockedError,
+    InvalidCodeError,
+    InvalidPasswordError,
+    SetupExpiredError,
+    TwoFactorAlreadyEnabledError,
+    TwoFactorNotEnabledError,
+    TwoFactorService,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+_two_factor_rate_limiter = RedisRateLimiter()
 
 
 def _service(db: AsyncSession = Depends(get_db)) -> AuthService:
@@ -31,6 +75,15 @@ def _service(db: AsyncSession = Depends(get_db)) -> AuthService:
 
 def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
     return AuditService(AuditRepository(db))
+
+
+def _two_factor_service(db: AsyncSession = Depends(get_db)) -> TwoFactorService:
+    return TwoFactorService(
+        AccountTwoFactorRepository(db),
+        PendingTwoFactorSetupRepository(db),
+        TwoFactorRecoveryCodeRepository(db),
+        TwoFactorChallengeRepository(db),
+    )
 
 
 def _client_ip(request: Request) -> str | None:
@@ -45,13 +98,38 @@ def _token_response(token_pair: TokenPair) -> TokenResponse:
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+def _bearer_session_id(request: Request) -> str | None:
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.lower().startswith("bearer "):
+        return None
+    try:
+        return decode_token(auth_header[7:], TokenType.ACCESS).get("session_id")
+    except TokenError:
+        return None
+
+
+async def _enforce_two_factor_rate_limit(key: str) -> None:
+    limited = await _two_factor_rate_limiter.is_rate_limited(
+        key,
+        settings.TWO_FACTOR_VERIFY_RATE_LIMIT_REQUESTS,
+        settings.TWO_FACTOR_VERIFY_RATE_LIMIT_WINDOW_SECONDS,
+    )
+    if limited:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too many verification attempts, try again later",
+            headers={"Retry-After": str(settings.TWO_FACTOR_VERIFY_RATE_LIMIT_WINDOW_SECONDS)},
+        )
+
+
+@router.post("/login", response_model=TokenResponse | TwoFactorRequiredResponse)
 async def login(
     payload: LoginRequest,
     request: Request,
     service: AuthService = Depends(_service),
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
-) -> TokenResponse:
+) -> TokenResponse | TwoFactorRequiredResponse:
     try:
         account = await service.authenticate(payload.username, payload.password)
     except AuthenticationError as exc:
@@ -59,6 +137,20 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid username or password",
         ) from exc
+
+    two_factor = await two_factor_service.get_status(account.id)
+    if two_factor is not None:
+        challenge = await two_factor_service.create_challenge(account)
+        challenge_token = create_two_factor_challenge_token(
+            account.id,
+            account.role.value,
+            challenge.id,
+            settings.TWO_FACTOR_CHALLENGE_EXPIRE_SECONDS,
+        )
+        return TwoFactorRequiredResponse(
+            challenge_token=challenge_token,
+            expires_in=settings.TWO_FACTOR_CHALLENGE_EXPIRE_SECONDS,
+        )
 
     token_pair = await service.login(
         account,
@@ -73,6 +165,230 @@ async def login(
         actor_role=account.role.value,
     )
     return _token_response(token_pair)
+
+
+@router.post("/2fa/verify", response_model=TokenResponse)
+async def verify_two_factor(
+    payload: TwoFactorVerifyRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    service: AuthService = Depends(_service),
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
+    audit: AuditService = Depends(_audit_service),
+) -> TokenResponse:
+    # 410 Gone: the challenge itself is dead (expired/consumed/locked/malformed
+    # token) - the client must restart login, retrying with a new code won't
+    # help. 401: the challenge is still alive but this specific code was
+    # wrong - the client may retry.
+    challenge_dead = HTTPException(
+        status_code=status.HTTP_410_GONE, detail="invalid or expired challenge"
+    )
+    try:
+        payload_claims = decode_token(payload.challenge_token, TokenType.TWO_FACTOR_CHALLENGE)
+    except TokenError as exc:
+        raise challenge_dead from exc
+
+    account_id = uuid.UUID(payload_claims["sub"])
+    challenge_id = uuid.UUID(payload_claims["jti"])
+
+    await _enforce_two_factor_rate_limit(f"2fa_verify:{account_id}")
+
+    account = await AccountRepository(db).get_by_id(account_id)
+    if account is None or not account.is_active:
+        raise challenge_dead
+
+    try:
+        used_recovery = await two_factor_service.verify_challenge(
+            challenge_id, account, payload.code
+        )
+    except (ChallengeInvalidError, ChallengeLockedError) as exc:
+        raise challenge_dead from exc
+    except InvalidCodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid code"
+        ) from exc
+
+    token_pair = await service.login(
+        account,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=_client_ip(request),
+    )
+    await audit.log_action(
+        action="auth.2fa_recovery_used" if used_recovery else "auth.2fa_login_success",
+        entity_type="account",
+        entity_id=str(account.id),
+        actor_account_id=account.id,
+        actor_role=account.role.value,
+    )
+    await audit.log_action(
+        action="auth.login",
+        entity_type="account",
+        entity_id=str(account.id),
+        actor_account_id=account.id,
+        actor_role=account.role.value,
+    )
+    return _token_response(token_pair)
+
+
+@router.get("/2fa/status", response_model=TwoFactorStatusResponse)
+async def two_factor_status(
+    account: Account = Depends(get_current_account),
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
+) -> TwoFactorStatusResponse:
+    record = await two_factor_service.get_status(account.id)
+    if record is None:
+        return TwoFactorStatusResponse(enabled=False)
+
+    remaining = await two_factor_service.count_unused_recovery_codes(account.id)
+    return TwoFactorStatusResponse(
+        enabled=True, enabled_at=record.enabled_at, recovery_codes_remaining=remaining
+    )
+
+
+@router.post("/2fa/setup/start", response_model=TwoFactorSetupStartResponse)
+async def start_two_factor_setup(
+    payload: TwoFactorSetupStartRequest,
+    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
+    audit: AuditService = Depends(_audit_service),
+) -> TwoFactorSetupStartResponse:
+    try:
+        pending = await two_factor_service.start_setup(account, payload.password)
+    except InvalidPasswordError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid password"
+        ) from exc
+    except TwoFactorAlreadyEnabledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="two-factor authentication already enabled"
+        ) from exc
+
+    secret = decrypt_totp_secret(pending.encrypted_secret)
+    await audit.log_action(
+        action="auth.2fa_setup_started",
+        entity_type="account",
+        entity_id=str(account.id),
+        actor_account_id=account.id,
+        actor_role=account.role.value,
+    )
+    return TwoFactorSetupStartResponse(
+        otpauth_uri=two_factor_service.build_otpauth_uri(account, secret),
+        manual_key=two_factor_service.format_manual_key(secret),
+        expires_at=pending.expires_at,
+    )
+
+
+@router.post("/2fa/setup/confirm", response_model=TwoFactorSetupConfirmResponse)
+async def confirm_two_factor_setup(
+    payload: TwoFactorSetupConfirmRequest,
+    request: Request,
+    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    service: AuthService = Depends(_service),
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
+    audit: AuditService = Depends(_audit_service),
+) -> TwoFactorSetupConfirmResponse:
+    try:
+        record, recovery_codes = await two_factor_service.confirm_setup(
+            account, payload.totp_code
+        )
+    except SetupExpiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE, detail="setup expired, please start again"
+        ) from exc
+    except InvalidCodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid code"
+        ) from exc
+
+    current_session_id = _bearer_session_id(request)
+    revoked_count = await service.logout_all(
+        account.id,
+        except_session_id=uuid.UUID(current_session_id) if current_session_id else None,
+    )
+    await audit.log_action(
+        action="auth.2fa_enabled",
+        entity_type="account",
+        entity_id=str(account.id),
+        actor_account_id=account.id,
+        actor_role=account.role.value,
+        audit_metadata={"other_sessions_revoked": revoked_count},
+    )
+    return TwoFactorSetupConfirmResponse(
+        enabled_at=record.enabled_at, recovery_codes=recovery_codes
+    )
+
+
+@router.post("/2fa/disable", status_code=status.HTTP_204_NO_CONTENT)
+async def disable_two_factor(
+    payload: TwoFactorDisableRequest,
+    request: Request,
+    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    service: AuthService = Depends(_service),
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
+    audit: AuditService = Depends(_audit_service),
+) -> None:
+    try:
+        await two_factor_service.disable(account, payload.password, payload.code)
+    except InvalidPasswordError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid password"
+        ) from exc
+    except TwoFactorNotEnabledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="two-factor authentication not enabled"
+        ) from exc
+    except InvalidCodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid code"
+        ) from exc
+
+    current_session_id = _bearer_session_id(request)
+    revoked_count = await service.logout_all(
+        account.id,
+        except_session_id=uuid.UUID(current_session_id) if current_session_id else None,
+    )
+    await audit.log_action(
+        action="auth.2fa_disabled",
+        entity_type="account",
+        entity_id=str(account.id),
+        actor_account_id=account.id,
+        actor_role=account.role.value,
+        audit_metadata={"other_sessions_revoked": revoked_count},
+    )
+
+
+@router.post("/2fa/recovery/regenerate", response_model=TwoFactorRegenerateResponse)
+async def regenerate_recovery_codes(
+    payload: TwoFactorRegenerateRequest,
+    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
+    audit: AuditService = Depends(_audit_service),
+) -> TwoFactorRegenerateResponse:
+    try:
+        codes = await two_factor_service.regenerate_recovery_codes(
+            account, payload.password, payload.totp_code
+        )
+    except InvalidPasswordError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid password"
+        ) from exc
+    except TwoFactorNotEnabledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="two-factor authentication not enabled"
+        ) from exc
+    except InvalidCodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid code"
+        ) from exc
+
+    await audit.log_action(
+        action="auth.2fa_recovery_regenerated",
+        entity_type="account",
+        entity_id=str(account.id),
+        actor_account_id=account.id,
+        actor_role=account.role.value,
+    )
+    return TwoFactorRegenerateResponse(recovery_codes=codes)
 
 
 @router.get("/me", response_model=AccountRead)
@@ -158,14 +474,7 @@ async def list_sessions(
     account: Account = Depends(get_current_account),
     service: AuthService = Depends(_service),
 ) -> AuthSessionListResponse:
-    auth_header = request.headers.get("authorization", "")
-    current_session_id: str | None = None
-    if auth_header.lower().startswith("bearer "):
-        try:
-            current_session_id = decode_token(auth_header[7:], TokenType.ACCESS).get("session_id")
-        except TokenError:
-            current_session_id = None
-
+    current_session_id = _bearer_session_id(request)
     sessions = await service.list_sessions(account.id)
     items = [
         AuthSessionRead.model_validate(session).model_copy(

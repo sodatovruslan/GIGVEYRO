@@ -27,6 +27,7 @@ class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"
     REALTIME = "realtime"
+    TWO_FACTOR_CHALLENGE = "two_factor_challenge"
 
 
 class TokenError(Exception):
@@ -39,6 +40,7 @@ def _create_token(
     token_type: TokenType,
     expires_delta: timedelta,
     session_id: uuid.UUID | None = None,
+    jti: uuid.UUID | None = None,
 ) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
@@ -47,7 +49,7 @@ def _create_token(
         "type": token_type.value,
         "iat": now,
         "exp": now + expires_delta,
-        "jti": str(uuid.uuid4()),
+        "jti": str(jti) if jti is not None else str(uuid.uuid4()),
     }
     if session_id is not None:
         payload["session_id"] = str(session_id)
@@ -74,11 +76,33 @@ def create_refresh_token(subject: uuid.UUID, role: str, session_id: uuid.UUID | 
     )
 
 
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def hash_refresh_token(token: str) -> str:
     # Refresh tokens are never stored in plaintext - only this hash is
     # persisted on the AuthSession row, so a DB read never discloses a
     # usable credential.
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return _sha256_hex(token)
+
+
+def hash_recovery_code(code: str) -> str:
+    # Same rationale as hash_refresh_token: recovery codes are one-time
+    # bearer credentials and must never be stored in plaintext.
+    return _sha256_hex(code.strip().upper())
+
+
+def create_two_factor_challenge_token(
+    subject: uuid.UUID, role: str, challenge_id: uuid.UUID, expires_seconds: int
+) -> str:
+    return _create_token(
+        subject,
+        role,
+        TokenType.TWO_FACTOR_CHALLENGE,
+        timedelta(seconds=expires_seconds),
+        jti=challenge_id,
+    )
 
 
 def create_realtime_ticket(subject: uuid.UUID, role: str, expires_seconds: int = 30) -> str:
