@@ -92,11 +92,31 @@ async def health_diagnostics():
     NOT a dependency for load balancer health checks.
     Consider protecting this endpoint in production (e.g. internal network only).
     """
+    from app.infra.redis_client import get_redis
     from app.services.provider_factory import get_provider_diagnostics
+
+    redis_client = get_redis()
+    worker_alive = False
+    if redis_client:
+        try:
+            worker_alive = bool(await redis_client.exists(f"{settings.REDIS_KEY_PREFIX}:worker:heartbeat"))
+        except Exception:
+            pass
+
     return {
         "app_env": settings.APP_ENV,
         "payout_enabled": settings.PAYOUT_ENABLED,
         "providers": get_provider_diagnostics(),
         "redis": await redis_health_check(),
         "docs_enabled": settings.DOCS_ENABLED,
+        "rate_limiting": {
+            "fail_mode": settings.RATE_LIMIT_FAIL_MODE,
+            "prefix": settings.REDIS_KEY_PREFIX,
+        },
+        "realtime": {
+            "broker": settings.REALTIME_BROKER,
+        },
+        "workers": {
+            "worker_alive": worker_alive,
+        },
     }

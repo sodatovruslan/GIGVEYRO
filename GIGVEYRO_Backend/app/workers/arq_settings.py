@@ -48,12 +48,26 @@ def _redis_settings() -> RedisSettings:
     )
 
 
+async def _heartbeat_loop(redis_client) -> None:
+    import asyncio
+    import logging
+    logger = logging.getLogger("worker.heartbeat")
+    key = f"{settings.REDIS_KEY_PREFIX}:worker:heartbeat"
+    while True:
+        try:
+            await redis_client.set(key, "alive", ex=60)
+        except Exception as exc:
+            logger.warning("Failed to write worker heartbeat: %s", exc)
+        await asyncio.sleep(15)
+
+
 async def startup(ctx: dict) -> None:
     """ARQ worker startup hook — initialise shared resources."""
+    import asyncio
     import logging
 
     from app.infra.logging_config import configure_logging
-    from app.infra.redis_client import init_redis
+    from app.infra.redis_client import get_redis, init_redis
     from app.infra.sentry import init_sentry
 
     configure_logging(app_env=settings.APP_ENV, log_level="INFO")
@@ -61,6 +75,10 @@ async def startup(ctx: dict) -> None:
 
     init_sentry()
     await init_redis()
+
+    redis_client = get_redis()
+    if redis_client:
+        ctx["heartbeat_task"] = asyncio.create_task(_heartbeat_loop(redis_client))
 
     logger.info(
         "ARQ worker started: env=%s, concurrency=%d",
@@ -76,6 +94,15 @@ async def shutdown(ctx: dict) -> None:
     from app.infra.redis_client import close_redis
 
     logger = logging.getLogger("worker.shutdown")
+
+    task = ctx.get("heartbeat_task")
+    if task:
+        task.cancel()
+        try:
+            await task
+        except Exception:
+            pass
+
     await close_redis()
     logger.info("ARQ worker shut down cleanly.")
 

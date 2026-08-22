@@ -71,3 +71,22 @@ async def test_lifespan_startup_and_health_endpoints():
     assert res_live.json() == {"status": "alive"}
     assert res_ready.status_code in (200, 503)
 
+
+async def test_health_diagnostics():
+    from app.main import app
+    from httpx import ASGITransport, AsyncClient
+
+    transport = ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res = await client.get("/health/diagnostics")
+
+    assert res.status_code == 200
+    data = res.json()
+    assert "rate_limiting" in data
+    assert "realtime" in data
+    assert "workers" in data
+    assert "providers" in data
+    assert "redis" in data
+
+
