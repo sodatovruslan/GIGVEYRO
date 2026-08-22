@@ -9,11 +9,13 @@ from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.enums.account import UserRole
 from app.enums.deposit import CorrelationStatus, DepositAsset, DepositNetwork, DepositStatus
+from app.enums.notification import NotificationType
 from app.models.account import Account
 from app.models.deposit import Deposit, UnmatchedTransfer
 from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
 from app.services.deposit_provider import CryptoDepositProvider
+from app.services.notification import NotificationService
 from app.services.wallet import WalletService
 
 logger = logging.getLogger(__name__)
@@ -87,11 +89,13 @@ class DepositService:
         account_repository: AccountRepository,
         wallet_service: WalletService,
         provider: CryptoDepositProvider,
+        notification_service: NotificationService | None = None,
     ):
         self._deposits = deposit_repository
         self._accounts = account_repository
         self._wallet_service = wallet_service
         self._provider = provider
+        self._notifications = notification_service
 
     async def create_deposit_intent(self, account: Account, *, amount: Decimal) -> Deposit:
         if account.role != UserRole.USER:
@@ -340,7 +344,22 @@ class DepositService:
 
         deposit.credited_amount = deposit.received_amount
         transition_deposit(deposit, DepositStatus.CREDITED)
-        return await self._deposits.save(deposit)
+        saved = await self._deposits.save(deposit)
+
+        if self._notifications is not None:
+            await self._notifications.emit_notification(
+                deposit.account_id,
+                NotificationType.DEPOSIT_CONFIRMED,
+                title="Deposit credited",
+                message=(
+                    f"Deposit {deposit.public_id} for {deposit.credited_amount} "
+                    "USDT was credited"
+                ),
+                payload={"deposit_id": str(deposit.id)},
+                dedupe_key=f"deposit_credited:{deposit.id}",
+            )
+
+        return saved
 
     async def _get_or_raise(self, deposit_id: uuid.UUID) -> Deposit:
         deposit = await self._deposits.get_by_id(deposit_id)

@@ -9,6 +9,8 @@ from app.enums.account import UserRole
 from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
 from app.repositories.ledger import LedgerRepository
+from app.repositories.notification import NotificationRepository
+from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.deposit import DepositRead, DepositSimulateTransaction
 from app.services.deposit import (
@@ -18,6 +20,8 @@ from app.services.deposit import (
     InvalidTransactionError,
 )
 from app.services.deposit_provider import MockTRC20DepositProvider
+from app.services.notification import NotificationService
+from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import WalletNotFoundError, WalletService
 
 router = APIRouter(
@@ -31,7 +35,13 @@ def _service(db: AsyncSession = Depends(get_db)) -> DepositService:
     account_repository = AccountRepository(db)
     wallet_service = WalletService(WalletRepository(db), LedgerRepository(db), account_repository)
     return DepositService(
-        DepositRepository(db), account_repository, wallet_service, MockTRC20DepositProvider()
+        DepositRepository(db),
+        account_repository,
+        wallet_service,
+        MockTRC20DepositProvider(),
+        notification_service=NotificationService(
+            NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
+        ),
     )
 
 
