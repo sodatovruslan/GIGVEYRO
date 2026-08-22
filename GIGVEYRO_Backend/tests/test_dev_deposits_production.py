@@ -15,6 +15,7 @@ def test_dev_simulate_route_not_mounted_when_app_env_is_production():
     """
     script = (
         "import os; os.environ['APP_ENV'] = 'production'; os.environ['DEBUG'] = 'false'; "
+        "os.environ['ALLOW_MOCK_PROVIDERS_IN_PRODUCTION'] = 'true'; "
         "from app.main import app; "
         "schema = app.openapi(); "
         "paths = list(schema['paths'].keys()); "

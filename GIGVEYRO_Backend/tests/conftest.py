@@ -1,10 +1,41 @@
+import asyncio
+import os
+import re
+import subprocess
+import sys
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
+import asyncpg
 import pytest
+from dotenv import dotenv_values
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Test settings and the disposable database URL must be established before app
+# modules instantiate their process-wide settings, engine, and ASGI application.
+# ruff: noqa: E402
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_ENV_VALUES = dotenv_values(_PROJECT_ROOT / ".env")
+_BASE_DATABASE_URL = os.environ.get("DATABASE_URL") or _ENV_VALUES.get("DATABASE_URL")
+if not _BASE_DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is required to derive the isolated pytest database")
+
+_base_url = make_url(str(_BASE_DATABASE_URL))
+_base_database = _base_url.database or "gigveyro"
+_TEST_DATABASE_NAME = f"{_base_database[:42]}_pytest_{os.getpid()}"
+if not re.fullmatch(r"[A-Za-z0-9_]+", _TEST_DATABASE_NAME):
+    raise RuntimeError("Derived pytest database name contains unsafe characters")
+
+_TEST_DATABASE_URL = _base_url.set(database=_TEST_DATABASE_NAME)
+_ADMIN_DATABASE_URL = _base_url.set(drivername="postgresql", database="postgres")
+os.environ["APP_ENV"] = "test"
+os.environ["DEBUG"] = "false"
+os.environ["DATABASE_URL"] = _TEST_DATABASE_URL.render_as_string(hide_password=False)
 
 from app.core.config import settings as app_settings
 from app.core.middleware import in_memory_rate_limiter
@@ -26,6 +57,41 @@ from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
 from app.services.deal import generate_public_id
 from app.services.deposit import generate_deposit_public_id
+
+
+async def _create_test_database() -> None:
+    connection = await asyncpg.connect(_ADMIN_DATABASE_URL.render_as_string(hide_password=False))
+    try:
+        exists = await connection.fetchval(
+            "SELECT 1 FROM pg_database WHERE datname = $1", _TEST_DATABASE_NAME
+        )
+        if exists:
+            raise RuntimeError(f"Refusing to replace existing test database {_TEST_DATABASE_NAME}")
+        await connection.execute(f'CREATE DATABASE "{_TEST_DATABASE_NAME}"')
+    finally:
+        await connection.close()
+
+
+async def _drop_test_database() -> None:
+    connection = await asyncpg.connect(_ADMIN_DATABASE_URL.render_as_string(hide_password=False))
+    try:
+        await connection.execute(f'DROP DATABASE IF EXISTS "{_TEST_DATABASE_NAME}" WITH (FORCE)')
+    finally:
+        await connection.close()
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    asyncio.run(_create_test_database())
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=_PROJECT_ROOT,
+        env=os.environ.copy(),
+        check=True,
+    )
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    asyncio.run(_drop_test_database())
 
 
 @pytest.fixture(autouse=True)
