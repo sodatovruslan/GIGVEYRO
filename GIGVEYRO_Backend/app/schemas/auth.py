@@ -23,5 +23,11 @@ class TwoFactorRequiredResponse(BaseModel):
     expires_in: int
 
 
+class TwoFactorSetupRequiredResponse(BaseModel):
+    two_factor_setup_required: Literal[True] = True
+    setup_token: str
+    expires_in: int
+
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str

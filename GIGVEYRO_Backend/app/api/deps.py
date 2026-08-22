@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, status
@@ -18,27 +19,27 @@ from app.repositories.auth_session import AuthSessionRepository
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_current_account(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-    db: AsyncSession = Depends(get_db),
-) -> Account:
-    unauthorized = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+async def _resolve_access_account(
+    credentials: HTTPAuthorizationCredentials | None, db: AsyncSession
+) -> Account | None:
+    """Core of get_current_account, but returns None instead of raising.
 
+    Split out so other dependencies (e.g. the required-2FA onboarding
+    resolver) can attempt a normal access token first without duplicating
+    the session-validity check, and fall back to a different token purpose
+    on failure.
+    """
     if credentials is None:
-        raise unauthorized
+        return None
 
     try:
         payload = decode_token(credentials.credentials, TokenType.ACCESS)
-    except TokenError as exc:
-        raise unauthorized from exc
+    except TokenError:
+        return None
 
     account = await AccountRepository(db).get_by_id(uuid.UUID(payload["sub"]))
     if account is None or not account.is_active:
-        raise unauthorized
+        return None
 
     # Tokens minted through the real login/refresh flow carry a session_id,
     # so a revoked/logged-out session is rejected immediately instead of
@@ -53,8 +54,22 @@ async def get_current_account(
             or auth_session.revoked_at is not None
             or auth_session.expires_at <= datetime.now(UTC)
         ):
-            raise unauthorized
+            return None
 
+    return account
+
+
+async def get_current_account(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Account:
+    account = await _resolve_access_account(credentials, db)
+    if account is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return account
 
 
@@ -68,3 +83,49 @@ def require_roles(*roles: UserRole) -> Callable[..., Awaitable[Account]]:
         return account
 
     return dependency
+
+
+@dataclass(frozen=True)
+class TwoFactorSetupActor:
+    account: Account
+    # False when authenticated via a normal access token (the account chose
+    # to enable 2FA voluntarily) - the endpoint must still independently
+    # verify the caller's password for this sensitive action. True when
+    # authenticated via a two_factor_setup_required token (OWNER_2FA_REQUIRED
+    # forced onboarding right after login) - the token itself already proves
+    # the password was just verified during /auth/login, so asking again
+    # would just be onboarding friction.
+    password_verified: bool
+
+
+async def get_two_factor_setup_actor(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> TwoFactorSetupActor:
+    unauthorized = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    account = await _resolve_access_account(credentials, db)
+    if account is not None:
+        if account.role != UserRole.OWNER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="insufficient permissions"
+            )
+        return TwoFactorSetupActor(account=account, password_verified=False)
+
+    if credentials is None:
+        raise unauthorized
+
+    try:
+        payload = decode_token(credentials.credentials, TokenType.TWO_FACTOR_SETUP_REQUIRED)
+    except TokenError as exc:
+        raise unauthorized from exc
+
+    setup_account = await AccountRepository(db).get_by_id(uuid.UUID(payload["sub"]))
+    if setup_account is None or not setup_account.is_active or setup_account.role != UserRole.OWNER:
+        raise unauthorized
+
+    return TwoFactorSetupActor(account=setup_account, password_verified=True)

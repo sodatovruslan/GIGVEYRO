@@ -4,22 +4,31 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_account, require_roles
+from app.api.deps import (
+    TwoFactorSetupActor,
+    get_current_account,
+    get_two_factor_setup_actor,
+    require_roles,
+)
 from app.core.config import settings
 from app.core.security import (
     TokenError,
     TokenType,
     create_two_factor_challenge_token,
+    create_two_factor_setup_required_token,
     decode_token,
 )
 from app.core.totp_crypto import decrypt_totp_secret
 from app.db.session import get_db
 from app.enums.account import UserRole
+from app.enums.notification import NotificationType
 from app.infra.redis_rate_limiter import RedisRateLimiter
 from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.auth_session import AuthSessionRepository
+from app.repositories.notification import NotificationRepository
+from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.two_factor import (
     AccountTwoFactorRepository,
     PendingTwoFactorSetupRepository,
@@ -32,6 +41,7 @@ from app.schemas.auth import (
     RefreshTokenRequest,
     TokenResponse,
     TwoFactorRequiredResponse,
+    TwoFactorSetupRequiredResponse,
 )
 from app.schemas.auth_session import AuthSessionListResponse, AuthSessionRead, LogoutAllResponse
 from app.schemas.two_factor import (
@@ -53,6 +63,8 @@ from app.services.auth import (
     TokenPair,
     TokenReuseError,
 )
+from app.services.notification import NotificationService
+from app.services.telegram_provider import MockTelegramProvider
 from app.services.two_factor import (
     ChallengeInvalidError,
     ChallengeLockedError,
@@ -86,6 +98,27 @@ def _two_factor_service(db: AsyncSession = Depends(get_db)) -> TwoFactorService:
     )
 
 
+def _notification_service(db: AsyncSession = Depends(get_db)) -> NotificationService:
+    return NotificationService(
+        NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
+    )
+
+
+async def _notify_owner_security_event(
+    notifications: NotificationService, account: Account, *, title: str, message: str
+) -> None:
+    # Security notifications are currently scoped to OWNER only (the only
+    # role that can have 2FA / active-session self-management in this
+    # stage) - same emit_notification() call other domains already use for
+    # deposits/withdrawals/appeals, no changes to the notification system
+    # itself.
+    if account.role != UserRole.OWNER:
+        return
+    await notifications.emit_notification(
+        account.id, NotificationType.SECURITY_EVENT, title=title, message=message
+    )
+
+
 def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
@@ -109,10 +142,14 @@ def _bearer_session_id(request: Request) -> str | None:
 
 
 async def _enforce_two_factor_rate_limit(key: str) -> None:
+    # Same rationale as the login limiter (app/core/middleware.py): a
+    # Redis outage must not silently remove brute-force protection from
+    # 2FA code verification.
     limited = await _two_factor_rate_limiter.is_rate_limited(
         key,
         settings.TWO_FACTOR_VERIFY_RATE_LIMIT_REQUESTS,
         settings.TWO_FACTOR_VERIFY_RATE_LIMIT_WINDOW_SECONDS,
+        fail_mode="fallback",
     )
     if limited:
         raise HTTPException(
@@ -122,14 +159,17 @@ async def _enforce_two_factor_rate_limit(key: str) -> None:
         )
 
 
-@router.post("/login", response_model=TokenResponse | TwoFactorRequiredResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse | TwoFactorRequiredResponse | TwoFactorSetupRequiredResponse,
+)
 async def login(
     payload: LoginRequest,
     request: Request,
     service: AuthService = Depends(_service),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
-) -> TokenResponse | TwoFactorRequiredResponse:
+) -> TokenResponse | TwoFactorRequiredResponse | TwoFactorSetupRequiredResponse:
     try:
         account = await service.authenticate(payload.username, payload.password)
     except AuthenticationError as exc:
@@ -150,6 +190,20 @@ async def login(
         return TwoFactorRequiredResponse(
             challenge_token=challenge_token,
             expires_in=settings.TWO_FACTOR_CHALLENGE_EXPIRE_SECONDS,
+        )
+
+    if account.role == UserRole.OWNER and settings.OWNER_2FA_REQUIRED:
+        # Credentials are valid but this OWNER has no 2FA configured yet and
+        # enforcement is on: no real session is issued. The setup_token only
+        # authorizes the onboarding setup/confirm endpoints (see
+        # api/deps.py:get_two_factor_setup_actor) - it cannot reach any other
+        # protected endpoint, matching the login-challenge token's isolation.
+        setup_expires_seconds = settings.TWO_FACTOR_SETUP_EXPIRE_MINUTES * 60
+        setup_token = create_two_factor_setup_required_token(
+            account.id, account.role.value, setup_expires_seconds
+        )
+        return TwoFactorSetupRequiredResponse(
+            setup_token=setup_token, expires_in=setup_expires_seconds
         )
 
     token_pair = await service.login(
@@ -175,6 +229,7 @@ async def verify_two_factor(
     service: AuthService = Depends(_service),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
+    notifications: NotificationService = Depends(_notification_service),
 ) -> TokenResponse:
     # 410 Gone: the challenge itself is dead (expired/consumed/locked/malformed
     # token) - the client must restart login, retrying with a new code won't
@@ -227,6 +282,13 @@ async def verify_two_factor(
         actor_account_id=account.id,
         actor_role=account.role.value,
     )
+    if used_recovery:
+        await _notify_owner_security_event(
+            notifications,
+            account,
+            title="Recovery code used",
+            message="A recovery code was used to sign in to your account.",
+        )
     return _token_response(token_pair)
 
 
@@ -248,12 +310,15 @@ async def two_factor_status(
 @router.post("/2fa/setup/start", response_model=TwoFactorSetupStartResponse)
 async def start_two_factor_setup(
     payload: TwoFactorSetupStartRequest,
-    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    actor: Annotated[TwoFactorSetupActor, Depends(get_two_factor_setup_actor)],
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
 ) -> TwoFactorSetupStartResponse:
+    account = actor.account
     try:
-        pending = await two_factor_service.start_setup(account, payload.password)
+        pending = await two_factor_service.start_setup(
+            account, payload.password, password_verified=actor.password_verified
+        )
     except InvalidPasswordError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid password"
@@ -282,11 +347,13 @@ async def start_two_factor_setup(
 async def confirm_two_factor_setup(
     payload: TwoFactorSetupConfirmRequest,
     request: Request,
-    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    actor: Annotated[TwoFactorSetupActor, Depends(get_two_factor_setup_actor)],
     service: AuthService = Depends(_service),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
+    notifications: NotificationService = Depends(_notification_service),
 ) -> TwoFactorSetupConfirmResponse:
+    account = actor.account
     try:
         record, recovery_codes = await two_factor_service.confirm_setup(
             account, payload.totp_code
@@ -299,6 +366,46 @@ async def confirm_two_factor_setup(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid code"
         ) from exc
+
+    if actor.password_verified:
+        # Forced onboarding (OWNER_2FA_REQUIRED): no session existed before
+        # this call, so this is where one is finally created. Any session
+        # from before 2FA enforcement kicked in is revoked outright - there
+        # is no "current session" to except yet.
+        revoked_count = await service.logout_all(account.id)
+        token_pair = await service.login(
+            account,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=_client_ip(request),
+        )
+        await audit.log_action(
+            action="auth.2fa_enabled",
+            entity_type="account",
+            entity_id=str(account.id),
+            actor_account_id=account.id,
+            actor_role=account.role.value,
+            audit_metadata={"other_sessions_revoked": revoked_count, "forced_onboarding": True},
+        )
+        await audit.log_action(
+            action="auth.login",
+            entity_type="account",
+            entity_id=str(account.id),
+            actor_account_id=account.id,
+            actor_role=account.role.value,
+        )
+        await _notify_owner_security_event(
+            notifications,
+            account,
+            title="Two-factor authentication enabled",
+            message="Two-factor authentication was enabled on your account.",
+        )
+        return TwoFactorSetupConfirmResponse(
+            enabled_at=record.enabled_at,
+            recovery_codes=recovery_codes,
+            access_token=token_pair.access_token,
+            refresh_token=token_pair.refresh_token,
+            access_expires_in=token_pair.access_expires_in,
+        )
 
     current_session_id = _bearer_session_id(request)
     revoked_count = await service.logout_all(
@@ -313,6 +420,12 @@ async def confirm_two_factor_setup(
         actor_role=account.role.value,
         audit_metadata={"other_sessions_revoked": revoked_count},
     )
+    await _notify_owner_security_event(
+        notifications,
+        account,
+        title="Two-factor authentication enabled",
+        message="Two-factor authentication was enabled on your account.",
+    )
     return TwoFactorSetupConfirmResponse(
         enabled_at=record.enabled_at, recovery_codes=recovery_codes
     )
@@ -326,6 +439,7 @@ async def disable_two_factor(
     service: AuthService = Depends(_service),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
+    notifications: NotificationService = Depends(_notification_service),
 ) -> None:
     try:
         await two_factor_service.disable(account, payload.password, payload.code)
@@ -354,6 +468,12 @@ async def disable_two_factor(
         actor_account_id=account.id,
         actor_role=account.role.value,
         audit_metadata={"other_sessions_revoked": revoked_count},
+    )
+    await _notify_owner_security_event(
+        notifications,
+        account,
+        title="Two-factor authentication disabled",
+        message="Two-factor authentication was disabled on your account.",
     )
 
 
@@ -455,6 +575,7 @@ async def logout_all(
     account: Account = Depends(get_current_account),
     service: AuthService = Depends(_service),
     audit: AuditService = Depends(_audit_service),
+    notifications: NotificationService = Depends(_notification_service),
 ) -> LogoutAllResponse:
     revoked_count = await service.logout_all(account.id)
     await audit.log_action(
@@ -465,6 +586,13 @@ async def logout_all(
         actor_role=account.role.value,
         audit_metadata={"revoked_count": revoked_count},
     )
+    if revoked_count > 0:
+        await _notify_owner_security_event(
+            notifications,
+            account,
+            title="All other sessions signed out",
+            message=f"{revoked_count} other active session(s) were signed out.",
+        )
     return LogoutAllResponse(revoked_count=revoked_count)
 
 

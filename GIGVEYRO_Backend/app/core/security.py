@@ -28,6 +28,7 @@ class TokenType(StrEnum):
     REFRESH = "refresh"
     REALTIME = "realtime"
     TWO_FACTOR_CHALLENGE = "two_factor_challenge"
+    TWO_FACTOR_SETUP_REQUIRED = "two_factor_setup_required"
 
 
 class TokenError(Exception):
@@ -102,6 +103,22 @@ def create_two_factor_challenge_token(
         TokenType.TWO_FACTOR_CHALLENGE,
         timedelta(seconds=expires_seconds),
         jti=challenge_id,
+    )
+
+
+def create_two_factor_setup_required_token(
+    subject: uuid.UUID, role: str, expires_seconds: int
+) -> str:
+    # Issued instead of real tokens when OWNER_2FA_REQUIRED is enforced and
+    # the account has no 2FA configured yet. Distinct purpose from
+    # TWO_FACTOR_CHALLENGE (which verifies an *existing* 2FA setup) - this
+    # one only ever authorizes the onboarding setup/confirm endpoints
+    # (see api/deps.py:get_setup_required_account), never general API access.
+    return _create_token(
+        subject,
+        role,
+        TokenType.TWO_FACTOR_SETUP_REQUIRED,
+        timedelta(seconds=expires_seconds),
     )
 
 

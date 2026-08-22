@@ -86,9 +86,12 @@ class TwoFactorService:
     async def count_unused_recovery_codes(self, account_id: uuid.UUID) -> int:
         return await self._recovery.count_unused(account_id)
 
-    async def start_setup(self, account: Account, password: str) -> PendingTwoFactorSetup:
-        if not verify_password(password, account.password_hash):
-            raise InvalidPasswordError()
+    async def start_setup(
+        self, account: Account, password: str | None, *, password_verified: bool = False
+    ) -> PendingTwoFactorSetup:
+        if not password_verified:
+            if password is None or not verify_password(password, account.password_hash):
+                raise InvalidPasswordError()
         if await self._two_factor.get_by_account_id(account.id) is not None:
             raise TwoFactorAlreadyEnabledError()
 
