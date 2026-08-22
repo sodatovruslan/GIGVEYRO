@@ -7,7 +7,8 @@ import { mapAppealFieldErrors } from "../src/features/appeals/validation.ts";
 import { AuthOperationGate } from "../src/features/auth/auth-operation-gate.ts";
 import { loginErrorKey } from "../src/features/auth/login-error.ts";
 import { auditMessagePath } from "../src/features/audit/i18n.ts";
-import { mapWithdrawalFieldErrors } from "../src/features/withdrawals/validation.ts";
+import { notificationLink } from "../src/features/notifications/links.ts";
+import { isWithdrawalStateConflict, mapWithdrawalFieldErrors } from "../src/features/withdrawals/validation.ts";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
@@ -147,6 +148,52 @@ test("changed appeals and deposits keys exist in RU/TG/EN", async () => {
     assert.ok(catalog.deposits.dateFrom);
     assert.ok(catalog.deposits.dateTo);
   }
+});
+
+test("owner withdrawal actions detect a stale-state conflict and refetch instead of retrying blindly", () => {
+  assert.equal(isWithdrawalStateConflict({ message: "cannot approve withdrawal in status approved" }), true);
+  assert.equal(isWithdrawalStateConflict({ message: "cannot cancel withdrawal in status paid" }), true);
+  assert.equal(isWithdrawalStateConflict({ message: "amount must be a positive, finite number" }), false);
+});
+
+test("notification deep links only target routes that actually exist for the recipient's role", () => {
+  assert.equal(notificationLink({ type: "APPEAL_OPENED", payload: { appeal_id: "a1" } }, "merchant"), "/merchant/appeals");
+  assert.equal(notificationLink({ type: "WITHDRAWAL_STATUS_CHANGED", payload: { withdrawal_id: "w1" } }, "owner"), "/owner/withdrawals");
+  assert.equal(notificationLink({ type: "DEPOSIT_CONFIRMED", payload: { deposit_id: "d1" } }, "merchant"), null);
+  assert.equal(notificationLink({ type: "WITHDRAWAL_STATUS_CHANGED", payload: { withdrawal_id: "w1" } }, "user"), null);
+  assert.equal(notificationLink({ type: "DEAL_CREATED", payload: { deal_id: "x1" } }, "owner"), null);
+  assert.equal(notificationLink({ type: "APPEAL_OPENED", payload: null }, "owner"), null);
+});
+
+test("business list views paginate instead of hardcoding limit=100", async () => {
+  const appealsApi = await source("src/lib/api/appeals.ts");
+  const depositsApi = await source("src/lib/api/deposits.ts");
+  const merchantApi = await source("src/lib/api/merchant.ts");
+  const ownerOpsApi = await source("src/lib/api/owner-operations.ts");
+  const notificationsApi = await source("src/lib/api/notifications.ts");
+  assert.match(appealsApi, /list: \(owner: boolean, limit = 20, offset = 0\)/);
+  assert.match(depositsApi, /list: \(owner: boolean, status\?: DepositStatus, filters: DepositOwnerFilters = \{\}, limit = 20, offset = 0\)/);
+  assert.match(merchantApi, /withdrawals: \(status\?: MerchantWithdrawal\["status"\], limit = 20, offset = 0\)/);
+  assert.match(ownerOpsApi, /withdrawals: \(status\?: MerchantWithdrawal\["status"\], limit = 20, offset = 0\)/);
+  assert.match(notificationsApi, /list: \(limit = 20, offset = 0\)/);
+  const appealsPage = await source("src/components/appeals/appeals-page.tsx");
+  const depositsPage = await source("src/components/deposits/deposits-page.tsx");
+  const ownerWithdrawalsPage = await source("src/app/owner/withdrawals/page.tsx");
+  const merchantWithdrawalsPage = await source("src/app/merchant/withdrawals/page.tsx");
+  const notificationsPage = await source("src/components/notifications/notifications-page.tsx");
+  for (const page of [appealsPage, depositsPage, ownerWithdrawalsPage, merchantWithdrawalsPage, notificationsPage]) {
+    assert.match(page, /Pager/);
+  }
+});
+
+test("owner deposit unmatched-transfer visibility is real, read-only, and not a manual-credit shortcut", async () => {
+  const api = await source("src/lib/api/deposits.ts");
+  const panel = await source("src/components/deposits/unmatched-transfers-panel.tsx");
+  assert.match(api, /\/owner\/deposits\/unmatched/);
+  assert.doesNotMatch(panel, /method:\s*"POST"/);
+  assert.doesNotMatch(panel, /method:\s*"PATCH"/);
+  assert.doesNotMatch(panel, /credit/i);
+  assert.match(panel, /Pager/);
 });
 
 test("next-intl resolves every canonical backend audit action in RU/TG/EN", async () => {
