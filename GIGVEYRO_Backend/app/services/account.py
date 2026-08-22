@@ -7,6 +7,7 @@ from app.core.security import hash_password
 from app.enums.account import UserRole
 from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.repositories.auth_session import AuthSessionRepository
 from app.services.traffic import TrafficService, TrafficSettingsNotFoundError
 from app.services.wallet import WalletService
 
@@ -33,10 +34,12 @@ class AccountService:
         repository: AccountRepository,
         wallet_service: WalletService | None = None,
         traffic_service: TrafficService | None = None,
+        auth_session_repository: AuthSessionRepository | None = None,
     ):
         self._repository = repository
         self._wallet_service = wallet_service
         self._traffic_service = traffic_service
+        self._auth_sessions = auth_session_repository
 
     async def get_by_id(self, account_id: uuid.UUID) -> Account | None:
         return await self._repository.get_by_id(account_id)
@@ -142,11 +145,16 @@ class AccountService:
         account.is_active = is_active
         updated = await self._repository.update(account)
 
-        if not is_active and account.role == UserRole.USER and self._traffic_service is not None:
-            try:
-                await self._traffic_service.disable_traffic(account_id)
-            except TrafficSettingsNotFoundError:
-                pass
+        if not is_active:
+            if account.role == UserRole.USER and self._traffic_service is not None:
+                try:
+                    await self._traffic_service.disable_traffic(account_id)
+                except TrafficSettingsNotFoundError:
+                    pass
+            if self._auth_sessions is not None:
+                await self._auth_sessions.revoke_all_for_account(
+                    account_id, reason="account_blocked"
+                )
 
         return updated
 
@@ -157,6 +165,9 @@ class AccountService:
 
         account.password_hash = hash_password(new_password)
         await self._repository.update(account)
+
+        if self._auth_sessions is not None:
+            await self._auth_sessions.revoke_all_for_account(account_id, reason="password_reset")
 
     async def _get_manageable_or_none(self, account_id: uuid.UUID) -> Account | None:
         account = await self._repository.get_by_id(account_id)

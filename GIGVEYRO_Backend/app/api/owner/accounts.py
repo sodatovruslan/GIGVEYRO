@@ -11,6 +11,7 @@ from app.enums.wallet import LedgerEntryType
 from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
+from app.repositories.auth_session import AuthSessionRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
@@ -53,7 +54,9 @@ def _service(db: AsyncSession = Depends(get_db)) -> AccountService:
     traffic_service = TrafficService(
         TrafficRepository(db), PaymentRequisiteRepository(db), account_repository
     )
-    return AccountService(account_repository, wallet_service, traffic_service)
+    return AccountService(
+        account_repository, wallet_service, traffic_service, AuthSessionRepository(db)
+    )
 
 
 def _wallet_service(db: AsyncSession = Depends(get_db)) -> WalletService:
