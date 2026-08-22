@@ -1,5 +1,13 @@
-from app.core.security import create_access_token, create_refresh_token
+from app.core.security import TokenType, create_access_token, create_refresh_token, decode_token
 from app.enums.account import UserRole
+
+
+async def _login(client, account, password: str) -> dict:
+    response = await client.post(
+        "/auth/login", json={"username": account.username, "password": password}
+    )
+    assert response.status_code == 200
+    return response.json()
 
 
 async def test_login_with_correct_credentials_returns_tokens(client, make_account):
@@ -62,6 +70,24 @@ async def test_login_with_inactive_account_returns_401(client, make_account):
     assert response.status_code == 401
 
 
+async def test_login_creates_server_side_session(client, make_account, db_session):
+    from sqlalchemy import select
+
+    from app.models.auth_session import AuthSession
+
+    account = await make_account(password="CorrectPassword123")
+    body = await _login(client, account, "CorrectPassword123")
+
+    payload = decode_token(body["refresh_token"], TokenType.REFRESH)
+    result = await db_session.execute(
+        select(AuthSession).where(AuthSession.id == payload["session_id"])
+    )
+    session = result.scalar_one()
+    assert session.account_id == account.id
+    assert session.revoked_at is None
+    assert session.refresh_token_hash != body["refresh_token"]
+
+
 async def test_me_without_token_returns_401(client):
     response = await client.get("/auth/me")
     assert response.status_code == 401
@@ -105,14 +131,17 @@ async def test_me_with_inactive_account_returns_401(client, make_account):
 
 async def test_refresh_with_valid_refresh_token_returns_new_tokens(client, make_account):
     account = await make_account(password="CorrectPassword123")
-    refresh_token = create_refresh_token(account.id, account.role.value)
+    login_body = await _login(client, account, "CorrectPassword123")
 
-    response = await client.post("/auth/refresh", json={"refresh_token": refresh_token})
+    response = await client.post(
+        "/auth/refresh", json={"refresh_token": login_body["refresh_token"]}
+    )
 
     assert response.status_code == 200
     body = response.json()
     assert "access_token" in body
     assert "refresh_token" in body
+    assert body["refresh_token"] != login_body["refresh_token"]
 
 
 async def test_refresh_with_access_token_returns_401(client, make_account):
@@ -120,5 +149,16 @@ async def test_refresh_with_access_token_returns_401(client, make_account):
     access_token = create_access_token(account.id, account.role.value)
 
     response = await client.post("/auth/refresh", json={"refresh_token": access_token})
+
+    assert response.status_code == 401
+
+
+async def test_refresh_without_prior_login_returns_401(client, make_account):
+    # A hand-crafted refresh token with no server-side session behind it
+    # (e.g. minted outside the real login flow) must not be honoured.
+    account = await make_account(password="CorrectPassword123")
+    refresh_token = create_refresh_token(account.id, account.role.value)
+
+    response = await client.post("/auth/refresh", json={"refresh_token": refresh_token})
 
     assert response.status_code == 401

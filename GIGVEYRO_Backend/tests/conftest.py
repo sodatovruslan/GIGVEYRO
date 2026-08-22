@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings as app_settings
 from app.core.middleware import in_memory_rate_limiter
-from app.core.security import hash_password
+from app.core.security import hash_password, hash_refresh_token
 from app.db.session import engine, get_db
 from app.enums.account import UserRole
 from app.enums.deal import DealStatus
@@ -17,6 +17,7 @@ from app.enums.payment_requisite import PaymentRequisiteType
 from app.enums.wallet import Currency
 from app.main import app
 from app.models.account import Account
+from app.models.auth_session import AuthSession
 from app.models.deal import Deal
 from app.models.deposit import Deposit
 from app.models.merchant_wallet import MerchantWallet
@@ -171,6 +172,32 @@ def make_traffic_settings(db_session):
         await db_session.flush()
         await db_session.refresh(settings)
         return settings
+
+    return _make
+
+
+@pytest.fixture
+def make_auth_session(db_session):
+    async def _make(
+        account: Account,
+        *,
+        refresh_token: str | None = None,
+        expires_in_days: int = 30,
+        revoked_at: datetime | None = None,
+        revoked_reason: str | None = None,
+    ) -> AuthSession:
+        token = refresh_token or uuid.uuid4().hex
+        session = AuthSession(
+            account_id=account.id,
+            refresh_token_hash=hash_refresh_token(token),
+            expires_at=datetime.now(UTC) + timedelta(days=expires_in_days),
+            revoked_at=revoked_at,
+            revoked_reason=revoked_reason,
+        )
+        db_session.add(session)
+        await db_session.flush()
+        await db_session.refresh(session)
+        return session
 
     return _make
 
