@@ -80,7 +80,9 @@
     "backToLogin": "Back to sign in",
     "invalidCode": "Invalid code. Please try again.",
     "codeExpired": "This session expired. Please sign in again.",
-    "tooManyAttempts": "Too many attempts. Please try again later."
+    "tooManyAttempts": "Too many attempts. Please try again later.",
+    "twoFactorSetupRequiredTitle": "Two-factor setup required",
+    "twoFactorSetupRequiredSubtitle": "Owner accounts require two-factor authentication. Set it up now to continue."
   },
   "navigation": {
     "workspace": "WORKSPACE",
@@ -646,7 +648,8 @@
       "APPEAL_OPENED": "Appeal opened",
       "APPEAL_RESOLVED": "Appeal resolved",
       "DEPOSIT_CONFIRMED": "Deposit confirmed",
-      "WITHDRAWAL_STATUS_CHANGED": "Withdrawal status changed"
+      "WITHDRAWAL_STATUS_CHANGED": "Withdrawal status changed",
+      "SECURITY_EVENT": "Security event"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",
@@ -689,6 +692,16 @@
     "enableSuccess": "Two-factor authentication is now enabled.",
     "disableSuccess": "Two-factor authentication has been disabled.",
     "regenerateSuccess": "New recovery codes generated.",
-    "otherSessionsRevoked": "Other active sessions were signed out for your security."
+    "otherSessionsRevoked": "Other active sessions were signed out for your security.",
+    "sessionsTitle": "Active sessions",
+    "sessionsDescription": "Devices and browsers currently signed in to your account.",
+    "logoutAllDevices": "Log out all other devices",
+    "noSessions": "No active sessions.",
+    "unknownDevice": "Unknown device",
+    "currentDevice": "This device",
+    "lastActive": "Last active {date}",
+    "sessionCreated": "Signed in {date}",
+    "revokeSession": "Log out",
+    "revokeSessionLabel": "Log out this session"
   }
 }

@@ -80,7 +80,9 @@
     "backToLogin": "Назад ко входу",
     "invalidCode": "Неверный код. Попробуйте ещё раз.",
     "codeExpired": "Сессия истекла. Войдите снова.",
-    "tooManyAttempts": "Слишком много попыток. Попробуйте позже."
+    "tooManyAttempts": "Слишком много попыток. Попробуйте позже.",
+    "twoFactorSetupRequiredTitle": "Требуется настройка двухэтапной проверки",
+    "twoFactorSetupRequiredSubtitle": "Для аккаунта владельца требуется двухэтапная проверка. Настройте её, чтобы продолжить."
   },
   "navigation": {
     "workspace": "РАБОЧЕЕ ПРОСТРАНСТВО",
@@ -646,7 +648,8 @@
       "APPEAL_OPENED": "Апелляция открыта",
       "APPEAL_RESOLVED": "Апелляция решена",
       "DEPOSIT_CONFIRMED": "Депозит подтверждён",
-      "WITHDRAWAL_STATUS_CHANGED": "Статус вывода изменён"
+      "WITHDRAWAL_STATUS_CHANGED": "Статус вывода изменён",
+      "SECURITY_EVENT": "Событие безопасности"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",
@@ -689,6 +692,16 @@
     "enableSuccess": "Двухфакторная аутентификация включена.",
     "disableSuccess": "Двухфакторная аутентификация отключена.",
     "regenerateSuccess": "Новые резервные коды созданы.",
-    "otherSessionsRevoked": "Другие активные сессии были завершены в целях безопасности."
+    "otherSessionsRevoked": "Другие активные сессии были завершены в целях безопасности.",
+    "sessionsTitle": "Активные сессии",
+    "sessionsDescription": "Устройства и браузеры, где сейчас выполнен вход в ваш аккаунт.",
+    "logoutAllDevices": "Завершить все остальные сессии",
+    "noSessions": "Нет активных сессий.",
+    "unknownDevice": "Неизвестное устройство",
+    "currentDevice": "Это устройство",
+    "lastActive": "Последняя активность: {date}",
+    "sessionCreated": "Вход выполнен: {date}",
+    "revokeSession": "Завершить",
+    "revokeSessionLabel": "Завершить эту сессию"
   }
 }

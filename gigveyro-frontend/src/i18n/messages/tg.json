@@ -80,7 +80,9 @@
     "backToLogin": "Бозгашт ба воридшавӣ",
     "invalidCode": "Рамзи нодуруст. Бори дигар кӯшиш кунед.",
     "codeExpired": "Мӯҳлати сессия гузашт. Аз нав ворид шавед.",
-    "tooManyAttempts": "Кӯшишҳои зиёд. Баъдтар кӯшиш кунед."
+    "tooManyAttempts": "Кӯшишҳои зиёд. Баъдтар кӯшиш кунед.",
+    "twoFactorSetupRequiredTitle": "Танзими санҷиши дуумарҳилавӣ лозим аст",
+    "twoFactorSetupRequiredSubtitle": "Барои ҳисоби соҳиб санҷиши дуумарҳилавӣ ҳатмист. Барои идома он ро танзим кунед."
   },
   "navigation": {
     "workspace": "ФАЗОИ КОРӢ",
@@ -646,7 +648,8 @@
       "APPEAL_OPENED": "Шикоят кушода шуд",
       "APPEAL_RESOLVED": "Шикоят ҳал шуд",
       "DEPOSIT_CONFIRMED": "Депозит тасдиқ шуд",
-      "WITHDRAWAL_STATUS_CHANGED": "Вазъи гирифтани маблағ тағйир ёфт"
+      "WITHDRAWAL_STATUS_CHANGED": "Вазъи гирифтани маблағ тағйир ёфт",
+      "SECURITY_EVENT": "Рӯйдоди бехатарӣ"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",
@@ -689,6 +692,16 @@
     "enableSuccess": "Санҷиши дуфакторӣ фаъол карда шуд.",
     "disableSuccess": "Санҷиши дуфакторӣ ғайрифаъол карда шуд.",
     "regenerateSuccess": "Рамзҳои захиравии нав эҷод шуданд.",
-    "otherSessionsRevoked": "Дигар сессияҳои фаъол барои бехатарӣ хотима ёфтанд."
+    "otherSessionsRevoked": "Дигар сессияҳои фаъол барои бехатарӣ хотима ёфтанд.",
+    "sessionsTitle": "Сессияҳои фаъол",
+    "sessionsDescription": "Дастгоҳҳо ва браузерҳое, ки ҳоло ба ҳисоби шумо ворид шудаанд.",
+    "logoutAllDevices": "Хотима додани дигар сессияҳо",
+    "noSessions": "Сессияи фаъол нест.",
+    "unknownDevice": "Дастгоҳи номаълум",
+    "currentDevice": "Ин дастгоҳ",
+    "lastActive": "Фаъолияти охирин: {date}",
+    "sessionCreated": "Вақти воридшавӣ: {date}",
+    "revokeSession": "Хотима додан",
+    "revokeSessionLabel": "Хотима додани ин сессия"
   }
 }

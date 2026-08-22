@@ -50,9 +50,10 @@ test("stale 401 responses cannot clear refreshed cookies", async () => {
   assert.doesNotMatch(sessionRoute, /maxAge:\s*0/);
   assert.doesNotMatch(backendRoute, /backendResponse\.status === 401[\s\S]*maxAge:\s*0/);
   const provider = await source("src/features/auth/auth-provider.tsx");
-  // login, verifyTwoFactor, and logout each start an exclusive operation
-  // and must abort any in-flight request generation before mutating state.
-  assert.equal((provider.match(/abortApiGeneration\(\)/g) || []).length, 3);
+  // login, verifyTwoFactor, confirmForcedTwoFactorSetup, and logout each
+  // start an exclusive operation and must abort any in-flight request
+  // generation before mutating state.
+  assert.equal((provider.match(/abortApiGeneration\(\)/g) || []).length, 4);
 });
 
 test("long Telegram codes use visible wrapping and remain selectable", async () => {
