@@ -377,7 +377,14 @@
     "resolution": "Resolution",
     "settleMerchant": "Settle to merchant",
     "releaseUser": "Return to user",
-    "failed": "Action failed."
+    "failed": "Action failed.",
+    "validation": {
+      "dealNotEligible": "This deal is not in a state that allows opening an appeal.",
+      "activeAppealExists": "This deal already has an active appeal.",
+      "dealNotFound": "Deal not found.",
+      "message": "Enter a message between 5 and 2000 characters.",
+      "ownerNote": "Enter a note between 3 and 2000 characters."
+    }
   },
   "notifications": {
     "eyebrow": "COMMUNICATION CENTER",
