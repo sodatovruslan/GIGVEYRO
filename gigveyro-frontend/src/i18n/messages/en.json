@@ -312,7 +312,18 @@
     "amountUsdt": "USDT amount",
     "createAction": "Create deposit",
     "failed": "Failed to create deposit.",
-    "done": "Done"
+    "done": "Done",
+    "searchPlaceholder": "Search by deposit ID",
+    "txHashPlaceholder": "Transaction hash",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "apply": "Apply",
+    "reset": "Reset",
+    "viewDetails": "Details",
+    "detailTitle": "Deposit details",
+    "depositId": "Deposit ID",
+    "depositAddress": "Deposit address",
+    "expiresAt": "Expires at"
   },
   "withdrawals": {
     "eyebrow": "PAYOUTS",

@@ -312,7 +312,18 @@
     "amountUsdt": "Маблағи USDT",
     "createAction": "Эҷоди депозит",
     "failed": "Депозит эҷод нашуд.",
-    "done": "Тайёр"
+    "done": "Тайёр",
+    "searchPlaceholder": "Ҷустуҷӯ бо ID-и депозит",
+    "txHashPlaceholder": "Хеши транзаксия",
+    "dateFrom": "Аз сана",
+    "dateTo": "То сана",
+    "apply": "Татбиқ",
+    "reset": "Бозсозӣ",
+    "viewDetails": "Тафсилот",
+    "detailTitle": "Тафсилоти депозит",
+    "depositId": "ID-и депозит",
+    "depositAddress": "Суроғаи депозит",
+    "expiresAt": "Мӯҳлат"
   },
   "withdrawals": {
     "eyebrow": "ПАРДОХТҲО",

@@ -312,7 +312,18 @@
     "amountUsdt": "Сумма USDT",
     "createAction": "Создать депозит",
     "failed": "Не удалось создать депозит.",
-    "done": "Готово"
+    "done": "Готово",
+    "searchPlaceholder": "Поиск по ID депозита",
+    "txHashPlaceholder": "Хэш транзакции",
+    "dateFrom": "С даты",
+    "dateTo": "По дату",
+    "apply": "Применить",
+    "reset": "Сбросить",
+    "viewDetails": "Детали",
+    "detailTitle": "Детали депозита",
+    "depositId": "ID депозита",
+    "depositAddress": "Адрес депозита",
+    "expiresAt": "Истекает"
   },
   "withdrawals": {
     "eyebrow": "ВЫПЛАТЫ",
