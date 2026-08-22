@@ -1,21 +1,23 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import type { Account, LoginInput, TokenResponse, TwoFactorRequiredResponse } from "@/lib/api/types";
+import type { Account, TokenResponse } from "@/lib/api/types";
 import { ACCESS_COOKIE, authCookieOptions, backendFetch, REFRESH_COOKIE } from "@/lib/server/backend";
+
+interface VerifyInput { challenge_token: string; code: string }
 
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (origin && origin !== request.nextUrl.origin) {
     return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
   }
-  const payload = (await request.json().catch(() => null)) as LoginInput | null;
-  if (!payload?.username || !payload.password) {
-    return NextResponse.json({ detail: "Введите логин и пароль" }, { status: 400 });
+  const payload = (await request.json().catch(() => null)) as VerifyInput | null;
+  if (!payload?.challenge_token || !payload.code) {
+    return NextResponse.json({ detail: "Введите код подтверждения" }, { status: 400 });
   }
 
   let tokenResponse: Response;
   try {
-    tokenResponse = await backendFetch("/auth/login", {
+    tokenResponse = await backendFetch("/auth/2fa/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -30,11 +32,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const body = (await tokenResponse.json()) as TokenResponse | TwoFactorRequiredResponse;
-  if ("two_factor_required" in body) {
-    return NextResponse.json(body);
-  }
-  const tokens = body;
+  const tokens = (await tokenResponse.json()) as TokenResponse;
   let accountResponse: Response;
   try {
     accountResponse = await backendFetch("/auth/me", {

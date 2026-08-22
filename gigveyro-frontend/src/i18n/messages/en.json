@@ -67,7 +67,20 @@
     "loginFailed": "Sign-in failed.",
     "invalidCredentials": "Incorrect username or password.",
     "profileFailed": "Failed to load the account profile",
-    "sessionMissing": "No active session"
+    "sessionMissing": "No active session",
+    "twoFactorTitle": "Two-factor verification",
+    "twoFactorSubtitle": "Enter the 6-digit code from your authenticator app.",
+    "twoFactorRecoverySubtitle": "Enter one of your unused recovery codes.",
+    "verificationCodeLabel": "Verification code",
+    "recoveryCodeLabel": "Recovery code",
+    "verify": "Verify",
+    "verifying": "Verifying…",
+    "useRecoveryCode": "Use a recovery code",
+    "useAuthenticatorCode": "Use authenticator app instead",
+    "backToLogin": "Back to sign in",
+    "invalidCode": "Invalid code. Please try again.",
+    "codeExpired": "This session expired. Please sign in again.",
+    "tooManyAttempts": "Too many attempts. Please try again later."
   },
   "navigation": {
     "workspace": "WORKSPACE",
@@ -87,7 +100,8 @@
     "requisites": "Payment details",
     "logout": "Sign out",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "settings": "Settings"
   },
   "roles": {
     "owner": "Owner",
@@ -458,7 +472,9 @@
     "merchantWallets": "Merchant wallets",
     "dealsTrend": "Deal trend",
     "chartEmpty": "No data for the selected period",
-    "integrityStatus": { "ok": "Balances are consistent" },
+    "integrityStatus": {
+      "ok": "Balances are consistent"
+    },
     "accountsEyebrow": "ACCOUNTS",
     "integrityEyebrow": "BALANCE INTEGRITY"
   },
@@ -480,7 +496,14 @@
     "systemEyebrow": "SYSTEM",
     "providersEyebrow": "PROVIDERS",
     "safetyEyebrow": "SAFETY",
-    "values": { "healthy": "Operational", "development": "Development", "mock": "Mock provider", "fallback": "Fallback mode", "enabled": "Enabled", "disabled": "Disabled" }
+    "values": {
+      "healthy": "Operational",
+      "development": "Development",
+      "mock": "Mock provider",
+      "fallback": "Fallback mode",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    }
   },
   "audit": {
     "eyebrow": "OWNER CONTROL CENTER",
@@ -495,14 +518,42 @@
     "entity": "Entity",
     "actor": "Actor",
     "requestId": "Request ID",
-    "allActions": "All actions", "allEntities": "All entities", "reset": "Reset",
-    "entities": { "account": "Account", "wallet": "Wallet", "deal": "Deal", "appeal": "Appeal", "withdrawal": "Withdrawal" },
+    "allActions": "All actions",
+    "allEntities": "All entities",
+    "reset": "Reset",
+    "entities": {
+      "account": "Account",
+      "wallet": "Wallet",
+      "deal": "Deal",
+      "appeal": "Appeal",
+      "withdrawal": "Withdrawal"
+    },
     "actions": {
-      "account": { "create": "Account created", "update": "Account updated", "block": "Account blocked", "unblock": "Account unblocked", "reset_password": "Password changed" },
-      "wallet": { "allocate": "Balance allocated", "adjust_insurance": "Insurance adjusted", "manual_adjust": "Balance adjusted" },
-      "deal": { "complete": "Deal completed", "release": "Deal released" },
-      "appeal": { "review": "Appeal taken for review", "resolve": "Appeal resolved" },
-      "withdrawal": { "approve": "Withdrawal approved", "reject": "Withdrawal rejected", "mark_paid": "Withdrawal marked paid" }
+      "account": {
+        "create": "Account created",
+        "update": "Account updated",
+        "block": "Account blocked",
+        "unblock": "Account unblocked",
+        "reset_password": "Password changed"
+      },
+      "wallet": {
+        "allocate": "Balance allocated",
+        "adjust_insurance": "Insurance adjusted",
+        "manual_adjust": "Balance adjusted"
+      },
+      "deal": {
+        "complete": "Deal completed",
+        "release": "Deal released"
+      },
+      "appeal": {
+        "review": "Appeal taken for review",
+        "resolve": "Appeal resolved"
+      },
+      "withdrawal": {
+        "approve": "Withdrawal approved",
+        "reject": "Withdrawal rejected",
+        "mark_paid": "Withdrawal marked paid"
+      }
     }
   },
   "errors": {
@@ -596,5 +647,43 @@
       "usdt_trc20_address": "USDT TRC20",
       "bybit_uid": "Bybit UID"
     }
+  },
+  "security": {
+    "title": "Security",
+    "twoFactorTitle": "Two-factor authentication",
+    "twoFactorDescription": "Require a code from an authenticator app when signing in.",
+    "statusEnabled": "Enabled",
+    "statusDisabled": "Disabled",
+    "enabledSince": "Enabled since {date}",
+    "recoveryCodesRemaining": "{count} recovery codes remaining",
+    "enable": "Enable 2FA",
+    "disable": "Disable 2FA",
+    "regenerateCodes": "Regenerate recovery codes",
+    "currentPasswordLabel": "Current password",
+    "continueButton": "Continue",
+    "scanQrTitle": "Scan this QR code",
+    "scanQrDescription": "Scan with Google Authenticator, Microsoft Authenticator, 1Password, or a similar app.",
+    "manualKeyLabel": "Or enter this key manually",
+    "enterCodeLabel": "Enter the 6-digit code from your app",
+    "confirmEnable": "Enable",
+    "recoveryCodesTitle": "Save your recovery codes",
+    "recoveryCodesWarning": "Save these codes now. They will not be shown again. Each code can only be used once.",
+    "copyAll": "Copy all",
+    "download": "Download as text",
+    "done": "Done",
+    "disableTitle": "Disable two-factor authentication",
+    "disableWarning": "This will remove two-factor protection from your account.",
+    "codeLabel": "Authenticator code or recovery code",
+    "regenerateTitle": "Regenerate recovery codes",
+    "regenerateWarning": "Your existing recovery codes will stop working immediately.",
+    "invalidPassword": "Incorrect password.",
+    "invalidCode": "Invalid code.",
+    "alreadyEnabled": "Two-factor authentication is already enabled.",
+    "notEnabled": "Two-factor authentication is not enabled.",
+    "setupExpired": "Setup session expired. Please start again.",
+    "enableSuccess": "Two-factor authentication is now enabled.",
+    "disableSuccess": "Two-factor authentication has been disabled.",
+    "regenerateSuccess": "New recovery codes generated.",
+    "otherSessionsRevoked": "Other active sessions were signed out for your security."
   }
 }

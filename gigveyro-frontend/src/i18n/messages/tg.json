@@ -67,7 +67,20 @@
     "loginFailed": "Воридшавӣ иҷро нашуд.",
     "invalidCredentials": "Номи корбар ё рамз нодуруст аст.",
     "profileFailed": "Профили ҳисоб бор нашуд",
-    "sessionMissing": "Сессия вуҷуд надорад"
+    "sessionMissing": "Сессия вуҷуд надорад",
+    "twoFactorTitle": "Санҷиши дуумарҳилавӣ",
+    "twoFactorSubtitle": "Рамзи 6-рақамаро аз барномаи аутентификатор ворид кунед.",
+    "twoFactorRecoverySubtitle": "Яке аз рамзҳои захиравии истифоданашударо ворид кунед.",
+    "verificationCodeLabel": "Рамзи тасдиқ",
+    "recoveryCodeLabel": "Рамзи захиравӣ",
+    "verify": "Тасдиқ кардан",
+    "verifying": "Санҷиш…",
+    "useRecoveryCode": "Рамзи захиравиро истифода баред",
+    "useAuthenticatorCode": "Рамзи барномаро истифода баред",
+    "backToLogin": "Бозгашт ба воридшавӣ",
+    "invalidCode": "Рамзи нодуруст. Бори дигар кӯшиш кунед.",
+    "codeExpired": "Мӯҳлати сессия гузашт. Аз нав ворид шавед.",
+    "tooManyAttempts": "Кӯшишҳои зиёд. Баъдтар кӯшиш кунед."
   },
   "navigation": {
     "workspace": "ФАЗОИ КОРӢ",
@@ -87,7 +100,8 @@
     "requisites": "Реквизитҳо",
     "logout": "Баромадан",
     "openMenu": "Кушодани меню",
-    "closeMenu": "Пӯшидани меню"
+    "closeMenu": "Пӯшидани меню",
+    "settings": "Танзимот"
   },
   "roles": {
     "owner": "Соҳиб",
@@ -458,7 +472,9 @@
     "merchantWallets": "Ҳамёнҳои тоҷирон",
     "dealsTrend": "Раванди муомилаҳо",
     "chartEmpty": "Барои давраи интихобшуда маълумот нест",
-    "integrityStatus": { "ok": "Тавозунҳо мувофиқанд" },
+    "integrityStatus": {
+      "ok": "Тавозунҳо мувофиқанд"
+    },
     "accountsEyebrow": "ҲИСОБҲО",
     "integrityEyebrow": "ДУРУСТИИ ТАВОЗУНҲО"
   },
@@ -480,7 +496,14 @@
     "systemEyebrow": "СИСТЕМА",
     "providersEyebrow": "ТАЪМИНКУНАНДАГОН",
     "safetyEyebrow": "АМНИЯТ",
-    "values": { "healthy": "Кор мекунад", "development": "Муҳити таҳия", "mock": "Провайдери санҷишӣ", "fallback": "Реҷаи эҳтиётӣ", "enabled": "Фаъол", "disabled": "Хомӯш" }
+    "values": {
+      "healthy": "Кор мекунад",
+      "development": "Муҳити таҳия",
+      "mock": "Провайдери санҷишӣ",
+      "fallback": "Реҷаи эҳтиётӣ",
+      "enabled": "Фаъол",
+      "disabled": "Хомӯш"
+    }
   },
   "audit": {
     "eyebrow": "МАРКАЗИ ИДОРАКУНИИ СОҲИБ",
@@ -495,14 +518,42 @@
     "entity": "Объект",
     "actor": "Иҷрокунанда",
     "requestId": "Request ID",
-    "allActions": "Ҳамаи амалҳо", "allEntities": "Ҳамаи объектҳо", "reset": "Пок кардан",
-    "entities": { "account": "Ҳисоб", "wallet": "Ҳамён", "deal": "Муомила", "appeal": "Шикоят", "withdrawal": "Бардошт" },
+    "allActions": "Ҳамаи амалҳо",
+    "allEntities": "Ҳамаи объектҳо",
+    "reset": "Пок кардан",
+    "entities": {
+      "account": "Ҳисоб",
+      "wallet": "Ҳамён",
+      "deal": "Муомила",
+      "appeal": "Шикоят",
+      "withdrawal": "Бардошт"
+    },
     "actions": {
-      "account": { "create": "Ҳисоб сохта шуд", "update": "Ҳисоб тағйир ёфт", "block": "Ҳисоб баста шуд", "unblock": "Ҳисоб кушода шуд", "reset_password": "Рамз иваз шуд" },
-      "wallet": { "allocate": "Тавозун илова шуд", "adjust_insurance": "Суғурта тағйир ёфт", "manual_adjust": "Тавозун ислоҳ шуд" },
-      "deal": { "complete": "Муомила анҷом ёфт", "release": "Муомила озод шуд" },
-      "appeal": { "review": "Шикоят ба баррасӣ гирифта шуд", "resolve": "Шикоят ҳал шуд" },
-      "withdrawal": { "approve": "Бардошт тасдиқ шуд", "reject": "Бардошт рад шуд", "mark_paid": "Бардошт пардохтшуда қайд шуд" }
+      "account": {
+        "create": "Ҳисоб сохта шуд",
+        "update": "Ҳисоб тағйир ёфт",
+        "block": "Ҳисоб баста шуд",
+        "unblock": "Ҳисоб кушода шуд",
+        "reset_password": "Рамз иваз шуд"
+      },
+      "wallet": {
+        "allocate": "Тавозун илова шуд",
+        "adjust_insurance": "Суғурта тағйир ёфт",
+        "manual_adjust": "Тавозун ислоҳ шуд"
+      },
+      "deal": {
+        "complete": "Муомила анҷом ёфт",
+        "release": "Муомила озод шуд"
+      },
+      "appeal": {
+        "review": "Шикоят ба баррасӣ гирифта шуд",
+        "resolve": "Шикоят ҳал шуд"
+      },
+      "withdrawal": {
+        "approve": "Бардошт тасдиқ шуд",
+        "reject": "Бардошт рад шуд",
+        "mark_paid": "Бардошт пардохтшуда қайд шуд"
+      }
     }
   },
   "errors": {
@@ -596,5 +647,43 @@
       "usdt_trc20_address": "USDT TRC20",
       "bybit_uid": "Bybit UID"
     }
+  },
+  "security": {
+    "title": "Бехатарӣ",
+    "twoFactorTitle": "Санҷиши дуфакторӣ",
+    "twoFactorDescription": "Ҳангоми воридшавӣ рамзро аз барномаи аутентификатор талаб кунед.",
+    "statusEnabled": "Фаъол",
+    "statusDisabled": "Ғайрифаъол",
+    "enabledSince": "Фаъол аз {date}",
+    "recoveryCodesRemaining": "Рамзҳои захиравии боқимонда: {count}",
+    "enable": "Фаъол кардани 2FA",
+    "disable": "Ғайрифаъол кардани 2FA",
+    "regenerateCodes": "Навсозии рамзҳои захиравӣ",
+    "currentPasswordLabel": "Пароли ҷорӣ",
+    "continueButton": "Идома",
+    "scanQrTitle": "Рамзи QR-ро скан кунед",
+    "scanQrDescription": "Google Authenticator, Microsoft Authenticator, 1Password ё барномаи монандро истифода баред.",
+    "manualKeyLabel": "Ё ин калидро дастӣ ворид кунед",
+    "enterCodeLabel": "Рамзи 6-рақамаро аз барнома ворид кунед",
+    "confirmEnable": "Фаъол кардан",
+    "recoveryCodesTitle": "Рамзҳои захиравиро нигоҳ доред",
+    "recoveryCodesWarning": "Ин рамзҳоро ҳозир нигоҳ доред. Онҳо дигар нишон дода намешаванд. Ҳар рамз фақат як бор истифода мешавад.",
+    "copyAll": "Нусхабардории ҳама",
+    "download": "Ҳамчун матн боргирӣ кунед",
+    "done": "Тайёр",
+    "disableTitle": "Ғайрифаъол кардани санҷиши дуфакторӣ",
+    "disableWarning": "Ин ҳифзи дуфакториро аз ҳисоби шумо бартараф мекунад.",
+    "codeLabel": "Рамзи барнома ё рамзи захиравӣ",
+    "regenerateTitle": "Навсозии рамзҳои захиравӣ",
+    "regenerateWarning": "Рамзҳои захиравии кӯҳна фавран кор намекунанд.",
+    "invalidPassword": "Пароли нодуруст.",
+    "invalidCode": "Рамзи нодуруст.",
+    "alreadyEnabled": "Санҷиши дуфакторӣ аллакай фаъол аст.",
+    "notEnabled": "Санҷиши дуфакторӣ фаъол нест.",
+    "setupExpired": "Мӯҳлати сессияи танзим гузашт. Аз нав кӯшиш кунед.",
+    "enableSuccess": "Санҷиши дуфакторӣ фаъол карда шуд.",
+    "disableSuccess": "Санҷиши дуфакторӣ ғайрифаъол карда шуд.",
+    "regenerateSuccess": "Рамзҳои захиравии нав эҷод шуданд.",
+    "otherSessionsRevoked": "Дигар сессияҳои фаъол барои бехатарӣ хотима ёфтанд."
   }
 }

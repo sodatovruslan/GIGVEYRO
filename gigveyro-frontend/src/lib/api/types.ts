@@ -22,6 +22,33 @@ export interface TokenResponse {
   access_expires_in: number;
 }
 
+export interface TwoFactorRequiredResponse {
+  two_factor_required: true;
+  challenge_token: string;
+  expires_in: number;
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  enabled_at: string | null;
+  recovery_codes_remaining: number;
+}
+
+export interface TwoFactorSetupStart {
+  otpauth_uri: string;
+  manual_key: string;
+  expires_at: string;
+}
+
+export interface TwoFactorSetupConfirmResult {
+  enabled_at: string;
+  recovery_codes: string[];
+}
+
+export interface TwoFactorRegenerateResult {
+  recovery_codes: string[];
+}
+
 export interface ValidationIssue {
   loc?: Array<string | number>;
   msg?: string;

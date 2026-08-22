@@ -5,13 +5,17 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { AuthOperationGate } from "@/features/auth/auth-operation-gate";
 import { ApiError, apiErrorFromPayload } from "@/lib/api/error";
 import { abortApiGeneration } from "@/lib/api/client";
-import type { Account, LoginInput } from "@/lib/api/types";
+import type { Account, LoginInput, TwoFactorRequiredResponse } from "@/lib/api/types";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
+export type LoginResult =
+  | { kind: "authenticated"; account: Account }
+  | { kind: "two_factor_required"; challengeToken: string; expiresIn: number };
 interface AuthContextValue {
   account: Account | null;
   status: AuthStatus;
-  login: (input: LoginInput) => Promise<Account>;
+  login: (input: LoginInput) => Promise<LoginResult>;
+  verifyTwoFactor: (challengeToken: string, code: string) => Promise<Account>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
 }
@@ -53,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [restoreSession]);
 
-  const login = useCallback(async (input: LoginInput) => {
+  const login = useCallback(async (input: LoginInput): Promise<LoginResult> => {
     const operation = gateRef.current.startExclusive();
     abortApiGeneration();
     let response: Response;
@@ -62,6 +66,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
+        cache: "no-store",
+      });
+    } catch {
+      throw new ApiError(0, "Connection failed");
+    }
+    const payload = await response.json().catch(() => null) as unknown;
+    if (!gateRef.current.isCurrent(operation)) throw new ApiError(409, "Authentication request was superseded");
+    if (!response.ok) throw apiErrorFromPayload(response.status, payload);
+    if (payload && typeof payload === "object" && "two_factor_required" in payload) {
+      const challenge = payload as TwoFactorRequiredResponse;
+      return { kind: "two_factor_required", challengeToken: challenge.challenge_token, expiresIn: challenge.expires_in };
+    }
+    const nextAccount = payload as Account;
+    setAccount(nextAccount);
+    setStatus("authenticated");
+    return { kind: "authenticated", account: nextAccount };
+  }, []);
+
+  const verifyTwoFactor = useCallback(async (challengeToken: string, code: string) => {
+    const operation = gateRef.current.startExclusive();
+    abortApiGeneration();
+    let response: Response;
+    try {
+      response = await fetch("/api/auth/2fa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challenge_token: challengeToken, code }),
         cache: "no-store",
       });
     } catch {
@@ -85,8 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ account, status, login, logout, restoreSession }),
-    [account, login, logout, restoreSession, status],
+    () => ({ account, status, login, verifyTwoFactor, logout, restoreSession }),
+    [account, login, verifyTwoFactor, logout, restoreSession, status],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

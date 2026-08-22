@@ -50,7 +50,9 @@ test("stale 401 responses cannot clear refreshed cookies", async () => {
   assert.doesNotMatch(sessionRoute, /maxAge:\s*0/);
   assert.doesNotMatch(backendRoute, /backendResponse\.status === 401[\s\S]*maxAge:\s*0/);
   const provider = await source("src/features/auth/auth-provider.tsx");
-  assert.equal((provider.match(/abortApiGeneration\(\)/g) || []).length, 2);
+  // login, verifyTwoFactor, and logout each start an exclusive operation
+  // and must abort any in-flight request generation before mutating state.
+  assert.equal((provider.match(/abortApiGeneration\(\)/g) || []).length, 3);
 });
 
 test("long Telegram codes use visible wrapping and remain selectable", async () => {
@@ -194,6 +196,34 @@ test("owner deposit unmatched-transfer visibility is real, read-only, and not a 
   assert.doesNotMatch(panel, /method:\s*"PATCH"/);
   assert.doesNotMatch(panel, /credit/i);
   assert.match(panel, /Pager/);
+});
+
+test("login page clears two-factor challenge state on a fresh credentials submit", async () => {
+  const page = await source("src/app/login/page.tsx");
+  assert.match(page, /resetTwoFactorState\(\)/);
+  assert.match(page, /async function handleCredentialsSubmit/);
+});
+
+test("two-factor verify uses a dedicated BFF route and never proxies the challenge through /api/backend", async () => {
+  const verifyRoute = await source("src/app/api/auth/2fa/verify/route.ts");
+  const provider = await source("src/features/auth/auth-provider.tsx");
+  assert.match(verifyRoute, /\/auth\/2fa\/verify/);
+  assert.match(verifyRoute, /ACCESS_COOKIE/);
+  assert.match(verifyRoute, /REFRESH_COOKIE/);
+  assert.match(provider, /api\/auth\/2fa\/verify/);
+});
+
+test("2FA and security settings keys exist in RU/TG/EN", async () => {
+  const catalogs = await Promise.all(["ru", "tg", "en"].map(async (locale) => JSON.parse(await source(`src/i18n/messages/${locale}.json`))));
+  for (const catalog of catalogs) {
+    assert.ok(catalog.auth.twoFactorTitle);
+    assert.ok(catalog.auth.useRecoveryCode);
+    assert.ok(catalog.auth.codeExpired);
+    assert.ok(catalog.security.title);
+    assert.ok(catalog.security.recoveryCodesWarning);
+    assert.ok(catalog.security.enableSuccess);
+    assert.ok(catalog.navigation.settings);
+  }
 });
 
 test("next-intl resolves every canonical backend audit action in RU/TG/EN", async () => {

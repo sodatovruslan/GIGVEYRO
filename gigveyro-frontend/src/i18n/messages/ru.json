@@ -67,7 +67,20 @@
     "loginFailed": "Не удалось выполнить вход.",
     "invalidCredentials": "Неверный логин или пароль.",
     "profileFailed": "Не удалось получить профиль аккаунта",
-    "sessionMissing": "Сессия отсутствует"
+    "sessionMissing": "Сессия отсутствует",
+    "twoFactorTitle": "Двухэтапная проверка",
+    "twoFactorSubtitle": "Введите 6-значный код из приложения-аутентификатора.",
+    "twoFactorRecoverySubtitle": "Введите один из неиспользованных резервных кодов.",
+    "verificationCodeLabel": "Код подтверждения",
+    "recoveryCodeLabel": "Резервный код",
+    "verify": "Подтвердить",
+    "verifying": "Проверка…",
+    "useRecoveryCode": "Использовать резервный код",
+    "useAuthenticatorCode": "Использовать код из приложения",
+    "backToLogin": "Назад ко входу",
+    "invalidCode": "Неверный код. Попробуйте ещё раз.",
+    "codeExpired": "Сессия истекла. Войдите снова.",
+    "tooManyAttempts": "Слишком много попыток. Попробуйте позже."
   },
   "navigation": {
     "workspace": "РАБОЧЕЕ ПРОСТРАНСТВО",
@@ -87,7 +100,8 @@
     "requisites": "Реквизиты",
     "logout": "Выйти",
     "openMenu": "Открыть меню",
-    "closeMenu": "Закрыть меню"
+    "closeMenu": "Закрыть меню",
+    "settings": "Настройки"
   },
   "roles": {
     "owner": "Владелец",
@@ -458,7 +472,9 @@
     "merchantWallets": "Кошельки мерчантов",
     "dealsTrend": "Динамика сделок",
     "chartEmpty": "За выбранный период данных нет",
-    "integrityStatus": { "ok": "Балансы согласованы" },
+    "integrityStatus": {
+      "ok": "Балансы согласованы"
+    },
     "accountsEyebrow": "АККАУНТЫ",
     "integrityEyebrow": "ЦЕЛОСТНОСТЬ БАЛАНСОВ"
   },
@@ -480,7 +496,14 @@
     "systemEyebrow": "СИСТЕМА",
     "providersEyebrow": "ПРОВАЙДЕРЫ",
     "safetyEyebrow": "БЕЗОПАСНОСТЬ",
-    "values": { "healthy": "Работает", "development": "Среда разработки", "mock": "Тестовый провайдер", "fallback": "Резервный режим", "enabled": "Включено", "disabled": "Отключено" }
+    "values": {
+      "healthy": "Работает",
+      "development": "Среда разработки",
+      "mock": "Тестовый провайдер",
+      "fallback": "Резервный режим",
+      "enabled": "Включено",
+      "disabled": "Отключено"
+    }
   },
   "audit": {
     "eyebrow": "ЦЕНТР УПРАВЛЕНИЯ OWNER",
@@ -495,14 +518,42 @@
     "entity": "Сущность",
     "actor": "Инициатор",
     "requestId": "Request ID",
-    "allActions": "Все действия", "allEntities": "Все сущности", "reset": "Сбросить",
-    "entities": { "account": "Аккаунт", "wallet": "Кошелёк", "deal": "Сделка", "appeal": "Апелляция", "withdrawal": "Вывод" },
+    "allActions": "Все действия",
+    "allEntities": "Все сущности",
+    "reset": "Сбросить",
+    "entities": {
+      "account": "Аккаунт",
+      "wallet": "Кошелёк",
+      "deal": "Сделка",
+      "appeal": "Апелляция",
+      "withdrawal": "Вывод"
+    },
     "actions": {
-      "account": { "create": "Создан аккаунт", "update": "Изменён аккаунт", "block": "Заблокирован аккаунт", "unblock": "Разблокирован аккаунт", "reset_password": "Изменён пароль" },
-      "wallet": { "allocate": "Начислен баланс", "adjust_insurance": "Изменена страховка", "manual_adjust": "Скорректирован баланс" },
-      "deal": { "complete": "Завершена сделка", "release": "Освобождена сделка" },
-      "appeal": { "review": "Апелляция взята в работу", "resolve": "Апелляция разрешена" },
-      "withdrawal": { "approve": "Вывод одобрен", "reject": "Вывод отклонён", "mark_paid": "Вывод отмечен выплаченным" }
+      "account": {
+        "create": "Создан аккаунт",
+        "update": "Изменён аккаунт",
+        "block": "Заблокирован аккаунт",
+        "unblock": "Разблокирован аккаунт",
+        "reset_password": "Изменён пароль"
+      },
+      "wallet": {
+        "allocate": "Начислен баланс",
+        "adjust_insurance": "Изменена страховка",
+        "manual_adjust": "Скорректирован баланс"
+      },
+      "deal": {
+        "complete": "Завершена сделка",
+        "release": "Освобождена сделка"
+      },
+      "appeal": {
+        "review": "Апелляция взята в работу",
+        "resolve": "Апелляция разрешена"
+      },
+      "withdrawal": {
+        "approve": "Вывод одобрен",
+        "reject": "Вывод отклонён",
+        "mark_paid": "Вывод отмечен выплаченным"
+      }
     }
   },
   "errors": {
@@ -596,5 +647,43 @@
       "usdt_trc20_address": "USDT TRC20",
       "bybit_uid": "Bybit UID"
     }
+  },
+  "security": {
+    "title": "Безопасность",
+    "twoFactorTitle": "Двухфакторная аутентификация",
+    "twoFactorDescription": "Требовать код из приложения-аутентификатора при входе.",
+    "statusEnabled": "Включена",
+    "statusDisabled": "Отключена",
+    "enabledSince": "Включена с {date}",
+    "recoveryCodesRemaining": "Осталось резервных кодов: {count}",
+    "enable": "Включить 2FA",
+    "disable": "Отключить 2FA",
+    "regenerateCodes": "Обновить резервные коды",
+    "currentPasswordLabel": "Текущий пароль",
+    "continueButton": "Продолжить",
+    "scanQrTitle": "Отсканируйте QR-код",
+    "scanQrDescription": "Используйте Google Authenticator, Microsoft Authenticator, 1Password или похожее приложение.",
+    "manualKeyLabel": "Или введите этот ключ вручную",
+    "enterCodeLabel": "Введите 6-значный код из приложения",
+    "confirmEnable": "Включить",
+    "recoveryCodesTitle": "Сохраните резервные коды",
+    "recoveryCodesWarning": "Сохраните эти коды сейчас. Повторно они показаны не будут. Каждый код можно использовать только один раз.",
+    "copyAll": "Скопировать все",
+    "download": "Скачать как текст",
+    "done": "Готово",
+    "disableTitle": "Отключение двухфакторной аутентификации",
+    "disableWarning": "Это уберёт двухфакторную защиту с вашего аккаунта.",
+    "codeLabel": "Код из приложения или резервный код",
+    "regenerateTitle": "Обновление резервных кодов",
+    "regenerateWarning": "Старые резервные коды перестанут работать немедленно.",
+    "invalidPassword": "Неверный пароль.",
+    "invalidCode": "Неверный код.",
+    "alreadyEnabled": "Двухфакторная аутентификация уже включена.",
+    "notEnabled": "Двухфакторная аутентификация не включена.",
+    "setupExpired": "Сессия настройки истекла. Начните заново.",
+    "enableSuccess": "Двухфакторная аутентификация включена.",
+    "disableSuccess": "Двухфакторная аутентификация отключена.",
+    "regenerateSuccess": "Новые резервные коды созданы.",
+    "otherSessionsRevoked": "Другие активные сессии были завершены в целях безопасности."
   }
 }
