@@ -13,12 +13,12 @@ import { LanguageSwitcher } from "@/features/i18n/language-switcher";
 
 import styles from "./dashboard-shell.module.css";
 
-type NavigationKey = "overview"|"home"|"accounts"|"deals"|"deposits"|"funding"|"withdrawals"|"appeals"|"notifications"|"analytics"|"integrations"|"audit"|"wallet"|"requisites";
+type NavigationKey = "overview"|"home"|"accounts"|"deals"|"deposits"|"funding"|"withdrawals"|"appeals"|"notifications"|"analytics"|"integrations"|"audit"|"wallet"|"requisites"|"settings";
 interface NavigationItem { href: string; label: NavigationKey; glyph: string }
 
 const navigation: Record<UserRole, NavigationItem[]> = {
   owner: [
-    { href: "/owner", label: "overview", glyph: "◇" }, { href: "/owner/accounts", label: "accounts", glyph: "◎" }, { href: "/owner/deals", label: "deals", glyph: "⇄" }, { href: "/owner/deposits", label: "deposits", glyph: "↓" }, { href: "/owner/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/owner/appeals", label: "appeals", glyph: "!" }, { href: "/owner/notifications", label: "notifications", glyph: "○" }, { href: "/owner/analytics", label: "analytics", glyph: "⌁" }, { href: "/owner/integrations", label: "integrations", glyph: "⌘" }, { href: "/owner/audit", label: "audit", glyph: "≡" },
+    { href: "/owner", label: "overview", glyph: "◇" }, { href: "/owner/accounts", label: "accounts", glyph: "◎" }, { href: "/owner/deals", label: "deals", glyph: "⇄" }, { href: "/owner/deposits", label: "deposits", glyph: "↓" }, { href: "/owner/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/owner/appeals", label: "appeals", glyph: "!" }, { href: "/owner/notifications", label: "notifications", glyph: "○" }, { href: "/owner/analytics", label: "analytics", glyph: "⌁" }, { href: "/owner/integrations", label: "integrations", glyph: "⌘" }, { href: "/owner/audit", label: "audit", glyph: "≡" }, { href: "/owner/settings", label: "settings", glyph: "⚙" },
   ],
   user: [
     { href: "/user", label: "home", glyph: "◇" }, { href: "/user/wallet", label: "wallet", glyph: "₮" }, { href: "/user/deposits", label: "funding", glyph: "↓" }, { href: "/user/requisites", label: "requisites", glyph: "▣" }, { href: "/user/deals", label: "deals", glyph: "⇄" }, { href: "/user/appeals", label: "appeals", glyph: "!" }, { href: "/user/notifications", label: "notifications", glyph: "○" },

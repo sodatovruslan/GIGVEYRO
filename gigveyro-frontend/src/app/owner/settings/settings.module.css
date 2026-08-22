@@ -1,0 +1,38 @@
+.page { display: grid; gap: 24px; max-width: 720px; }
+.header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.header h1 { font: 700 26px/1.1 var(--font-display); }
+.card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card-bg); padding: 24px; }
+.cardHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+.cardHeader h2 { font: 700 17px/1.2 var(--font-display); }
+.cardHeader p { margin-top: 6px; color: var(--text-secondary); font-size: 13px; max-width: 480px; }
+.statusRow { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+.statusBadge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.statusEnabled { color: var(--success-text); background: var(--success-soft); }
+.statusDisabled { color: var(--text-muted); background: var(--surface-control); }
+.meta { color: var(--text-muted); font-size: 12px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions button { height: 40px; padding: 0 18px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; }
+.primaryButton { color: var(--on-accent); background: var(--primary); }
+.primaryButton:hover:not(:disabled) { background: var(--primary-hover); }
+.dangerButton { color: var(--danger-text); background: var(--danger-soft); border: 1px solid var(--danger-border); }
+.secondaryButton { color: var(--text-primary); background: var(--surface-control); border: 1px solid var(--border); }
+.actions button:disabled { opacity: .6; cursor: wait; }
+.modalBackdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: var(--overlay); backdrop-filter: blur(7px); padding: 20px; }
+.modal { width: min(440px, 100%); border-radius: var(--radius-lg); border: 1px solid var(--border-strong); background: var(--modal-bg); box-shadow: var(--shadow-lg); padding: 24px; display: grid; gap: 16px; max-height: 90vh; overflow-y: auto; }
+.modalHeader { display: flex; align-items: center; justify-content: space-between; }
+.modalHeader h2 { font: 700 17px/1.2 var(--font-display); }
+.modalHeader button { color: var(--text-muted); font-size: 20px; line-height: 1; background: none; border: 0; cursor: pointer; }
+.form { display: grid; gap: 16px; }
+.form label { display: grid; gap: 8px; color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.form input { height: 46px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-control); }
+.form input:focus { border-color: var(--primary); outline: 0; }
+.qrWrap { display: grid; justify-items: center; gap: 12px; padding: 16px; border-radius: var(--radius-sm); background: var(--surface-control); }
+.qrWrap img { width: 200px; height: 200px; border-radius: 8px; background: #fff; padding: 8px; }
+.manualKey { font-family: monospace; letter-spacing: .08em; font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-control); word-break: break-all; text-align: center; }
+.formError { padding: 11px 13px; border: 1px solid var(--danger-border); border-radius: var(--radius-sm); color: var(--danger-text); background: var(--danger-soft); font-size: 12px; }
+.formActions { display: flex; justify-content: flex-end; gap: 10px; }
+.formActions button { height: 42px; padding: 0 18px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; }
+.recoveryWarning { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--warning-soft); color: var(--warning-text); font-size: 13px; }
+.recoveryGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-family: monospace; }
+.recoveryGrid span { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-control); text-align: center; font-size: 13px; letter-spacing: .05em; }
+.toast { position: fixed; top: 20px; right: 20px; z-index: 50; padding: 12px 18px; border-radius: var(--radius-sm); background: var(--success-soft); color: var(--success-text); font-weight: 600; font-size: 13px; }
