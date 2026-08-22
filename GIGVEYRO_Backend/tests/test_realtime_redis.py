@@ -2,7 +2,8 @@ import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from app.core.config import settings
@@ -24,8 +25,8 @@ def _event() -> RealtimeEvent:
 
 @pytest.mark.asyncio
 async def test_redis_broker_mock_pubsub_delivery():
-    """Verify that RedisRealtimeBroker listens for Redis Pub/Sub messages and delivers them to local sockets."""
-    from unittest.mock import MagicMock
+    """Verify Redis Pub/Sub messages reach matching local sockets."""
+
     broker = RedisRealtimeBroker()
     mock_redis = AsyncMock()
     mock_pubsub = AsyncMock()
@@ -132,7 +133,7 @@ async def test_redis_broker_broadcast_calls_redis():
 @pytest.mark.asyncio
 async def test_redis_broker_ignores_malformed_json():
     """Verify that listener loop doesn't crash on malformed JSON payload."""
-    from unittest.mock import MagicMock
+
     broker = RedisRealtimeBroker()
     mock_redis = AsyncMock()
     mock_pubsub = AsyncMock()

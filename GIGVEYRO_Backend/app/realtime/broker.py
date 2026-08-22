@@ -161,7 +161,9 @@ class RedisRealtimeBroker:
         """Background listener loop subscribing to Redis channel."""
         import json
         import logging
+
         from redis.exceptions import RedisError
+
         from app.core.config import settings
         from app.infra.redis_client import get_redis
 
@@ -196,7 +198,9 @@ class RedisRealtimeBroker:
 
                             await self._deliver_locally(
                                 event=event,
-                                account_ids={uuid.UUID(uid) for uid in (recipient_account_ids or [])},
+                                account_ids={
+                                    uuid.UUID(uid) for uid in (recipient_account_ids or [])
+                                },
                                 roles={UserRole(role) for role in (recipient_roles or [])},
                                 broadcast=is_broadcast,
                             )
@@ -271,6 +275,7 @@ class RedisRealtimeBroker:
         roles: set[UserRole],
     ) -> int:
         import json
+
         from app.core.config import settings
         from app.infra.redis_client import get_redis
 
@@ -292,6 +297,7 @@ class RedisRealtimeBroker:
 
     async def broadcast(self, event: RealtimeEvent) -> int:
         import json
+
         from app.core.config import settings
         from app.infra.redis_client import get_redis
 
@@ -304,4 +310,3 @@ class RedisRealtimeBroker:
         }
         client = get_redis()
         return await client.publish(channel_name, json.dumps(payload))
-
