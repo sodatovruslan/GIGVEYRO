@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.enums.deposit import DepositAsset, DepositNetwork, DepositStatus
+from app.enums.deposit import CorrelationStatus, DepositAsset, DepositNetwork, DepositStatus
 from app.schemas.common import Money
 
 
@@ -38,6 +38,27 @@ class DepositRead(BaseModel):
 
 class DepositListResponse(BaseModel):
     items: list[DepositRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class UnmatchedTransferRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tx_hash: str
+    from_address: str
+    to_address: str
+    amount: Money
+    asset_contract: str
+    correlation_status: CorrelationStatus
+    reason: str
+    created_at: datetime
+
+
+class UnmatchedTransferListResponse(BaseModel):
+    items: list[UnmatchedTransferRead]
     total: int
     limit: int
     offset: int

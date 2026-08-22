@@ -177,6 +177,44 @@ class DepositService:
         )
         return items, total
 
+    async def get_unmatched_for_owner(self, transfer_id: uuid.UUID) -> UnmatchedTransfer:
+        transfer = await self._deposits.get_unmatched_by_id(transfer_id)
+        if transfer is None:
+            raise DepositNotFoundError()
+        return transfer
+
+    async def list_unmatched_for_owner(
+        self,
+        *,
+        correlation_status: CorrelationStatus | None,
+        tx_hash: str | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        min_amount: Decimal | None,
+        max_amount: Decimal | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[UnmatchedTransfer], int]:
+        items = await self._deposits.list_unmatched(
+            correlation_status=correlation_status,
+            tx_hash=tx_hash,
+            date_from=date_from,
+            date_to=date_to,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            limit=limit,
+            offset=offset,
+        )
+        total = await self._deposits.count_unmatched(
+            correlation_status=correlation_status,
+            tx_hash=tx_hash,
+            date_from=date_from,
+            date_to=date_to,
+            min_amount=min_amount,
+            max_amount=max_amount,
+        )
+        return items, total
+
     async def scan_and_correlate_deposits(self) -> int:
         """Scan recent on-chain transfers and correlate them with active deposit intents."""
         await self._deposits.expire_stale_waiting()

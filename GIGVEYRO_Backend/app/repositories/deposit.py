@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums.deposit import DepositStatus
+from app.enums.deposit import CorrelationStatus, DepositStatus
 from app.models.deposit import Deposit, UnmatchedTransfer
 
 
@@ -47,6 +48,81 @@ class DepositRepository:
             select(UnmatchedTransfer).where(UnmatchedTransfer.tx_hash == tx_hash)
         )
         return result.scalar_one_or_none()
+
+    async def get_unmatched_by_id(self, transfer_id: uuid.UUID) -> UnmatchedTransfer | None:
+        return await self._session.get(UnmatchedTransfer, transfer_id)
+
+    async def list_unmatched(
+        self,
+        *,
+        correlation_status: CorrelationStatus | None,
+        tx_hash: str | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        min_amount: Decimal | None,
+        max_amount: Decimal | None,
+        limit: int,
+        offset: int,
+    ) -> list[UnmatchedTransfer]:
+        query = self._filtered_unmatched(
+            select(UnmatchedTransfer),
+            correlation_status=correlation_status,
+            tx_hash=tx_hash,
+            date_from=date_from,
+            date_to=date_to,
+            min_amount=min_amount,
+            max_amount=max_amount,
+        )
+        query = query.order_by(UnmatchedTransfer.created_at.desc()).limit(limit).offset(offset)
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
+    async def count_unmatched(
+        self,
+        *,
+        correlation_status: CorrelationStatus | None,
+        tx_hash: str | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        min_amount: Decimal | None,
+        max_amount: Decimal | None,
+    ) -> int:
+        query = self._filtered_unmatched(
+            select(func.count()).select_from(UnmatchedTransfer),
+            correlation_status=correlation_status,
+            tx_hash=tx_hash,
+            date_from=date_from,
+            date_to=date_to,
+            min_amount=min_amount,
+            max_amount=max_amount,
+        )
+        result = await self._session.execute(query)
+        return result.scalar_one()
+
+    @staticmethod
+    def _filtered_unmatched(
+        query: Select,
+        *,
+        correlation_status: CorrelationStatus | None,
+        tx_hash: str | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        min_amount: Decimal | None,
+        max_amount: Decimal | None,
+    ) -> Select:
+        if correlation_status is not None:
+            query = query.where(UnmatchedTransfer.correlation_status == correlation_status)
+        if tx_hash:
+            query = query.where(UnmatchedTransfer.tx_hash.ilike(f"%{tx_hash}%"))
+        if date_from is not None:
+            query = query.where(UnmatchedTransfer.created_at >= date_from)
+        if date_to is not None:
+            query = query.where(UnmatchedTransfer.created_at <= date_to)
+        if min_amount is not None:
+            query = query.where(UnmatchedTransfer.amount >= min_amount)
+        if max_amount is not None:
+            query = query.where(UnmatchedTransfer.amount <= max_amount)
+        return query
 
     async def expire_stale_waiting(self) -> None:
         await self._session.execute(

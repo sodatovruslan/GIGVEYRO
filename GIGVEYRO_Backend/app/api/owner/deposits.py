@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,12 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_roles
 from app.db.session import get_db
 from app.enums.account import UserRole
-from app.enums.deposit import DepositStatus
+from app.enums.deposit import CorrelationStatus, DepositStatus
 from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.wallet import WalletRepository
-from app.schemas.deposit import DepositListResponse, DepositRead
+from app.schemas.deposit import (
+    DepositListResponse,
+    DepositRead,
+    UnmatchedTransferListResponse,
+    UnmatchedTransferRead,
+)
 from app.services.deposit import DepositNotFoundError, DepositService
 from app.services.deposit_provider import MockTRC20DepositProvider
 from app.services.wallet import WalletService
@@ -55,6 +61,43 @@ async def list_all_deposits(
         offset=offset,
     )
     return DepositListResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/unmatched", response_model=UnmatchedTransferListResponse)
+async def list_unmatched_transfers(
+    correlation_status: CorrelationStatus | None = Query(default=None, alias="status"),
+    tx_hash: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    min_amount: Decimal | None = None,
+    max_amount: Decimal | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    service: DepositService = Depends(_service),
+) -> UnmatchedTransferListResponse:
+    items, total = await service.list_unmatched_for_owner(
+        correlation_status=correlation_status,
+        tx_hash=tx_hash,
+        date_from=date_from,
+        date_to=date_to,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        limit=limit,
+        offset=offset,
+    )
+    return UnmatchedTransferListResponse(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/unmatched/{transfer_id}", response_model=UnmatchedTransferRead)
+async def get_unmatched_transfer(
+    transfer_id: uuid.UUID, service: DepositService = Depends(_service)
+) -> UnmatchedTransferRead:
+    try:
+        return await service.get_unmatched_for_owner(transfer_id)
+    except DepositNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="unmatched transfer not found"
+        ) from exc
 
 
 @router.get("/{deposit_id}", response_model=DepositRead)
