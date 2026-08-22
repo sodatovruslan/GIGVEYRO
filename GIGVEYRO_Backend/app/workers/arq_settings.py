@@ -23,6 +23,7 @@ WebSocket Note:
   Real-time events triggered by worker jobs (e.g. deposit confirmed) should
   be written to the realtime outbox table, which the web process polls.
 """
+
 from __future__ import annotations
 
 from arq import cron
@@ -53,6 +54,7 @@ def _redis_settings() -> RedisSettings:
 async def _heartbeat_loop(redis_client) -> None:
     import asyncio
     import logging
+
     logger = logging.getLogger("worker.heartbeat")
     key = f"{settings.REDIS_KEY_PREFIX}:worker:heartbeat"
     while True:
@@ -91,6 +93,7 @@ async def startup(ctx: dict) -> None:
 
 async def shutdown(ctx: dict) -> None:
     """ARQ worker shutdown hook — clean up shared resources."""
+    import asyncio
     import logging
 
     from app.infra.redis_client import close_redis
@@ -102,7 +105,7 @@ async def shutdown(ctx: dict) -> None:
         task.cancel()
         try:
             await task
-        except Exception:
+        except asyncio.CancelledError:
             pass
 
     await close_redis()

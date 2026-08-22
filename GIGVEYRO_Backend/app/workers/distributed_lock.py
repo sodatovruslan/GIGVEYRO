@@ -16,6 +16,7 @@ Usage:
             return  # Another worker holds the lock
         await do_work()
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,6 +24,8 @@ import secrets
 from types import TracebackType
 
 from redis.asyncio import Redis
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +44,14 @@ class DistributedLock:
 
     Args:
         redis:    Async Redis client instance
-        name:     Lock name (will be prefixed with 'dlock:')
+        name:     Lock name (namespaced by environment and prefixed with 'dlock:')
         ttl_ms:   Lock TTL in milliseconds. Lock auto-releases after this
                   time even if the holder crashes. Choose conservatively.
     """
 
     def __init__(self, redis: Redis, name: str, ttl_ms: int = 30_000) -> None:
         self._redis = redis
-        self._key = f"dlock:{name}"
+        self._key = f"{settings.REDIS_KEY_PREFIX}:dlock:{name}"
         self._ttl_ms = ttl_ms
         self._token: str | None = None
         self._acquired = False
@@ -56,9 +59,7 @@ class DistributedLock:
     async def __aenter__(self) -> bool:
         self._token = secrets.token_hex(16)
         # SET key token NX PX ttl_ms
-        result = await self._redis.set(
-            self._key, self._token, nx=True, px=self._ttl_ms
-        )
+        result = await self._redis.set(self._key, self._token, nx=True, px=self._ttl_ms)
         self._acquired = result is not None
         if not self._acquired:
             logger.debug("Distributed lock %r already held by another worker.", self._key)

@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from redis.exceptions import ConnectionError as RedisConnectionError
 
+from app.core.config import settings
 from app.infra.redis_client import redis_health_check
 
 
@@ -69,6 +70,8 @@ class TestDistributedLock:
         call_kwargs = mock_redis.set.call_args.kwargs
         assert call_kwargs.get("nx") is True
         assert call_kwargs.get("px") == 5000
+        lock_key = mock_redis.set.call_args.args[0]
+        assert lock_key == f"{settings.REDIS_KEY_PREFIX}:dlock:test_lock"
 
     async def test_lock_not_acquired_when_held(self):
         """Lock returns False when another holder has the key."""

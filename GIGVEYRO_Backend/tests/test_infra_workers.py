@@ -11,6 +11,7 @@ Tests:
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import patch
 
 import pytest
@@ -203,3 +204,14 @@ class TestWorkerSettings:
         assert scan_deposits in WorkerSettings.functions
         assert expire_stale_deals in WorkerSettings.functions
         assert process_approved_payouts in WorkerSettings.functions
+
+    async def test_worker_shutdown_cancels_heartbeat_cleanly(self):
+        """Worker shutdown treats heartbeat cancellation as normal lifecycle."""
+        from app.workers.arq_settings import shutdown
+
+        heartbeat = asyncio.create_task(asyncio.sleep(60))
+        with patch("app.infra.redis_client.close_redis") as close_redis:
+            await shutdown({"heartbeat_task": heartbeat})
+
+        assert heartbeat.cancelled()
+        close_redis.assert_awaited_once()
