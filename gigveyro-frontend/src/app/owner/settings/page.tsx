@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import QRCode from "qrcode";
@@ -344,7 +345,15 @@ export default function OwnerSettingsPage() {
                 <p>{t("scanQrTitle")}</p>
                 <p className={styles.meta}>{t("scanQrDescription")}</p>
                 <div className={styles.qrWrap}>
-                  {qrDataUrl && <img src={qrDataUrl} alt={t("scanQrTitle")} />}
+                  {qrDataUrl && (
+                    <Image
+                      src={qrDataUrl}
+                      alt={t("scanQrTitle")}
+                      width={200}
+                      height={200}
+                      unoptimized
+                    />
+                  )}
                 </div>
                 <div>
                   <p className={styles.meta}>{t("manualKeyLabel")}</p>
