@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { useAuth } from "@/features/auth/auth-provider";
+import { notificationsApi } from "@/lib/api/notifications";
 import type { UserRole } from "@/lib/api/types";
 import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 import { LanguageSwitcher } from "@/features/i18n/language-switcher";
@@ -32,7 +33,16 @@ export function DashboardShell({ role, children }: { role: UserRole; children: R
   const router = useRouter();
   const { account, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const t = useTranslations("navigation"); const tRoles = useTranslations("roles"); const tHeader = useTranslations("header"); const common = useTranslations("common");
+
+  useEffect(() => {
+    let active = true;
+    function refresh() { notificationsApi.unreadCount().then((result) => { if (active) setUnreadCount(result.unread_count); }).catch(() => {}); }
+    refresh();
+    window.addEventListener("gigveyro:notifications-updated", refresh);
+    return () => { active = false; window.removeEventListener("gigveyro:notifications-updated", refresh); };
+  }, [pathname]);
 
   async function handleLogout() {
     await logout();
@@ -54,6 +64,7 @@ export function DashboardShell({ role, children }: { role: UserRole; children: R
             return (
               <Link key={item.href} href={item.href} className={active ? styles.active : ""} onClick={() => setMenuOpen(false)}>
                 <span className={styles.glyph}>{item.glyph}</span>{t(item.label)}
+                {item.label === "notifications" && unreadCount > 0 && <span className={styles.badge}>{unreadCount > 99 ? "99+" : unreadCount}</span>}
               </Link>
             );
           })}

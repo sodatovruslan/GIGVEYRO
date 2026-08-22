@@ -31,7 +31,7 @@ export function NotificationsPage() {
   const [error, setError] = useState("");
   const [code, setCode] = useState<{ value: string; expires: string; bot: string } | null>(null);
 
-  async function perform(action: () => Promise<unknown>, refresh = true) { setError(""); try { await action(); if (refresh) await list.refetch(); } catch (reason) { setError(localizeError(reason)); } }
+  async function perform(action: () => Promise<unknown>, refresh = true) { setError(""); try { await action(); if (refresh) { await list.refetch(); window.dispatchEvent(new Event("gigveyro:notifications-updated")); } } catch (reason) { setError(localizeError(reason)); } }
   async function toggle(key: keyof NotificationPreferences) { if (!preferences.data || key === "account_id") return; await perform(() => notificationsApi.updatePreferences({ [key]: !preferences.data![key] }), false); await preferences.refetch(); }
   async function createCode() { setError(""); try { const result = await notificationsApi.telegramCode(); setCode({ value: result.verification_code, expires: result.expires_at, bot: result.bot_username }); } catch (reason) { setError(localizeError(reason)); } }
 
