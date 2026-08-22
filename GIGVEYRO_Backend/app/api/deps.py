@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -10,6 +11,7 @@ from app.db.session import get_db
 from app.enums.account import UserRole
 from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.repositories.auth_session import AuthSessionRepository
 
 # auto_error=False so a missing token is reported as our own 401, matching
 # every other authentication failure instead of FastAPI's default 403.
@@ -37,6 +39,21 @@ async def get_current_account(
     account = await AccountRepository(db).get_by_id(uuid.UUID(payload["sub"]))
     if account is None or not account.is_active:
         raise unauthorized
+
+    # Tokens minted through the real login/refresh flow carry a session_id,
+    # so a revoked/logged-out session is rejected immediately instead of
+    # staying valid until the access token's natural expiry. Tokens without
+    # a session_id (e.g. bootstrap scripts) fall back to the account check
+    # above only.
+    session_id = payload.get("session_id")
+    if session_id is not None:
+        auth_session = await AuthSessionRepository(db).get_by_id(uuid.UUID(session_id))
+        if (
+            auth_session is None
+            or auth_session.revoked_at is not None
+            or auth_session.expires_at <= datetime.now(UTC)
+        ):
+            raise unauthorized
 
     return account
 

@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -33,7 +34,11 @@ class TokenError(Exception):
 
 
 def _create_token(
-    subject: uuid.UUID, role: str, token_type: TokenType, expires_delta: timedelta
+    subject: uuid.UUID,
+    role: str,
+    token_type: TokenType,
+    expires_delta: timedelta,
+    session_id: uuid.UUID | None = None,
 ) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
@@ -44,25 +49,36 @@ def _create_token(
         "exp": now + expires_delta,
         "jti": str(uuid.uuid4()),
     }
+    if session_id is not None:
+        payload["session_id"] = str(session_id)
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def create_access_token(subject: uuid.UUID, role: str) -> str:
+def create_access_token(subject: uuid.UUID, role: str, session_id: uuid.UUID | None = None) -> str:
     return _create_token(
         subject,
         role,
         TokenType.ACCESS,
         timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        session_id=session_id,
     )
 
 
-def create_refresh_token(subject: uuid.UUID, role: str) -> str:
+def create_refresh_token(subject: uuid.UUID, role: str, session_id: uuid.UUID | None = None) -> str:
     return _create_token(
         subject,
         role,
         TokenType.REFRESH,
         timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        session_id=session_id,
     )
+
+
+def hash_refresh_token(token: str) -> str:
+    # Refresh tokens are never stored in plaintext - only this hash is
+    # persisted on the AuthSession row, so a DB read never discloses a
+    # usable credential.
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def create_realtime_ticket(subject: uuid.UUID, role: str, expires_seconds: int = 30) -> str:
@@ -91,5 +107,12 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
         uuid.UUID(str(subject))
     except ValueError as exc:
         raise TokenError("token subject is not a valid account id") from exc
+
+    session_id = payload.get("session_id")
+    if session_id is not None:
+        try:
+            uuid.UUID(str(session_id))
+        except ValueError as exc:
+            raise TokenError("token session id is not valid") from exc
 
     return payload
