@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.appeal import AppealReason, AppealStatus
 from app.models.appeal import DealAppeal
+from app.models.deal import Deal
 
 
 class AppealRepository:
@@ -130,10 +131,16 @@ class AppealRepository:
         date_from: datetime | None,
         date_to: datetime | None,
     ) -> Select:
+        if merchant_id is not None or user_id is not None:
+            query = query.join(Deal, Deal.id == DealAppeal.deal_id)
         if status is not None:
             query = query.where(DealAppeal.status == status)
         if reason_code is not None:
             query = query.where(DealAppeal.reason_code == reason_code)
+        if merchant_id is not None:
+            query = query.where(Deal.merchant_id == merchant_id)
+        if user_id is not None:
+            query = query.where(Deal.user_id == user_id)
         if search:
             query = query.where(DealAppeal.public_id.ilike(f"%{search}%"))
         if date_from is not None:

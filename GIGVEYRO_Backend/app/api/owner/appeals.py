@@ -15,6 +15,9 @@ from app.repositories.audit import AuditRepository
 from app.repositories.deal import DealRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
+from app.repositories.notification import NotificationRepository
+from app.repositories.realtime import RealtimeOutboxRepository
+from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.appeal import (
     AppealListResponse,
@@ -29,6 +32,9 @@ from app.services.appeal import (
     InvalidAppealTransitionError,
 )
 from app.services.audit import AuditService
+from app.services.notification import NotificationService
+from app.services.realtime import RealtimeEventService
+from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import WalletService
 
 router = APIRouter(
@@ -47,6 +53,10 @@ def _service(db: AsyncSession = Depends(get_db)) -> AppealService:
         appeal_repository=AppealRepository(db),
         deal_repository=DealRepository(db),
         wallet_service=wallet_service,
+        realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
+        notification_service=NotificationService(
+            NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
+        ),
     )
 
 

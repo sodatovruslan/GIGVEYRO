@@ -7,11 +7,16 @@ from sqlalchemy.exc import IntegrityError
 from app.enums.account import UserRole
 from app.enums.appeal import AppealReason, AppealResolution, AppealStatus
 from app.enums.deal import DealStatus
+from app.enums.notification import NotificationType
 from app.models.account import Account
 from app.models.appeal import DealAppeal
+from app.models.deal import Deal
+from app.realtime.contracts import RealtimeEventName
 from app.repositories.appeal import AppealRepository
 from app.repositories.deal import DealRepository
 from app.services.deal import DealNotFoundError, transition_deal
+from app.services.notification import NotificationService
+from app.services.realtime import RealtimeEventService
 from app.services.wallet import WalletService
 
 
@@ -57,10 +62,14 @@ class AppealService:
         appeal_repository: AppealRepository,
         deal_repository: DealRepository,
         wallet_service: WalletService,
+        realtime_service: RealtimeEventService | None = None,
+        notification_service: NotificationService | None = None,
     ):
         self._appeals = appeal_repository
         self._deals = deal_repository
         self._wallet_service = wallet_service
+        self._realtime = realtime_service
+        self._notifications = notification_service
 
     async def get_active_by_deal_id(self, deal_id: uuid.UUID) -> DealAppeal | None:
         return await self._appeals.get_active_by_deal_id(deal_id)
@@ -119,6 +128,18 @@ class AppealService:
 
         transition_deal(deal, DealStatus.DISPUTED)
         await self._deals.save(deal)
+        await self._emit(RealtimeEventName.DEAL_DISPUTED, deal)
+
+        counterparty_id = deal.merchant_id if account.role == UserRole.USER else deal.user_id
+        if counterparty_id is not None:
+            await self._notify(
+                counterparty_id,
+                NotificationType.APPEAL_OPENED,
+                title="Appeal opened",
+                message=f"An appeal was opened for deal {deal.public_id}",
+                payload={"appeal_id": str(appeal.id), "deal_id": str(deal.id)},
+                dedupe_key=f"appeal_opened:{appeal.id}",
+            )
 
         return appeal
 
@@ -228,6 +249,12 @@ class AppealService:
             transition_deal(deal, DealStatus.CANCELLED)
 
         await self._deals.save(deal)
+        event = (
+            RealtimeEventName.DEAL_COMPLETED
+            if deal.status == DealStatus.COMPLETED
+            else RealtimeEventName.DEAL_RELEASED
+        )
+        await self._emit(event, deal)
 
         transition_appeal(appeal, AppealStatus.RESOLVED)
         appeal.resolution = resolution
@@ -235,7 +262,43 @@ class AppealService:
         appeal.resolved_by_account_id = owner_id
         appeal.resolved_at = datetime.now(UTC)
 
-        return await self._appeals.save(appeal)
+        saved = await self._appeals.save(appeal)
+
+        for recipient_id in {deal.user_id, deal.merchant_id}:
+            if recipient_id is not None:
+                await self._notify(
+                    recipient_id,
+                    NotificationType.APPEAL_RESOLVED,
+                    title="Appeal resolved",
+                    message=f"The appeal for deal {deal.public_id} was resolved",
+                    payload={
+                        "appeal_id": str(appeal.id),
+                        "deal_id": str(deal.id),
+                        "resolution": resolution.value,
+                    },
+                    dedupe_key=f"appeal_resolved:{appeal.id}",
+                )
+
+        return saved
+
+    async def _emit(self, event: RealtimeEventName, deal: Deal) -> None:
+        if self._realtime is not None:
+            await self._realtime.enqueue_deal(event, deal)
+
+    async def _notify(
+        self,
+        account_id: uuid.UUID,
+        type_: NotificationType,
+        *,
+        title: str,
+        message: str,
+        payload: dict | None = None,
+        dedupe_key: str | None = None,
+    ) -> None:
+        if self._notifications is not None:
+            await self._notifications.emit_notification(
+                account_id, type_, title, message, payload, dedupe_key
+            )
 
     async def get_for_owner(self, appeal_id: uuid.UUID) -> DealAppeal:
         appeal = await self._appeals.get_by_id(appeal_id)
