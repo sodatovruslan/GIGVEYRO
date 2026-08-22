@@ -16,6 +16,7 @@ Request ID injection (call from middleware):
     from app.infra.logging_config import set_request_id
     set_request_id(request_id)
 """
+
 from __future__ import annotations
 
 import json
@@ -56,13 +57,33 @@ _SENSITIVE_KEYS = frozenset(
         "seed_phrase",
         "mnemonic",
         "totp_secret",
+        "totp_code",
         "recovery_code",
+        "recovery_codes",
+        "challenge_token",
+        "setup_token",
         "card_number",
+        "requisite_number",
         "cvv",
         "pin",
         "authorization",
+        "database_url",
+        "redis_url",
     }
 )
+
+_SENSITIVE_KEY_SUFFIXES = (
+    "_password",
+    "_secret",
+    "_token",
+    "_api_key",
+    "_private_key",
+)
+
+
+def _is_sensitive_key(key: object) -> bool:
+    normalized = str(key).lower()
+    return normalized in _SENSITIVE_KEYS or normalized.endswith(_SENSITIVE_KEY_SUFFIXES)
 
 
 def _mask_sensitive(obj: Any, depth: int = 0) -> Any:
@@ -71,7 +92,7 @@ def _mask_sensitive(obj: Any, depth: int = 0) -> Any:
         return obj
     if isinstance(obj, dict):
         return {
-            k: "***REDACTED***" if k.lower() in _SENSITIVE_KEYS else _mask_sensitive(v, depth + 1)
+            k: "***REDACTED***" if _is_sensitive_key(k) else _mask_sensitive(v, depth + 1)
             for k, v in obj.items()
         }
     if isinstance(obj, list):
@@ -94,15 +115,32 @@ class _JSONFormatter(logging.Formatter):
 
         # Attach extra metadata (e.g. kwargs passed to logger.info("...", extra={...}))
         extra_keys = set(record.__dict__) - {
-            "name", "msg", "args", "levelname", "levelno", "pathname",
-            "filename", "module", "exc_info", "exc_text", "stack_info",
-            "lineno", "funcName", "created", "msecs", "relativeCreated",
-            "thread", "threadName", "processName", "process", "message",
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
             "taskName",
         }
         for key in extra_keys:
             val = getattr(record, key)
-            log_obj[key] = _mask_sensitive(val)
+            log_obj[key] = "***REDACTED***" if _is_sensitive_key(key) else _mask_sensitive(val)
 
         if record.exc_info:
             log_obj["exception"] = self.formatException(record.exc_info)
