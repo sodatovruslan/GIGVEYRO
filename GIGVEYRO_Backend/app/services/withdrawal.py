@@ -9,11 +9,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.enums.account import UserRole
+from app.enums.notification import NotificationType
 from app.enums.withdrawal import WithdrawalDestinationType, WithdrawalStatus
 from app.models.account import Account
 from app.models.withdrawal import MerchantWithdrawal
 from app.repositories.account import AccountRepository
 from app.repositories.withdrawal import WithdrawalRepository
+from app.services.notification import NotificationService
 from app.services.wallet import WalletService
 
 logger = logging.getLogger(__name__)
@@ -140,11 +142,25 @@ class WithdrawalService:
         wallet_service: WalletService,
         account_repository: AccountRepository,
         payout_provider: PayoutProvider | None = None,
+        notification_service: NotificationService | None = None,
     ):
         self._withdrawals = withdrawal_repository
         self._wallet_service = wallet_service
         self._accounts = account_repository
         self._payout_provider = payout_provider or MockPayoutProvider()
+        self._notifications = notification_service
+
+    async def _notify_status_changed(self, withdrawal: MerchantWithdrawal) -> None:
+        if self._notifications is None:
+            return
+        await self._notifications.emit_notification(
+            withdrawal.merchant_id,
+            NotificationType.WITHDRAWAL_STATUS_CHANGED,
+            title="Withdrawal status changed",
+            message=f"Withdrawal {withdrawal.public_id} is now {withdrawal.status.value}",
+            payload={"withdrawal_id": str(withdrawal.id), "status": withdrawal.status.value},
+            dedupe_key=f"withdrawal_status:{withdrawal.id}:{withdrawal.status.value}",
+        )
 
     async def create_withdrawal(
         self,
@@ -223,7 +239,9 @@ class WithdrawalService:
         )
 
         transition_withdrawal(withdrawal, WithdrawalStatus.CANCELLED, actor_id=merchant_id)
-        return await self._withdrawals.save(withdrawal)
+        saved = await self._withdrawals.save(withdrawal)
+        await self._notify_status_changed(saved)
+        return saved
 
     async def get_for_merchant(
         self, merchant_id: uuid.UUID, withdrawal_id: uuid.UUID
@@ -261,7 +279,9 @@ class WithdrawalService:
             withdrawal.owner_comment = comment
 
         transition_withdrawal(withdrawal, WithdrawalStatus.APPROVED, actor_id=owner_id)
-        return await self._withdrawals.save(withdrawal)
+        saved = await self._withdrawals.save(withdrawal)
+        await self._notify_status_changed(saved)
+        return saved
 
     async def reject_by_owner(
         self, owner_id: uuid.UUID, withdrawal_id: uuid.UUID, comment: str | None = None
@@ -289,7 +309,9 @@ class WithdrawalService:
         )
 
         transition_withdrawal(withdrawal, WithdrawalStatus.REJECTED, actor_id=owner_id)
-        return await self._withdrawals.save(withdrawal)
+        saved = await self._withdrawals.save(withdrawal)
+        await self._notify_status_changed(saved)
+        return saved
 
     async def mark_paid_by_owner(
         self, owner_id: uuid.UUID, withdrawal_id: uuid.UUID, comment: str | None = None
@@ -327,7 +349,9 @@ class WithdrawalService:
         )
 
         transition_withdrawal(withdrawal, WithdrawalStatus.PAID, actor_id=owner_id)
-        return await self._withdrawals.save(withdrawal)
+        saved = await self._withdrawals.save(withdrawal)
+        await self._notify_status_changed(saved)
+        return saved
 
     async def get_for_owner(self, withdrawal_id: uuid.UUID) -> MerchantWithdrawal:
         withdrawal = await self._withdrawals.get_by_id(withdrawal_id)

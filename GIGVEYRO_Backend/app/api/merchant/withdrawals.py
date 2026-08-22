@@ -11,6 +11,8 @@ from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
+from app.repositories.notification import NotificationRepository
+from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.repositories.withdrawal import WithdrawalRepository
 from app.schemas.withdrawal import (
@@ -18,6 +20,8 @@ from app.schemas.withdrawal import (
     MerchantWithdrawalListResponse,
     MerchantWithdrawalRead,
 )
+from app.services.notification import NotificationService
+from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import InsufficientBalanceError, WalletService
 from app.services.withdrawal import (
     InvalidDestinationError,
@@ -43,6 +47,9 @@ def _service(db: AsyncSession = Depends(get_db)) -> WithdrawalService:
         withdrawal_repository=WithdrawalRepository(db),
         wallet_service=wallet_service,
         account_repository=account_repo,
+        notification_service=NotificationService(
+            NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
+        ),
     )
 
 
