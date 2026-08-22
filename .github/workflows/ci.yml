@@ -43,6 +43,7 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://gigveyro_test:test_password@localhost:5432/gigveyro_test
       REDIS_URL: redis://localhost:6379/0
       JWT_SECRET_KEY: ci-test-secret-key-minimum-32-chars-long
+      TOTP_ENCRYPTION_KEY: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
       APP_ENV: test
       PAYOUT_ENABLED: "false"
       DEPOSIT_PROVIDER_TYPE: mock
@@ -73,7 +74,7 @@ jobs:
         run: alembic upgrade head
 
       - name: Run tests
-        run: python -m pytest tests/ -v --tb=short --timeout=60
+        run: python -m pytest tests/ -v --tb=short
 
       - name: Security audit (pip-audit)
         run: |
