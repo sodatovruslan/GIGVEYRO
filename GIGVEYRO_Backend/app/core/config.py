@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    SESSION_CLEANUP_RETENTION_DAYS: int = 30
     REALTIME_TICKET_EXPIRE_SECONDS: int = 30
     REALTIME_HEARTBEAT_SECONDS: float = 25.0
     REALTIME_OUTBOX_POLL_SECONDS: float = 0.25
@@ -67,6 +68,31 @@ class Settings(BaseSettings):
     PAYOUT_API_URL: str = "https://api.payout-provider-mock.internal"
     PAYOUT_API_KEY: str = ""
 
+    # ── Production Infrastructure Settings (AI #4 — Infra) ──────────────────
+
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_MAX_CONNECTIONS: int = 20
+
+    # Background Workers (ARQ)
+    WORKER_CONCURRENCY: int = 4
+    OUTBOX_BATCH_SIZE: int = 50
+    SCAN_INTERVAL_SECONDS: int = 60
+
+    # Error Monitoring (optional — disabled when empty)
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+
+    # Production Provider Policy
+    # Set to True in production to allow mock providers (e.g. for testing in staging)
+    ALLOW_MOCK_PROVIDERS_IN_PRODUCTION: bool = False
+
+    # Database Connection Pool (production tuning)
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800  # Recycle connections every 30 min
+
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
         if self.APP_ENV == "production":
@@ -76,6 +102,27 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET_KEY must be strong (>=32 chars) in production")
             if "*" in self.CORS_ALLOWED_ORIGINS:
                 raise ValueError("Wildcard CORS origins are forbidden in production")
+            # Production Redis requirement
+            if "localhost" in self.REDIS_URL or "127.0.0.1" in self.REDIS_URL:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "REDIS_URL points to localhost in production — "
+                    "ensure this is intentional (e.g. Docker internal network)."
+                )
+            # Production mock provider policy
+            if not self.ALLOW_MOCK_PROVIDERS_IN_PRODUCTION:
+                if self.DEPOSIT_PROVIDER_TYPE == "mock":
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "DEPOSIT_PROVIDER_TYPE=mock in production. "
+                        "Set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True to silence this warning, "
+                        "or configure a real provider."
+                    )
+                if self.PAYOUT_PROVIDER_TYPE == "mock" and self.PAYOUT_ENABLED:
+                    raise ValueError(
+                        "PAYOUT_ENABLED=True with PAYOUT_PROVIDER_TYPE=mock is forbidden in production. "
+                        "Configure a real payout provider or set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
+                    )
         return self
 
 

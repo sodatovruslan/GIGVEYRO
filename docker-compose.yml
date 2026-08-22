@@ -1,0 +1,167 @@
+# ============================================================
+# GIGVEYRO — Production-like Docker Compose
+# Services: postgres · redis · backend · frontend · worker
+#
+# Usage:
+#   cp GIGVEYRO_Backend/.env.example GIGVEYRO_Backend/.env
+#   # edit .env with your values
+#   docker compose up --build
+# ============================================================
+
+name: gigveyro
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gigveyro}
+      POSTGRES_USER: ${POSTGRES_USER:-gigveyro_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gigveyro-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gigveyro_user} -d ${POSTGRES_DB:-gigveyro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # Do NOT expose port 5432 publicly in production.
+    # expose: ["5432"]
+
+  # ── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Persistence: AOF + RDB snapshot for durability
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - gigveyro-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Do NOT expose port 6379 publicly in production.
+    # expose: ["6379"]
+
+  # ── Backend (FastAPI) ────────────────────────────────────────
+  backend:
+    build:
+      context: ./GIGVEYRO_Backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./GIGVEYRO_Backend/.env
+    environment:
+      # Override DATABASE_URL and REDIS_URL to use internal service names
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-gigveyro_user}:${POSTGRES_PASSWORD:-CHANGE_ME}@postgres:5432/${POSTGRES_DB:-gigveyro}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-production}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - gigveyro-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Run migrations before starting app.
+    # In production pipelines, run migrations separately (backup → migrate → deploy).
+    command: >
+      sh -c "
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting backend...' &&
+        uvicorn app.main:app
+          --host 0.0.0.0
+          --port 8000
+          --workers 1
+          --log-level ${LOG_LEVEL:-info}
+          --no-access-log
+      "
+
+  # ── Background Worker (ARQ) ──────────────────────────────────
+  worker:
+    build:
+      context: ./GIGVEYRO_Backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./GIGVEYRO_Backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-gigveyro_user}:${POSTGRES_PASSWORD:-CHANGE_ME}@postgres:5432/${POSTGRES_DB:-gigveyro}
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: ${APP_ENV:-production}
+    networks:
+      - gigveyro-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Starting ARQ worker...' &&
+        python worker_entrypoint.py
+      "
+
+  # ── Frontend (Next.js) ───────────────────────────────────────
+  frontend:
+    build:
+      context: ./gigveyro-frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Server-side: frontend container → backend via internal network
+      BACKEND_URL: http://backend:8000
+      # Browser-visible API URL — must be the public-facing backend URL
+      # Override with your real domain in production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - gigveyro-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  gigveyro-net:
+    driver: bridge

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Enables minimal Docker image via .next/standalone output.
+  // See gigveyro-frontend/Dockerfile for usage.
+  output: "standalone",
   async headers() {
     return [
       {

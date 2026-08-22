@@ -3,11 +3,9 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.models  # noqa: F401  (register all ORM models before application startup)
 from app.api.appeals import router as appeals_router
@@ -37,14 +35,27 @@ from app.api.traffic import router as traffic_router
 from app.api.wallet import router as wallet_router
 from app.core.config import settings
 from app.core.middleware import RateLimitMiddleware, RequestIDMiddleware, SecurityHeadersMiddleware
-from app.db.session import AsyncSessionLocal, get_db
+from app.db.session import AsyncSessionLocal
+from app.infra.logging_config import configure_logging
+from app.infra.metrics import setup_metrics
+from app.infra.redis_client import close_redis, init_redis
+from app.infra.sentry import init_sentry
 from app.realtime.runtime import realtime_dispatcher
+
+# Configure structured logging before anything else
+configure_logging(app_env=settings.APP_ENV, log_level="DEBUG" if settings.DEBUG else "INFO")
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    # Initialise Sentry error monitoring (no-op if SENTRY_DSN not configured)
+    init_sentry()
+
+    # Initialise Redis connection pool (with retry/backoff)
+    await init_redis()
+
     stop = asyncio.Event()
     dispatcher_task = asyncio.create_task(
         realtime_dispatcher.run(
@@ -58,6 +69,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     finally:
         stop.set()
         await dispatcher_task
+        # Close Redis pool on shutdown
+        await close_redis()
+
 
 app = FastAPI(
     title="GIGVEYRO API",
@@ -115,25 +129,6 @@ if settings.APP_ENV != "production":
 
     app.include_router(dev_deposits_router)
 
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.get("/health/live")
-async def health_live():
-    return {"status": "alive"}
-
-
-@app.get("/health/ready")
-async def health_ready(db: AsyncSession = Depends(get_db)):
-    try:
-        await db.execute(text("SELECT 1"))
-        return {"status": "ready", "database": "connected"}
-    except Exception as exc:
-        logger.error("Health check DB failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database unavailable",
-        ) from exc
+# Setup Prometheus metrics endpoint (/metrics)
+# Must be called after all routers are registered
+setup_metrics(app)

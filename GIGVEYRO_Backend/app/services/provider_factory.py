@@ -39,3 +39,19 @@ def get_payout_provider() -> PayoutProvider:
             api_key=settings.PAYOUT_API_KEY,
         )
     return MockPayoutProvider()
+
+
+def get_provider_diagnostics() -> dict:
+    """Return current provider configuration for diagnostics endpoint.
+
+    Safe to expose — no credentials included.
+    """
+    return {
+        "deposit_provider": settings.DEPOSIT_PROVIDER_TYPE,
+        "exchange_rate_provider": settings.EXCHANGE_RATE_PROVIDER_TYPE,
+        "payout_provider": settings.PAYOUT_PROVIDER_TYPE,
+        "payout_enabled": settings.PAYOUT_ENABLED,
+        "allow_mock_in_production": settings.ALLOW_MOCK_PROVIDERS_IN_PRODUCTION,
+        "trongrid_configured": bool(settings.TRONGRID_API_KEY),
+        "payout_api_configured": bool(settings.PAYOUT_API_KEY),
+    }
