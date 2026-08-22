@@ -52,6 +52,8 @@ class TestProductionConfigValidation:
             ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
             PAYOUT_API_KEY="real-key",
             PAYOUT_API_URL="https://api.payout.real",
+            DOCS_ENABLED=False,
+            METRICS_ENABLED=False,
         )
         assert s.PAYOUT_ENABLED is True
 
@@ -67,8 +69,39 @@ class TestProductionConfigValidation:
             PAYOUT_ENABLED=False,
             PAYOUT_PROVIDER_TYPE="mock",
             ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
+            DOCS_ENABLED=False,
+            METRICS_ENABLED=False,
         )
         assert s.PAYOUT_ENABLED is False
+
+    def test_production_rejects_enabled_api_docs(self):
+        with pytest.raises(ValueError, match="DOCS_ENABLED must be False in production"):
+            Settings(
+                DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
+                JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
+                APP_ENV="production",
+                DEBUG=False,
+                CORS_ALLOWED_ORIGINS=["https://example.com"],
+                DEPOSIT_PROVIDER_TYPE="trongrid",
+                PAYOUT_ENABLED=False,
+                DOCS_ENABLED=True,
+                METRICS_ENABLED=False,
+            )
+
+    def test_production_rejects_unprotected_metrics(self):
+        with pytest.raises(ValueError, match="METRICS_AUTH_TOKEN must be strong"):
+            Settings(
+                DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
+                JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
+                APP_ENV="production",
+                DEBUG=False,
+                CORS_ALLOWED_ORIGINS=["https://example.com"],
+                DEPOSIT_PROVIDER_TYPE="trongrid",
+                PAYOUT_ENABLED=False,
+                DOCS_ENABLED=False,
+                METRICS_ENABLED=True,
+                METRICS_AUTH_TOKEN="",
+            )
 
     def test_debug_true_rejected_in_production(self):
         """DEBUG=True is rejected in production."""

@@ -187,6 +187,13 @@ class Settings(BaseSettings):
                             "PAYOUT_ENABLED=True requires real payout provider settings "
                             "(PAYOUT_API_KEY and real PAYOUT_API_URL) in production"
                         )
+            if self.DOCS_ENABLED:
+                raise ValueError("DOCS_ENABLED must be False in production")
+            if self.METRICS_ENABLED and len(self.METRICS_AUTH_TOKEN) < 32:
+                raise ValueError(
+                    "METRICS_AUTH_TOKEN must be strong (>=32 chars) when metrics are "
+                    "enabled in production"
+                )
         return self
 
 
