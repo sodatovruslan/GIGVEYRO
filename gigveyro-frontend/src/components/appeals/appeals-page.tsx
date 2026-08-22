@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { mapAppealFieldErrors, type AppealFieldErrors } from "@/features/appeals/validation";
@@ -11,6 +11,7 @@ import { appealsApi } from "@/lib/api/appeals";
 import { dealsApi } from "@/lib/api/deals";
 import type { Appeal, AppealReason, UserRole } from "@/lib/api/types";
 import { useApiQuery } from "@/lib/hooks/use-api-query";
+import { queryInvalidation } from "@/lib/query/invalidation";
 import { Pager } from "@/components/ui/pager";
 
 import styles from "./appeals-page.module.css";
@@ -26,6 +27,11 @@ export function AppealsPage({ role }: { role: UserRole }) {
   const owner = role === "owner";
   const [offset, setOffset] = useState(0);
   const query = useApiQuery(() => appealsApi.list(owner, PAGE_SIZE, offset), `${role}-appeals:${offset}`);
+  // Realtime invalidation (deal.disputed) targets the stable "${role}-appeals"
+  // key, independent of our paginated per-offset query key - resubscribe to
+  // it so a realtime event refetches whatever page/filter the user is on.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- query.refetch is stable; including `query` would resubscribe every render
+  useEffect(() => queryInvalidation.subscribe(`${role}-appeals`, () => void query.refetch()), [role, query.refetch]);
   const deals = useApiQuery(role === "merchant" ? dealsApi.merchantList : dealsApi.userList, `${role}-appeal-deals`, !owner);
   const [dialog, setDialog] = useState<"open" | "resolve" | null>(null);
   const [selected, setSelected] = useState<Appeal | null>(null);
@@ -46,6 +52,9 @@ export function AppealsPage({ role }: { role: UserRole }) {
       const mapped = mapFieldErrors ? mapFieldErrors(reasonValue) : {};
       setFieldErrors(mapped);
       if (!Object.keys(mapped).length) setError(localizeError(reasonValue));
+      // Someone else may have already reviewed/resolved/cancelled this appeal -
+      // refresh the list so status badges and available actions stay accurate.
+      await query.refetch();
     } finally { setSaving(false); }
   }
   function openAppeal(event: FormEvent) { event.preventDefault(); void mutate(() => appealsApi.open(dealId, reason, message), (reasonValue) => mapAppealFieldErrors(reasonValue, fieldMessages)); }

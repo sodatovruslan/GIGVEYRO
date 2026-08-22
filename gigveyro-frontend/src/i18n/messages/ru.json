@@ -299,11 +299,15 @@
     "noActiveRequisites": "Сначала активируйте банковский реквизит.",
     "rate": "Курс / USDT",
     "merchant": "Мерчант",
+    "user": "Пользователь",
     "deadline": "Срок",
     "created": "создана",
     "accepted": "принята",
     "completed": "завершена",
-    "createFailed": "Не удалось выполнить действие."
+    "cancelledAt": "Отменена",
+    "createFailed": "Не удалось выполнить действие.",
+    "detailTitle": "Детали сделки",
+    "backToDeals": "← Назад к сделкам"
   },
   "deposits": {
     "eyebrowUser": "ПОПОЛНЕНИЕ USDT",
@@ -381,6 +385,7 @@
     "actionFailed": "Не удалось изменить заявку.",
     "trc20Address": "TRC20 адрес",
     "staleStateError": "Этот запрос уже был обновлён другим пользователем. Список обновлён.",
+    "detailTitle": "Детали заявки",
     "validation": {
       "amount": "Укажите корректную положительную сумму.",
       "destination": "Проверьте реквизиты назначения.",

@@ -299,11 +299,15 @@
     "noActiveRequisites": "Enable bank payment details first.",
     "rate": "Rate / USDT",
     "merchant": "Merchant",
+    "user": "User",
     "deadline": "Deadline",
     "created": "created",
     "accepted": "accepted",
     "completed": "completed",
-    "createFailed": "Action failed."
+    "cancelledAt": "Cancelled",
+    "createFailed": "Action failed.",
+    "detailTitle": "Deal details",
+    "backToDeals": "← Back to deals"
   },
   "deposits": {
     "eyebrowUser": "USDT FUNDING",
@@ -381,6 +385,7 @@
     "actionFailed": "Failed to update request.",
     "trc20Address": "TRC20 address",
     "staleStateError": "This withdrawal was already updated by someone else. The list has been refreshed.",
+    "detailTitle": "Withdrawal details",
     "validation": {
       "amount": "Enter a valid positive amount.",
       "destination": "Check the destination details.",

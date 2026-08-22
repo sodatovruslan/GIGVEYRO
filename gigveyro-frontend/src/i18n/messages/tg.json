@@ -299,11 +299,15 @@
     "noActiveRequisites": "Аввал реквизити бонкиро фаъол кунед.",
     "rate": "Қурб / USDT",
     "merchant": "Тоҷир",
+    "user": "Корбар",
     "deadline": "Муҳлат",
     "created": "эҷод шуд",
     "accepted": "қабул шуд",
     "completed": "анҷом ёфт",
-    "createFailed": "Амал иҷро нашуд."
+    "cancelledAt": "Бекор шуд",
+    "createFailed": "Амал иҷро нашуд.",
+    "detailTitle": "Тафсилоти муомила",
+    "backToDeals": "← Бозгашт ба муомилаҳо"
   },
   "deposits": {
     "eyebrowUser": "ПУРКУНИИ USDT",
@@ -381,6 +385,7 @@
     "actionFailed": "Дархост тағйир наёфт.",
     "trc20Address": "Суроғаи TRC20",
     "staleStateError": "Ин дархост аллакай аз ҷониби дигар корбар навсозӣ шудааст. Рӯйхат навсозӣ шуд.",
+    "detailTitle": "Тафсилоти дархост",
     "validation": {
       "amount": "Маблағи мусбати дурустро ворид кунед.",
       "destination": "Маълумоти таъинотро санҷед.",
