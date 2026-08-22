@@ -14,6 +14,7 @@ from app.models.account import Account
 from app.models.deposit import Deposit, UnmatchedTransfer
 from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
+from app.services.audit import AuditService
 from app.services.deposit_provider import CryptoDepositProvider
 from app.services.notification import NotificationService
 from app.services.wallet import WalletService
@@ -90,12 +91,24 @@ class DepositService:
         wallet_service: WalletService,
         provider: CryptoDepositProvider,
         notification_service: NotificationService | None = None,
+        audit_service: AuditService | None = None,
     ):
         self._deposits = deposit_repository
         self._accounts = account_repository
         self._wallet_service = wallet_service
         self._provider = provider
         self._notifications = notification_service
+        self._audit = audit_service
+
+    async def _audit_deposit(self, deposit: Deposit, action: str) -> None:
+        if self._audit is not None:
+            await self._audit.log_action(
+                action=action,
+                entity_type="deposit",
+                entity_id=str(deposit.id),
+                actor_account_id=None,
+                actor_role="system",
+            )
 
     async def create_deposit_intent(self, account: Account, *, amount: Decimal) -> Deposit:
         if account.role != UserRole.USER:
@@ -350,7 +363,9 @@ class DepositService:
 
             if amount != deposit.expected_amount:
                 transition_deposit(deposit, DepositStatus.AMOUNT_MISMATCH)
-                return await self._deposits.save(deposit)
+                saved = await self._deposits.save(deposit)
+                await self._audit_deposit(saved, "deposit.amount_mismatch")
+                return saved
 
             transition_deposit(deposit, DepositStatus.DETECTED)
         else:
@@ -396,6 +411,8 @@ class DepositService:
                 payload={"deposit_id": str(deposit.id)},
                 dedupe_key=f"deposit_credited:{deposit.id}",
             )
+
+        await self._audit_deposit(saved, "deposit.credited")
 
         return saved
 

@@ -10,6 +10,7 @@ from app.enums.appeal import AppealStatus
 from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.appeal import AppealRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.deal import DealRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
@@ -24,6 +25,7 @@ from app.services.appeal import (
     AppealService,
     InvalidAppealTransitionError,
 )
+from app.services.audit import AuditService
 from app.services.deal import DealNotFoundError
 from app.services.notification import NotificationService
 from app.services.realtime import RealtimeEventService
@@ -53,6 +55,10 @@ def _service(db: AsyncSession = Depends(get_db)) -> AppealService:
     )
 
 
+def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
+    return AuditService(AuditRepository(db))
+
+
 @router.post(
     "/deals/{deal_id}/appeal", response_model=AppealRead, status_code=status.HTTP_201_CREATED
 )
@@ -61,14 +67,24 @@ async def open_appeal(
     payload: AppealCreate,
     actor: Account = Depends(get_current_account),
     service: AppealService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AppealRead:
     try:
-        return await service.open_appeal(
+        appeal = await service.open_appeal(
             actor,
             deal_id=deal_id,
             reason_code=payload.reason_code,
             message=payload.message,
         )
+        await audit.log_action(
+            action="appeal.open",
+            entity_type="appeal",
+            entity_id=str(appeal.id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+            audit_metadata={"deal_id": str(deal_id)},
+        )
+        return appeal
     except DealNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="deal not found") from exc
     except AppealNotAllowedError as exc:
@@ -108,9 +124,18 @@ async def cancel_appeal(
     appeal_id: uuid.UUID,
     actor: Account = Depends(get_current_account),
     service: AppealService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> AppealRead:
     try:
-        return await service.cancel_appeal(actor, appeal_id=appeal_id)
+        appeal = await service.cancel_appeal(actor, appeal_id=appeal_id)
+        await audit.log_action(
+            action="appeal.cancel",
+            entity_type="appeal",
+            entity_id=str(appeal_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+        )
+        return appeal
     except AppealNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="appeal not found"

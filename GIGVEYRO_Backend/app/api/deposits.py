@@ -9,12 +9,14 @@ from app.enums.account import UserRole
 from app.enums.deposit import DepositStatus
 from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.deposit import DepositRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.deposit import DepositCreate, DepositListResponse, DepositRead
+from app.services.audit import AuditService
 from app.services.deposit import DepositNotAllowedError, DepositNotFoundError, DepositService
 from app.services.deposit_provider import MockTRC20DepositProvider
 from app.services.notification import NotificationService
@@ -39,6 +41,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DepositService:
         notification_service=NotificationService(
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
+        audit_service=AuditService(AuditRepository(db)),
     )
 
 

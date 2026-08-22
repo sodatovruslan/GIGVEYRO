@@ -7,12 +7,14 @@ from app.api.deps import require_roles
 from app.db.session import get_db
 from app.enums.account import UserRole
 from app.repositories.account import AccountRepository
+from app.repositories.audit import AuditRepository
 from app.repositories.deposit import DepositRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.deposit import DepositRead, DepositSimulateTransaction
+from app.services.audit import AuditService
 from app.services.deposit import (
     DepositNotFoundError,
     DepositService,
@@ -42,6 +44,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DepositService:
         notification_service=NotificationService(
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
+        audit_service=AuditService(AuditRepository(db)),
     )
 
 
