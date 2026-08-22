@@ -25,6 +25,7 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"
+    REALTIME = "realtime"
 
 
 class TokenError(Exception):
@@ -61,6 +62,15 @@ def create_refresh_token(subject: uuid.UUID, role: str) -> str:
         role,
         TokenType.REFRESH,
         timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+
+
+def create_realtime_ticket(subject: uuid.UUID, role: str, expires_seconds: int = 30) -> str:
+    return _create_token(
+        subject,
+        role,
+        TokenType.REALTIME,
+        timedelta(seconds=expires_seconds),
     )
 
 

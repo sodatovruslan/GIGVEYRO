@@ -12,6 +12,7 @@ from app.models.notification import (
     NotificationPreference,
 )
 from app.models.payment_requisite import PaymentRequisite
+from app.models.realtime import RealtimeOutbox
 from app.models.telegram import TelegramAccountLink
 from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
@@ -31,6 +32,7 @@ __all__ = [
     "NotificationOutbox",
     "NotificationPreference",
     "PaymentRequisite",
+    "RealtimeOutbox",
     "TelegramAccountLink",
     "UserTrafficSettings",
     "UserWallet",

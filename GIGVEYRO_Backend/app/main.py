@@ -1,4 +1,7 @@
+import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,15 +30,34 @@ from app.api.owner.requisites import router as owner_requisites_router
 from app.api.owner.traffic import router as owner_traffic_router
 from app.api.owner.wallets import router as owner_wallets_router
 from app.api.owner.withdrawals import router as owner_withdrawals_router
+from app.api.realtime import router as realtime_router
 from app.api.requisites import router as requisites_router
 from app.api.telegram import router as telegram_router
 from app.api.traffic import router as traffic_router
 from app.api.wallet import router as wallet_router
 from app.core.config import settings
 from app.core.middleware import RateLimitMiddleware, RequestIDMiddleware, SecurityHeadersMiddleware
-from app.db.session import get_db
+from app.db.session import AsyncSessionLocal, get_db
+from app.realtime.runtime import realtime_dispatcher
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    stop = asyncio.Event()
+    dispatcher_task = asyncio.create_task(
+        realtime_dispatcher.run(
+            AsyncSessionLocal,
+            stop,
+            poll_interval=settings.REALTIME_OUTBOX_POLL_SECONDS,
+        )
+    )
+    try:
+        yield
+    finally:
+        stop.set()
+        await dispatcher_task
 
 app = FastAPI(
     title="GIGVEYRO API",
@@ -43,6 +65,7 @@ app = FastAPI(
     docs_url="/docs" if settings.DOCS_ENABLED else None,
     redoc_url="/redoc" if settings.DOCS_ENABLED else None,
     openapi_url="/openapi.json" if settings.DOCS_ENABLED else None,
+    lifespan=lifespan,
 )
 
 # Security Middlewares
@@ -63,6 +86,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(realtime_router)
 app.include_router(owner_accounts_router)
 app.include_router(owner_wallets_router)
 app.include_router(owner_requisites_router)
