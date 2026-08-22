@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createTranslator } from "next-intl";
 import { test } from "vitest";
 
+import { mapAppealFieldErrors } from "../src/features/appeals/validation.ts";
 import { AuthOperationGate } from "../src/features/auth/auth-operation-gate.ts";
 import { loginErrorKey } from "../src/features/auth/login-error.ts";
 import { auditMessagePath } from "../src/features/audit/i18n.ts";
@@ -108,6 +109,44 @@ test("locale catalogs contain no literal message keys with dots", async () => {
   };
   catalogs.forEach((catalog) => visit(catalog));
   assert.deepEqual(dotted, []);
+});
+
+test("appeal open/resolve maps backend business-rule errors to the deal/message fields", () => {
+  const messages = { dealNotEligible: "not-eligible", activeAppealExists: "already-open", dealNotFound: "not-found", invalidMessage: "bad-message", invalidOwnerNote: "bad-note" };
+  assert.deepEqual(mapAppealFieldErrors({ message: "cannot open appeal for deal in status completed", issues: [] }, messages), { deal_id: "not-eligible" });
+  assert.deepEqual(mapAppealFieldErrors({ message: "an active appeal already exists for this deal", issues: [] }, messages), { deal_id: "already-open" });
+  assert.deepEqual(mapAppealFieldErrors({ message: "deal not found", issues: [] }, messages), { deal_id: "not-found" });
+  assert.deepEqual(mapAppealFieldErrors({ message: "validation", issues: [{ loc: ["body", "owner_note"] }] }, messages), { owner_note: "bad-note" });
+});
+
+test("owner deposits list wires search/tx-hash/date filters and a detail lookup through the real backend routes", async () => {
+  const api = await source("src/lib/api/deposits.ts");
+  const page = await source("src/components/deposits/deposits-page.tsx");
+  assert.match(api, /tx_hash: filters\.txHash/);
+  assert.match(api, /date_from: filters\.dateFrom/);
+  assert.match(api, /date_to: filters\.dateTo/);
+  assert.match(api, /get: \(owner: boolean, id: string\)/);
+  assert.match(page, /openDetail/);
+  assert.doesNotMatch(page, /mock|fake/i);
+});
+
+test("sidebar notifications badge reflects the real unread-count endpoint and updates after mark-read", async () => {
+  const shell = await source("src/components/layout/dashboard-shell.tsx");
+  const notificationsPage = await source("src/components/notifications/notifications-page.tsx");
+  assert.match(shell, /notificationsApi\.unreadCount\(\)/);
+  assert.match(shell, /gigveyro:notifications-updated/);
+  assert.match(notificationsPage, /gigveyro:notifications-updated/);
+});
+
+test("changed appeals and deposits keys exist in RU/TG/EN", async () => {
+  const catalogs = await Promise.all(["ru", "tg", "en"].map(async (locale) => JSON.parse(await source(`src/i18n/messages/${locale}.json`))));
+  for (const catalog of catalogs) {
+    assert.ok(catalog.appeals.validation.activeAppealExists);
+    assert.ok(catalog.appeals.validation.dealNotEligible);
+    assert.ok(catalog.deposits.detailTitle);
+    assert.ok(catalog.deposits.dateFrom);
+    assert.ok(catalog.deposits.dateTo);
+  }
 });
 
 test("next-intl resolves every canonical backend audit action in RU/TG/EN", async () => {
