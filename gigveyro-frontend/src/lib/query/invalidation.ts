@@ -15,7 +15,9 @@ export class QueryInvalidationBus {
   subscribe(key: string, refetch: () => void) {
     const subscriber = { key, refetch };
     this.subscribers.add(subscriber);
-    return () => this.subscribers.delete(subscriber);
+    return () => {
+      this.subscribers.delete(subscriber);
+    };
   }
 
   invalidate(patterns: readonly QueryInvalidationPattern[]) {
