@@ -64,7 +64,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Lint (ruff)
-        run: ruff check app/ tests/ worker_entrypoint.py
+        run: ruff check .
+
+      - name: Verify single Alembic head
+        run: test "$(alembic heads | grep -c '(head)')" -eq 1
 
       - name: Run Alembic migrations
         run: alembic upgrade head
@@ -102,10 +105,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true  # Lint failures are warnings until lint is fully configured
 
       - name: Run tests
         run: npm test
+
+      - name: Type check
+        run: npx tsc --noEmit
 
       - name: Build (production)
         run: npm run build

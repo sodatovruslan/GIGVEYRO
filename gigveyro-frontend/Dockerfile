@@ -51,7 +51,7 @@ USER nextjs
 EXPOSE 3000
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
-    CMD wget -qO- http://localhost:3000/api/health 2>/dev/null || exit 1
+    CMD wget -qO- http://localhost:3000/ 2>/dev/null || exit 1
 
 # Runtime env vars (NEXT_PUBLIC_* and server-side) are injected via Docker env,
 # NOT baked into the image. See docs/deployment.md for env strategy.
