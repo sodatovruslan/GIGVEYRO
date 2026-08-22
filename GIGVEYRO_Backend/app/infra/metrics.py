@@ -39,22 +39,48 @@ except ImportError:
 # ── Metric definitions ─────────────────────────────────────────────────────
 
 if _PROMETHEUS_AVAILABLE:
-    OUTBOX_PENDING = Gauge(
-        "gigveyro_outbox_pending_total",
+    # ── Notification Outbox Metrics
+    NOTIFICATION_OUTBOX_PENDING = Gauge(
+        "gigveyro_notification_outbox_pending",
         "Number of pending notification outbox entries",
     )
+    NOTIFICATION_OUTBOX_FAILED = Gauge(
+        "gigveyro_notification_outbox_failed",
+        "Number of failed notification outbox entries",
+    )
+    NOTIFICATION_OUTBOX_OLDEST_AGE = Gauge(
+        "gigveyro_notification_outbox_oldest_age_seconds",
+        "Age of the oldest pending outbox entry in seconds",
+    )
 
+    # ── Deposit Scanner Metrics
+    DEPOSIT_SCAN_RUNS = Counter(
+        "gigveyro_deposit_scan_runs_total",
+        "Total deposit scanner runs",
+    )
+    DEPOSIT_SCAN_ERRORS = Counter(
+        "gigveyro_deposit_scan_errors_total",
+        "Total deposit scanner errors",
+    )
+    DEPOSIT_EVENTS_SEEN = Counter(
+        "gigveyro_deposit_events_seen_total",
+        "Total deposit events seen",
+    )
+    DEPOSIT_EVENTS_CORRELATED = Counter(
+        "gigveyro_deposit_events_correlated_total",
+        "Total deposit events correlated",
+    )
+    DEPOSIT_EVENTS_UNMATCHED = Counter(
+        "gigveyro_deposit_events_unmatched_total",
+        "Total deposit events unmatched",
+    )
+
+    # ── Worker & General Metrics
     WORKER_JOBS = Counter(
         "gigveyro_worker_jobs_total",
         "Total background worker job executions",
         labelnames=["job", "status"],  # status: success | failure
     )
-
-    DEPOSIT_SCAN_ERRORS = Counter(
-        "gigveyro_deposit_scan_errors_total",
-        "Total deposit scanner provider errors",
-    )
-
     PROVIDER_ERRORS = Counter(
         "gigveyro_provider_errors_total",
         "Total external provider errors",
@@ -69,19 +95,24 @@ else:
         def labels(self, *a, **kw) -> _NoopMetric:
             return self
 
-    OUTBOX_PENDING = _NoopMetric()  # type: ignore[assignment]
-    WORKER_JOBS = _NoopMetric()  # type: ignore[assignment]
+    NOTIFICATION_OUTBOX_PENDING = _NoopMetric()  # type: ignore[assignment]
+    NOTIFICATION_OUTBOX_FAILED = _NoopMetric()  # type: ignore[assignment]
+    NOTIFICATION_OUTBOX_OLDEST_AGE = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_SCAN_RUNS = _NoopMetric()  # type: ignore[assignment]
     DEPOSIT_SCAN_ERRORS = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_EVENTS_SEEN = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_EVENTS_CORRELATED = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_EVENTS_UNMATCHED = _NoopMetric()  # type: ignore[assignment]
+    WORKER_JOBS = _NoopMetric()  # type: ignore[assignment]
     PROVIDER_ERRORS = _NoopMetric()  # type: ignore[assignment]
 
 
 # ── FastAPI instrumentator setup ───────────────────────────────────────────
 
 def setup_metrics(app) -> None:  # noqa: ANN001
-    """Attach Prometheus HTTP instrumentation and /metrics endpoint to the app.
+    """Attach Prometheus HTTP instrumentation and secure /metrics endpoint to the app.
 
     Call from main.py after creating the FastAPI instance.
-    Safe no-op if prometheus-fastapi-instrumentator is not installed.
     """
     if not _PROMETHEUS_AVAILABLE:
         logger.info("Prometheus metrics disabled (prometheus-client not installed).")
@@ -98,23 +129,34 @@ def setup_metrics(app) -> None:  # noqa: ANN001
             excluded_handlers=["/metrics", "/health/*"],
             # No high-cardinality labels
             inprogress_labels=False,
-        ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-
-        logger.info("Prometheus metrics enabled at /metrics")
+        ).instrument(app)
+        logger.info("Prometheus HTTP request metrics instrumented.")
     except ImportError:
-        # Expose a basic /metrics endpoint using prometheus_client directly
-        logger.info(
-            "prometheus-fastapi-instrumentator not installed — "
-            "exposing basic /metrics with prometheus_client."
-        )
-        from fastapi import Response
+        logger.warning("prometheus-fastapi-instrumentator not installed.")
 
-        @app.get("/metrics", include_in_schema=False)
-        async def metrics_endpoint() -> Response:
-            return Response(
-                content=generate_latest(REGISTRY),
-                media_type=CONTENT_TYPE_LATEST,
-            )
+    from fastapi import Response, HTTPException, status, Header
+    from typing import Annotated
+    from app.core.config import settings
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_endpoint(
+        authorization: Annotated[str | None, Header()] = None
+    ) -> Response:
+        if not settings.METRICS_ENABLED:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+        if settings.METRICS_AUTH_TOKEN:
+            expected = f"Bearer {settings.METRICS_AUTH_TOKEN}"
+            if authorization != expected:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized metrics access",
+                )
+
+        return Response(
+            content=generate_latest(REGISTRY),
+            media_type=CONTENT_TYPE_LATEST,
+        )
 
 
 def record_worker_success(job_name: str) -> None:
@@ -139,4 +181,25 @@ def record_provider_error(provider: str) -> None:
 
 def set_outbox_pending(count: int) -> None:
     """Update the outbox pending gauge."""
-    OUTBOX_PENDING.set(count)
+    NOTIFICATION_OUTBOX_PENDING.set(count)
+
+
+def record_deposit_scan_run() -> None:
+    """Record a deposit scanner run."""
+    DEPOSIT_SCAN_RUNS.inc()
+
+
+def record_deposit_events(seen: int, correlated: int, unmatched: int) -> None:
+    """Record deposit scan event counts."""
+    DEPOSIT_EVENTS_SEEN.inc(seen)
+    DEPOSIT_EVENTS_CORRELATED.inc(correlated)
+    DEPOSIT_EVENTS_UNMATCHED.inc(unmatched)
+
+
+def set_outbox_metrics(pending: int, failed: int, oldest_age_seconds: float) -> None:
+    """Update outbox pending, failed, and oldest age gauges."""
+    NOTIFICATION_OUTBOX_PENDING.set(pending)
+    NOTIFICATION_OUTBOX_FAILED.set(failed)
+    NOTIFICATION_OUTBOX_OLDEST_AGE.set(oldest_age_seconds)
+
+

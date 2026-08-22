@@ -29,6 +29,7 @@ class TestProductionConfigValidation:
                 APP_ENV="production",
                 DEBUG=False,
                 CORS_ALLOWED_ORIGINS=["https://example.com"],
+                DEPOSIT_PROVIDER_TYPE="trongrid",
                 PAYOUT_ENABLED=True,
                 PAYOUT_PROVIDER_TYPE="mock",
                 ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
@@ -43,9 +44,12 @@ class TestProductionConfigValidation:
             APP_ENV="production",
             DEBUG=False,
             CORS_ALLOWED_ORIGINS=["https://example.com"],
+            DEPOSIT_PROVIDER_TYPE="trongrid",
             PAYOUT_ENABLED=True,
             PAYOUT_PROVIDER_TYPE="external_adapter",
             ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
+            PAYOUT_API_KEY="real-key",
+            PAYOUT_API_URL="https://api.payout.real",
         )
         assert s.PAYOUT_ENABLED is True
 
@@ -57,6 +61,7 @@ class TestProductionConfigValidation:
             APP_ENV="production",
             DEBUG=False,
             CORS_ALLOWED_ORIGINS=["https://example.com"],
+            DEPOSIT_PROVIDER_TYPE="trongrid",
             PAYOUT_ENABLED=False,
             PAYOUT_PROVIDER_TYPE="mock",
             ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
@@ -93,6 +98,47 @@ class TestProductionConfigValidation:
                 DEBUG=False,
                 CORS_ALLOWED_ORIGINS=["*"],
             )
+
+    def test_production_rejects_mock_deposit_provider(self):
+        """Production rejects DEPOSIT_PROVIDER_TYPE=mock when ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False."""
+        with pytest.raises(ValueError, match="DEPOSIT_PROVIDER_TYPE=mock is forbidden in production"):
+            Settings(
+                DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
+                JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
+                APP_ENV="production",
+                DEBUG=False,
+                DEPOSIT_PROVIDER_TYPE="mock",
+                ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
+            )
+
+    def test_production_rejects_horizontal_inmemory_broker(self):
+        """Production rejects horizontal scaling (WEB_CONCURRENCY > 1) with inmemory broker."""
+        with pytest.raises(ValueError, match="REALTIME_BROKER must be set to 'redis' in production"):
+            Settings(
+                DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
+                JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
+                APP_ENV="production",
+                DEBUG=False,
+                DEPOSIT_PROVIDER_TYPE="trongrid",
+                REALTIME_BROKER="inmemory",
+                WEB_CONCURRENCY=2,
+            )
+
+    def test_production_rejects_enabled_payout_missing_credentials(self):
+        """Production rejects PAYOUT_ENABLED=True with missing provider credentials."""
+        with pytest.raises(ValueError, match="PAYOUT_ENABLED=True requires real payout provider settings"):
+            Settings(
+                DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
+                JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
+                APP_ENV="production",
+                DEBUG=False,
+                DEPOSIT_PROVIDER_TYPE="trongrid",
+                PAYOUT_ENABLED=True,
+                PAYOUT_PROVIDER_TYPE="external_adapter",
+                PAYOUT_API_KEY="",  # missing key
+                ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
+            )
+
 
 
 class TestPayoutOrchestratorSafety:

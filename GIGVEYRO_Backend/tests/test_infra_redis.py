@@ -130,3 +130,33 @@ class TestRedisRateLimiter:
 
         # Fail-open: allow the request
         assert result is False
+
+    async def test_fails_closed_on_redis_error(self):
+        """Rate limiter fails closed (blocks / returns True) when mode is 'closed'."""
+        from app.infra.redis_rate_limiter import RedisRateLimiter
+
+        limiter = RedisRateLimiter()
+
+        with patch("app.infra.redis_rate_limiter.get_redis", side_effect=RuntimeError("not init")), \
+             patch("app.core.config.settings.RATE_LIMIT_FAIL_MODE", "closed"):
+            result = await limiter.is_rate_limited("test:key", max_requests=1, window_seconds=60)
+
+        # Fail-closed: block the request
+        assert result is True
+
+    async def test_falls_back_on_redis_error(self):
+        """Rate limiter falls back to local in-memory rate limiter when mode is 'fallback'."""
+        from app.infra.redis_rate_limiter import RedisRateLimiter
+
+        limiter = RedisRateLimiter()
+
+        with patch("app.infra.redis_rate_limiter.get_redis", side_effect=RuntimeError("not init")), \
+             patch("app.core.config.settings.RATE_LIMIT_FAIL_MODE", "fallback"):
+            # 1st request should be allowed
+            res1 = await limiter.is_rate_limited("test:fallback_key", max_requests=1, window_seconds=60)
+            assert res1 is False
+
+            # 2nd request should be blocked
+            res2 = await limiter.is_rate_limited("test:fallback_key", max_requests=1, window_seconds=60)
+            assert res2 is True
+

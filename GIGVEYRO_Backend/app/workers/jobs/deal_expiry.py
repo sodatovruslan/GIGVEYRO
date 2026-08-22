@@ -42,12 +42,17 @@ async def expire_stale_deals(ctx: dict) -> dict:
     Returns:
         dict with expired count.
     """
-    expiry_cutoff = datetime.now(UTC) - timedelta(minutes=settings.DEAL_TTL_MINUTES)
+    job_id = ctx.get("job_id", "unknown")
+    attempt = ctx.get("job_try", 1)
+
     logger.info(
-        "deal_expiry: expiring AVAILABLE deals created before %s (TTL=%d min)",
-        expiry_cutoff.isoformat(),
-        settings.DEAL_TTL_MINUTES,
+        "event=worker.job.started job=%s job_id=%s attempt=%d",
+        JOB_NAME,
+        job_id,
+        attempt,
     )
+
+    expiry_cutoff = datetime.now(UTC) - timedelta(minutes=settings.DEAL_TTL_MINUTES)
 
     try:
         async with AsyncSessionLocal() as session:
@@ -68,10 +73,23 @@ async def expire_stale_deals(ctx: dict) -> dict:
 
         expired_count = len(expired_ids)
         record_worker_success(JOB_NAME)
-        logger.info("deal_expiry: expired %d deals.", expired_count)
+        logger.info(
+            "event=worker.job.completed job=%s job_id=%s attempt=%d expired=%d",
+            JOB_NAME,
+            job_id,
+            attempt,
+            expired_count,
+        )
         return {"status": "ok", "expired": expired_count}
 
     except Exception as exc:
         record_worker_failure(JOB_NAME)
-        logger.error("deal_expiry: job failed: %s", exc, exc_info=True)
+        logger.error(
+            "event=worker.job.failed job=%s job_id=%s attempt=%d error=%s",
+            JOB_NAME,
+            job_id,
+            attempt,
+            str(exc),
+            exc_info=True,
+        )
         raise

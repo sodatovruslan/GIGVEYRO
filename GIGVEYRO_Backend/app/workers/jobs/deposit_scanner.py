@@ -57,34 +57,51 @@ async def scan_deposits(ctx: dict) -> dict:
     Returns:
         dict with scan result summary.
     """
+    job_id = ctx.get("job_id", "unknown")
+    attempt = ctx.get("job_try", 1)
+
+    logger.info(
+        "event=worker.job.started job=%s job_id=%s attempt=%d",
+        JOB_NAME,
+        job_id,
+        attempt,
+    )
+
+    from app.infra.metrics import record_deposit_scan_run
+
+    record_deposit_scan_run()
+
     if settings.DEPOSIT_PROVIDER_TYPE == "mock":
-        logger.debug("deposit_scanner: DEPOSIT_PROVIDER_TYPE=mock — skipping blockchain scan.")
+        logger.info(
+            "event=worker.job.completed job=%s job_id=%s attempt=%d status=skipped reason=mock_provider",
+            JOB_NAME,
+            job_id,
+            attempt,
+        )
         return {"status": "skipped", "reason": "mock_provider"}
 
     redis = get_redis()
 
     async with DistributedLock(redis, LOCK_NAME, ttl_ms=LOCK_TTL_MS) as acquired:
         if not acquired:
-            logger.debug("deposit_scanner: lock held by another worker — skipping.")
+            logger.info(
+                "event=worker.job.completed job=%s job_id=%s attempt=%d status=skipped reason=lock_held",
+                JOB_NAME,
+                job_id,
+                attempt,
+            )
             return {"status": "skipped", "reason": "lock_held"}
 
-        return await _run_scan()
+        return await _run_scan(job_id, attempt)
 
 
-async def _run_scan() -> dict:
+async def _run_scan(job_id: str, attempt: int) -> dict:
     """Execute the deposit scan within the distributed lock."""
     provider = get_deposit_provider()
     deposit_address = provider.get_deposit_address()
 
-    logger.info(
-        "deposit_scanner: scanning address=%s provider=%s",
-        deposit_address,
-        settings.DEPOSIT_PROVIDER_TYPE,
-    )
-
     try:
         async with AsyncSessionLocal() as session:
-            # Mirror the DI pattern from app.api.deposits._service
             account_repo = AccountRepository(session)
             wallet_service = WalletService(
                 WalletRepository(session),
@@ -103,16 +120,29 @@ async def _run_scan() -> dict:
                 provider=provider,
                 notification_service=notification_service,
             )
-            # scan_and_correlate_deposits is idempotent —
-            # duplicate tx_hash is caught by DB unique constraint or existing-check
             processed = await service.scan_and_correlate_deposits()
 
         record_worker_success(JOB_NAME)
-        logger.info("deposit_scanner: done. processed=%d", processed)
+        logger.info(
+            "event=worker.job.completed job=%s job_id=%s attempt=%d processed=%d address=%s",
+            JOB_NAME,
+            job_id,
+            attempt,
+            processed,
+            deposit_address,
+        )
         return {"status": "ok", "processed": processed}
 
     except Exception as exc:
         record_deposit_scan_error()
         record_worker_failure(JOB_NAME)
-        logger.error("deposit_scanner: scan failed: %s", exc, exc_info=True)
+        logger.error(
+            "event=worker.job.failed job=%s job_id=%s attempt=%d error=%s",
+            JOB_NAME,
+            job_id,
+            attempt,
+            str(exc),
+            exc_info=True,
+        )
         raise
+

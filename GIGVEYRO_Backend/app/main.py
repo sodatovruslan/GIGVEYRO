@@ -56,6 +56,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Initialise Redis connection pool (with retry/backoff)
     await init_redis()
 
+    if hasattr(realtime_broker, "startup"):
+        await realtime_broker.startup()
+
     stop = asyncio.Event()
     dispatcher_task = asyncio.create_task(
         realtime_dispatcher.run(
@@ -69,6 +72,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     finally:
         stop.set()
         await dispatcher_task
+        if hasattr(realtime_broker, "shutdown"):
+            await realtime_broker.shutdown()
         # Close Redis pool on shutdown
         await close_redis()
 

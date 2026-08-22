@@ -14,13 +14,15 @@ Guarantees:
 Telegram provider: uses MockTelegramProvider in development.
 For production Telegram, configure TELEGRAM_BOT_TOKEN and use a real provider.
 """
-from __future__ import annotations
-
 import logging
+from datetime import UTC, datetime
+from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
-from app.infra.metrics import record_worker_failure, record_worker_success, set_outbox_pending
+from app.enums.notification import NotificationStatus
+from app.infra.metrics import record_worker_failure, record_worker_success, set_outbox_metrics
+from app.models.notification import NotificationOutbox
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.services.notification import NotificationService
@@ -51,8 +53,17 @@ async def process_notification_outbox(ctx: dict) -> dict:
     Returns:
         dict with processed count and job outcome.
     """
+    job_id = ctx.get("job_id", "unknown")
+    attempt = ctx.get("job_try", 1)
+
+    logger.info(
+        "event=worker.job.started job=%s job_id=%s attempt=%d",
+        JOB_NAME,
+        job_id,
+        attempt,
+    )
+
     batch_size = settings.OUTBOX_BATCH_SIZE
-    logger.info("notification_outbox: starting batch (limit=%d)", batch_size)
 
     try:
         async with AsyncSessionLocal() as session:
@@ -68,20 +79,57 @@ async def process_notification_outbox(ctx: dict) -> dict:
 
             processed = await service.process_outbox_batch(limit=batch_size)
 
-            # Measure pending depth for observability
-            pending_entries = await notification_repo.get_pending_outbox_entries(limit=1000)
-            pending_count = len(pending_entries)
-            set_outbox_pending(pending_count)
+            # Measure pending depth, failed, and oldest age for observability
+            res_pending = await session.execute(
+                select(func.count(NotificationOutbox.id)).where(
+                    NotificationOutbox.status == NotificationStatus.PENDING
+                )
+            )
+            pending_count = res_pending.scalar_one() or 0
+
+            res_failed = await session.execute(
+                select(func.count(NotificationOutbox.id)).where(
+                    NotificationOutbox.status == NotificationStatus.FAILED
+                )
+            )
+            failed_count = res_failed.scalar_one() or 0
+
+            res_oldest = await session.execute(
+                select(NotificationOutbox.created_at)
+                .where(NotificationOutbox.status == NotificationStatus.PENDING)
+                .order_by(NotificationOutbox.created_at.asc())
+                .limit(1)
+            )
+            oldest_created_at = res_oldest.scalar_one_or_none()
+            oldest_age = 0.0
+            if oldest_created_at:
+                if oldest_created_at.tzinfo is None:
+                    oldest_created_at = oldest_created_at.replace(tzinfo=UTC)
+                oldest_age = (datetime.now(UTC) - oldest_created_at).total_seconds()
+
+            set_outbox_metrics(pending_count, failed_count, oldest_age)
 
         record_worker_success(JOB_NAME)
         logger.info(
-            "notification_outbox: processed=%d, pending_approx=%d",
+            "event=worker.job.completed job=%s job_id=%s attempt=%d processed=%d pending_approx=%d failed=%d oldest_age=%d",
+            JOB_NAME,
+            job_id,
+            attempt,
             processed,
             pending_count,
+            failed_count,
+            int(oldest_age),
         )
         return {"processed": processed, "pending_approx": pending_count, "status": "ok"}
 
     except Exception as exc:
         record_worker_failure(JOB_NAME)
-        logger.error("notification_outbox: job failed: %s", exc, exc_info=True)
+        logger.error(
+            "event=worker.job.failed job=%s job_id=%s attempt=%d error=%s",
+            JOB_NAME,
+            job_id,
+            attempt,
+            str(exc),
+            exc_info=True,
+        )
         raise  # ARQ will handle retry

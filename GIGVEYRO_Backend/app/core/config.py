@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from cryptography.fernet import Fernet
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,6 +23,17 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     SESSION_CLEANUP_RETENTION_DAYS: int = 30
+
+    # Two-factor authentication (TOTP, owner-only for now)
+    TOTP_ENCRYPTION_KEY: str
+    OWNER_2FA_REQUIRED: bool = False
+    TWO_FACTOR_SETUP_EXPIRE_MINUTES: int = 10
+    TWO_FACTOR_CHALLENGE_EXPIRE_SECONDS: int = 300
+    TWO_FACTOR_MAX_CHALLENGE_ATTEMPTS: int = 5
+    TWO_FACTOR_RECOVERY_CODE_COUNT: int = 10
+    TWO_FACTOR_VERIFY_RATE_LIMIT_REQUESTS: int = 10
+    TWO_FACTOR_VERIFY_RATE_LIMIT_WINDOW_SECONDS: int = 300
+
     REALTIME_TICKET_EXPIRE_SECONDS: int = 30
     REALTIME_HEARTBEAT_SECONDS: float = 25.0
     REALTIME_OUTBOX_POLL_SECONDS: float = 0.25
@@ -93,6 +105,42 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800  # Recycle connections every 30 min
 
+    # ── Realtime & Web Scaling Settings ─────────────────────────────────────
+    REALTIME_BROKER: str = "inmemory"  # "inmemory" or "redis"
+    WEB_CONCURRENCY: int = 1
+
+    # Redis Namespace / Key Prefix (gigveyro:<env> by default)
+    REDIS_KEY_PREFIX: str = ""
+
+    # Rate Limiter Settings
+    RATE_LIMIT_FAIL_MODE: str = "open"  # "open" or "closed"
+
+    # Metrics Security Settings
+    METRICS_ENABLED: bool = True
+    METRICS_AUTH_TOKEN: str = ""
+
+
+    @model_validator(mode="after")
+    def validate_totp_encryption_key(self) -> "Settings":
+        # A malformed key is a hard functional bug (every TOTP encrypt/decrypt
+        # call would fail), not just a production-strength policy, so this is
+        # checked in every environment, not only production.
+        try:
+            Fernet(self.TOTP_ENCRYPTION_KEY.encode("utf-8"))
+        except Exception as exc:
+            raise ValueError(
+                "TOTP_ENCRYPTION_KEY must be a valid urlsafe-base64-encoded 32-byte Fernet key "
+                "(generate with: python -c \"from cryptography.fernet import Fernet; "
+                'print(Fernet.generate_key().decode())")'
+            ) from exc
+        return self
+
+    @model_validator(mode="after")
+    def default_redis_prefix(self) -> "Settings":
+        if not self.REDIS_KEY_PREFIX:
+            self.REDIS_KEY_PREFIX = f"gigveyro:{self.APP_ENV}"
+        return self
+
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
         if self.APP_ENV == "production":
@@ -100,6 +148,8 @@ class Settings(BaseSettings):
                 raise ValueError("DEBUG must be False in production")
             if "CHANGE_ME" in self.JWT_SECRET_KEY or len(self.JWT_SECRET_KEY) < 32:
                 raise ValueError("JWT_SECRET_KEY must be strong (>=32 chars) in production")
+            if "CHANGE_ME" in self.TOTP_ENCRYPTION_KEY:
+                raise ValueError("TOTP_ENCRYPTION_KEY must be a real generated key in production")
             if "*" in self.CORS_ALLOWED_ORIGINS:
                 raise ValueError("Wildcard CORS origins are forbidden in production")
             # Production Redis requirement
@@ -109,20 +159,31 @@ class Settings(BaseSettings):
                     "REDIS_URL points to localhost in production — "
                     "ensure this is intentional (e.g. Docker internal network)."
                 )
+            
+            # Realtime horizontal scaling check
+            if self.REALTIME_BROKER == "inmemory" and self.WEB_CONCURRENCY > 1:
+                raise ValueError(
+                    "REALTIME_BROKER must be set to 'redis' in production "
+                    "when WEB_CONCURRENCY > 1 (horizontal scaling)."
+                )
+
             # Production mock provider policy
             if not self.ALLOW_MOCK_PROVIDERS_IN_PRODUCTION:
                 if self.DEPOSIT_PROVIDER_TYPE == "mock":
-                    import logging
-                    logging.getLogger(__name__).warning(
-                        "DEPOSIT_PROVIDER_TYPE=mock in production. "
-                        "Set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True to silence this warning, "
-                        "or configure a real provider."
+                    raise ValueError(
+                        "DEPOSIT_PROVIDER_TYPE=mock is forbidden in production. "
+                        "Configure a real deposit provider or set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
                     )
                 if self.PAYOUT_PROVIDER_TYPE == "mock" and self.PAYOUT_ENABLED:
                     raise ValueError(
                         "PAYOUT_ENABLED=True with PAYOUT_PROVIDER_TYPE=mock is forbidden in production. "
                         "Configure a real payout provider or set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
                     )
+                if self.PAYOUT_ENABLED:
+                    if not self.PAYOUT_API_KEY or "mock" in self.PAYOUT_API_URL:
+                        raise ValueError(
+                            "PAYOUT_ENABLED=True requires real payout provider settings (PAYOUT_API_KEY and real PAYOUT_API_URL) in production"
+                        )
         return self
 
 

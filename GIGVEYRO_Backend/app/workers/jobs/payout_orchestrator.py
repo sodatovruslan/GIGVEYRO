@@ -47,14 +47,24 @@ async def process_approved_payouts(ctx: dict) -> dict:
 
     This job is a NO-OP when PAYOUT_ENABLED=False (the safe default).
     """
+    job_id = ctx.get("job_id", "unknown")
+    attempt = ctx.get("job_try", 1)
+
+    logger.info(
+        "event=worker.job.started job=%s job_id=%s attempt=%d",
+        JOB_NAME,
+        job_id,
+        attempt,
+    )
+
     if not settings.PAYOUT_ENABLED:
-        logger.debug(
-            "payout_orchestrator: PAYOUT_ENABLED=False — skipping. "
-            "Set PAYOUT_ENABLED=True in production to enable real payouts."
+        logger.info(
+            "event=worker.job.completed job=%s job_id=%s attempt=%d status=disabled reason=PAYOUT_ENABLED_False",
+            JOB_NAME,
+            job_id,
+            attempt,
         )
         return {"status": "disabled", "reason": "PAYOUT_ENABLED=False"}
-
-    logger.info("payout_orchestrator: PAYOUT_ENABLED=True — processing approved withdrawals.")
 
     try:
         async with AsyncSessionLocal() as session:
@@ -90,9 +100,6 @@ async def process_approved_payouts(ctx: dict) -> dict:
 
             for withdrawal in approved:
                 try:
-                    # mark_paid_by_owner calls the payout provider internally
-                    # and is guarded by PAYOUT_ENABLED check in ExternalPayoutAdapter
-                    # Use system account ID for automated processing
                     import uuid
                     SYSTEM_ACTOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
                     await service.mark_paid_by_owner(
@@ -101,24 +108,44 @@ async def process_approved_payouts(ctx: dict) -> dict:
                         comment="Automated payout via worker",
                     )
                     processed += 1
-                    logger.info(
-                        "payout_orchestrator: processed withdrawal %s", withdrawal.id
-                    )
                 except PayoutDisabledError:
-                    logger.error("payout_orchestrator: PayoutDisabledError — aborting batch.")
+                    logger.error(
+                        "event=worker.job.aborted job=%s job_id=%s attempt=%d reason=PayoutDisabledError",
+                        JOB_NAME,
+                        job_id,
+                        attempt,
+                    )
                     break
                 except Exception as exc:
                     failed += 1
                     logger.error(
-                        "payout_orchestrator: failed withdrawal %s: %s",
-                        withdrawal.id,
-                        exc,
+                        "event=worker.job.item_failed job=%s job_id=%s attempt=%d item_id=%s error=%s",
+                        JOB_NAME,
+                        job_id,
+                        attempt,
+                        str(withdrawal.id),
+                        str(exc),
                     )
 
         record_worker_success(JOB_NAME)
+        logger.info(
+            "event=worker.job.completed job=%s job_id=%s attempt=%d processed=%d failed=%d",
+            JOB_NAME,
+            job_id,
+            attempt,
+            processed,
+            failed,
+        )
         return {"status": "ok", "processed": processed, "failed": failed}
 
     except Exception as exc:
         record_worker_failure(JOB_NAME)
-        logger.error("payout_orchestrator: job failed: %s", exc, exc_info=True)
+        logger.error(
+            "event=worker.job.failed job=%s job_id=%s attempt=%d error=%s",
+            JOB_NAME,
+            job_id,
+            attempt,
+            str(exc),
+            exc_info=True,
+        )
         raise

@@ -66,13 +66,25 @@ class RedisRateLimiter:
 
     def __init__(self) -> None:
         self._script_sha: str | None = None
+        self._fallback_limiter: object | None = None
+
+    def _get_fallback_limiter(self) -> object:
+        if self._fallback_limiter is None:
+            from app.core.middleware import RateLimiter
+            self._fallback_limiter = RateLimiter()
+        return self._fallback_limiter
 
     async def is_rate_limited(self, key: str, max_requests: int, window_seconds: int) -> bool:
         """Returns True if the key is rate-limited, False if the request is allowed.
 
-        Falls back to ALLOW on Redis errors (fail-open) to avoid blocking
-        legitimate users due to infrastructure issues. Logs the error.
+        Handles Redis connection errors and uninitialised states by applying
+        the policy configured in settings.RATE_LIMIT_FAIL_MODE:
+          - "open": Fail open (allow request)
+          - "closed": Fail closed (block request / rate limit)
+          - "fallback": Fall back to a local in-memory sliding window rate limiter
         """
+        from app.core.config import settings
+
         try:
             client = get_redis()
             now = time.time()
@@ -82,10 +94,13 @@ class RedisRateLimiter:
             if self._script_sha is None:
                 self._script_sha = await client.script_load(_SLIDING_WINDOW_SCRIPT)
 
+            # Apply prefix namespace to the key
+            redis_key = f"{settings.REDIS_KEY_PREFIX}:ratelimit:{key}"
+
             result = await client.evalsha(
                 self._script_sha,
                 1,  # numkeys
-                f"ratelimit:{key}",
+                redis_key,
                 str(now),
                 str(window_seconds),
                 str(max_requests),
@@ -93,12 +108,19 @@ class RedisRateLimiter:
             )
             return bool(result)
 
-        except RuntimeError:
-            # Redis not initialised (e.g. tests without Redis)
-            logger.debug("Redis not initialised — rate limiter falling back to allow.")
-            return False
-        except RedisError as exc:
+        except (RuntimeError, RedisError) as exc:
             logger.warning(
-                "Redis rate limiter error for key %r — failing open: %s", key, exc
+                "Redis rate limiter error for key %r (mode=%s) — handling: %s",
+                key,
+                settings.RATE_LIMIT_FAIL_MODE,
+                exc,
             )
-            return False
+            if settings.RATE_LIMIT_FAIL_MODE == "closed":
+                return True
+            elif settings.RATE_LIMIT_FAIL_MODE == "fallback":
+                fallback = self._get_fallback_limiter()
+                # Call synchronous in-memory fallback
+                return fallback.is_rate_limited(key, max_requests, window_seconds)
+            else:  # "open"
+                return False
+

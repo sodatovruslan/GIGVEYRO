@@ -26,6 +26,18 @@ from app.infra.redis_client import redis_health_check
 router = APIRouter()
 
 
+@router.get("/health")
+async def health():
+    """Simple liveness/status check."""
+    return {"status": "ok"}
+
+
+@router.get("/health/live")
+async def health_live():
+    """Process liveness probe."""
+    return {"status": "alive"}
+
+
 @router.get("/health/db")
 async def health_db(response: Response, db: AsyncSession = Depends(get_db)):
     """Database connectivity check."""
