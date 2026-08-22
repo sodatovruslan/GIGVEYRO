@@ -202,6 +202,12 @@ async def test_challenge_token_cannot_access_protected_endpoints(client, make_ac
     response = await client.get("/auth/me", headers={"Authorization": f"Bearer {challenge_token}"})
     assert response.status_code == 401
 
+    realtime = await client.post(
+        "/api/v1/realtime/ticket",
+        headers={"Authorization": f"Bearer {challenge_token}"},
+    )
+    assert realtime.status_code == 401
+
 
 async def test_valid_totp_verify_creates_session(client, make_account):
     owner = await make_account(role=UserRole.OWNER, password="OwnerPass123")
@@ -220,6 +226,12 @@ async def test_valid_totp_verify_creates_session(client, make_account):
     body = response.json()
     assert "access_token" in body
     assert "refresh_token" in body
+
+    realtime = await client.post(
+        "/api/v1/realtime/ticket",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert realtime.status_code == 200
 
 
 async def test_wrong_totp_verify_rejected(client, make_account):

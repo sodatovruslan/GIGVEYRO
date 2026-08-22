@@ -1,4 +1,3 @@
-
 import pyotp
 
 from app.core.config import settings
@@ -95,6 +94,12 @@ async def test_setup_token_cannot_access_protected_endpoints(client, make_accoun
     response = await client.get("/auth/me", headers={"Authorization": f"Bearer {setup_token}"})
     assert response.status_code == 401
 
+    realtime = await client.post(
+        "/api/v1/realtime/ticket",
+        headers={"Authorization": f"Bearer {setup_token}"},
+    )
+    assert realtime.status_code == 401
+
 
 async def test_setup_token_authorizes_start_without_password(client, make_account, monkeypatch):
     monkeypatch.setattr(settings, "OWNER_2FA_REQUIRED", True)
@@ -145,6 +150,12 @@ async def test_setup_confirm_via_setup_token_issues_session_and_recovery_codes(
     me = await client.get("/auth/me", headers={"Authorization": f"Bearer {body['access_token']}"})
     assert me.status_code == 200
     assert me.json()["username"] == owner.username
+
+    realtime = await client.post(
+        "/api/v1/realtime/ticket",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert realtime.status_code == 200
 
 
 async def test_subsequent_login_after_forced_onboarding_requires_normal_2fa_challenge(
@@ -259,7 +270,5 @@ async def test_normal_owner_access_token_still_requires_password_for_voluntary_e
     monkeypatch.setattr(settings, "OWNER_2FA_REQUIRED", False)
     owner = await make_account(role=UserRole.OWNER, password="OwnerPass123")
 
-    response = await client.post(
-        "/auth/2fa/setup/start", json={}, headers=_auth_headers(owner)
-    )
+    response = await client.post("/auth/2fa/setup/start", json={}, headers=_auth_headers(owner))
     assert response.status_code == 401
