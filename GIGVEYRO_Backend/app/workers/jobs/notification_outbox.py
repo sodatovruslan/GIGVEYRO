@@ -110,6 +110,7 @@ async def process_notification_outbox(ctx: dict) -> dict:
                 oldest_age = (datetime.now(UTC) - oldest_created_at).total_seconds()
 
             set_outbox_metrics(pending_count, failed_count, oldest_age)
+            await session.commit()
 
         record_worker_success(JOB_NAME)
         logger.info(
