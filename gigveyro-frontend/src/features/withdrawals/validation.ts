@@ -16,3 +16,9 @@ export function mapWithdrawalFieldErrors(error: unknown, messages: { invalidAmou
   if (/amount must be a positive/i.test(apiError.message)) result.amount = messages.invalidAmount;
   return result;
 }
+
+export function isWithdrawalStateConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("message" in error)) return false;
+  const apiError = error as { message: string };
+  return /cannot (approve|reject|mark paid|cancel) withdrawal in status/i.test(apiError.message);
+}

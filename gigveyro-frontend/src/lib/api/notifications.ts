@@ -2,7 +2,7 @@ import { apiFetch } from "@/lib/api/client";
 import type { NotificationItem, NotificationPreferences, TelegramLinkCode } from "@/lib/api/types";
 
 export const notificationsApi = {
-  list: () => apiFetch<NotificationItem[]>("/notifications?limit=100&offset=0"),
+  list: (limit = 20, offset = 0) => apiFetch<NotificationItem[]>(`/notifications?limit=${limit}&offset=${offset}`),
   unreadCount: () => apiFetch<{ unread_count: number }>("/notifications/unread-count"),
   markRead: (id: string) => apiFetch<void>(`/notifications/${id}/read`, { method: "POST" }),
   markAllRead: () => apiFetch<{ updated_count: number }>("/notifications/read-all", { method: "POST" }),
