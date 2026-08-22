@@ -167,6 +167,57 @@ test("notification deep links only target routes that actually exist for the rec
   assert.equal(notificationLink({ type: "APPEAL_OPENED", payload: null }, "owner"), null);
 });
 
+test("unmatched-transfers panel is a real named export wired into the owner deposits page", async () => {
+  const panelSource = await source("src/components/deposits/unmatched-transfers-panel.tsx");
+  const pageSource = await source("src/components/deposits/deposits-page.tsx");
+  assert.match(panelSource, /export function UnmatchedTransfersPanel/);
+  assert.match(pageSource, /import \{ UnmatchedTransfersPanel \} from "\.\/unmatched-transfers-panel"/);
+  assert.match(pageSource, /<UnmatchedTransfersPanel \/>/);
+});
+
+test("owner and participant deal detail views fetch through the real backend routes, not mocked data", async () => {
+  const api = await source("src/lib/api/deals.ts");
+  const ownerDetailPage = await source("src/app/owner/deals/[id]/page.tsx");
+  const listPage = await source("src/components/deals/deals-page.tsx");
+  assert.match(api, /ownerGet: \(id: string\) => apiFetch<Deal>\(`\/owner\/deals\/\$\{id\}`\)/);
+  assert.match(api, /merchantGet: \(id: string\) => apiFetch<Deal>\(`\/merchant\/deals\/\$\{id\}`\)/);
+  assert.match(api, /userGet: \(id: string\) => apiFetch<Deal>\(`\/deals\/\$\{id\}`\)/);
+  assert.match(ownerDetailPage, /dealsApi\.ownerGet\(id\)/);
+  assert.match(listPage, /openDetail/);
+  assert.doesNotMatch(ownerDetailPage, /mock|fake/i);
+  assert.doesNotMatch(listPage, /mock|fake/i);
+});
+
+test("withdrawal detail is available to both owner and merchant through the real backend routes", async () => {
+  const ownerApi = await source("src/lib/api/owner-operations.ts");
+  const merchantApi = await source("src/lib/api/merchant.ts");
+  const detailGrid = await source("src/components/withdrawals/withdrawal-detail.tsx");
+  const ownerPage = await source("src/app/owner/withdrawals/page.tsx");
+  const merchantPage = await source("src/app/merchant/withdrawals/page.tsx");
+  assert.match(ownerApi, /getWithdrawal: \(id: string\) => apiFetch<MerchantWithdrawal>\(`\/owner\/withdrawals\/\$\{id\}`\)/);
+  assert.match(merchantApi, /getWithdrawal: \(id: string\) => apiFetch<MerchantWithdrawal>\(`\/merchant\/withdrawals\/\$\{id\}`\)/);
+  assert.match(ownerPage, /WithdrawalDetailGrid/);
+  assert.match(merchantPage, /WithdrawalDetailGrid/);
+  assert.doesNotMatch(detailGrid, /mock|fake/i);
+});
+
+test("appeals list resubscribes to the realtime invalidation key independent of the paginated query key", async () => {
+  const page = await source("src/components/appeals/appeals-page.tsx");
+  assert.match(page, /queryInvalidation\.subscribe\(`\$\{role\}-appeals`/);
+  assert.match(page, /appealsApi\.list\(owner, PAGE_SIZE, offset\)/);
+});
+
+test("business mutations refetch the list on failure so stale actions don't linger after a 409/conflict", async () => {
+  const dealsPage = await source("src/components/deals/deals-page.tsx");
+  const ownerDealDetail = await source("src/app/owner/deals/[id]/page.tsx");
+  const appealsPage = await source("src/components/appeals/appeals-page.tsx");
+  for (const page of [dealsPage, ownerDealDetail, appealsPage]) {
+    const catchBlockIndex = page.indexOf("catch");
+    assert.ok(catchBlockIndex > -1, "expected a catch block");
+    assert.match(page.slice(catchBlockIndex), /refetch\(\)/);
+  }
+});
+
 test("business list views paginate instead of hardcoding limit=100", async () => {
   const appealsApi = await source("src/lib/api/appeals.ts");
   const depositsApi = await source("src/lib/api/deposits.ts");
