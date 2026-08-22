@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
+from app.infra.redis_rate_limiter import RedisRateLimiter
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -46,6 +47,14 @@ class RateLimiter:
 
 in_memory_rate_limiter = RateLimiter()
 
+# Login is an auth-critical endpoint: a fully-open fail policy would mean a
+# Redis outage silently disables brute-force protection. "fallback" keeps a
+# bounded local sliding-window limiter enforcing the same numbers in that
+# case rather than going fully open or fully closed (which would lock out
+# every user - an availability risk of its own) - see SECURITY.md.
+_LOGIN_RATE_LIMIT_FAIL_MODE = "fallback"
+_login_rate_limiter = RedisRateLimiter()
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
@@ -54,11 +63,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if path == "/auth/login" and request.method == "POST":
             key = f"login:{client_ip}"
-            if in_memory_rate_limiter.is_rate_limited(
+            limited = await _login_rate_limiter.is_rate_limited(
                 key,
                 settings.LOGIN_RATE_LIMIT_REQUESTS,
                 settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
-            ):
+                fail_mode=_LOGIN_RATE_LIMIT_FAIL_MODE,
+            )
+            if limited:
                 return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     content={"detail": "Too many login attempts. Please try again later."},

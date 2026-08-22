@@ -70,20 +70,36 @@ class RedisRateLimiter:
 
     def _get_fallback_limiter(self) -> object:
         if self._fallback_limiter is None:
-            from app.core.middleware import RateLimiter
-            self._fallback_limiter = RateLimiter()
+            # Reuse the app-wide singleton (not a fresh instance) so it's
+            # covered by the same conftest.py autouse fixture that already
+            # resets app.core.middleware.in_memory_rate_limiter between
+            # tests - a throwaway instance here would accumulate hits across
+            # the whole pytest session instead.
+            from app.core.middleware import in_memory_rate_limiter
+            self._fallback_limiter = in_memory_rate_limiter
         return self._fallback_limiter
 
-    async def is_rate_limited(self, key: str, max_requests: int, window_seconds: int) -> bool:
+    async def is_rate_limited(
+        self,
+        key: str,
+        max_requests: int,
+        window_seconds: int,
+        fail_mode: str | None = None,
+    ) -> bool:
         """Returns True if the key is rate-limited, False if the request is allowed.
 
         Handles Redis connection errors and uninitialised states by applying
-        the policy configured in settings.RATE_LIMIT_FAIL_MODE:
+        the policy configured in settings.RATE_LIMIT_FAIL_MODE, or the
+        `fail_mode` override when a caller needs a different policy for a
+        specific endpoint (e.g. auth endpoints choosing "fallback" instead
+        of the general-purpose default):
           - "open": Fail open (allow request)
           - "closed": Fail closed (block request / rate limit)
           - "fallback": Fall back to a local in-memory sliding window rate limiter
         """
         from app.core.config import settings
+
+        effective_fail_mode = fail_mode or settings.RATE_LIMIT_FAIL_MODE
 
         try:
             client = get_redis()
@@ -112,12 +128,12 @@ class RedisRateLimiter:
             logger.warning(
                 "Redis rate limiter error for key %r (mode=%s) — handling: %s",
                 key,
-                settings.RATE_LIMIT_FAIL_MODE,
+                effective_fail_mode,
                 exc,
             )
-            if settings.RATE_LIMIT_FAIL_MODE == "closed":
+            if effective_fail_mode == "closed":
                 return True
-            elif settings.RATE_LIMIT_FAIL_MODE == "fallback":
+            elif effective_fail_mode == "fallback":
                 fallback = self._get_fallback_limiter()
                 # Call synchronous in-memory fallback
                 return fallback.is_rate_limited(key, max_requests, window_seconds)
