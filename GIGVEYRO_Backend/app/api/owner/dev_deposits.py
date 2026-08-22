@@ -75,7 +75,7 @@ async def simulate_deposit_transaction(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except InvalidTransactionError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
     except WalletNotFoundError as exc:
         # Every USER account gets a wallet at creation time (Stage 5/6), so

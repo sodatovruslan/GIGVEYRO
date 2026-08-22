@@ -49,7 +49,7 @@ def _wallet_error_response(exc: Exception) -> HTTPException:
     if isinstance(exc, WalletNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="wallet not found")
     if isinstance(exc, InvalidAmountError):
-        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     # InactiveAccountError / InsufficientBalanceError: the account/wallet is
     # a valid target, but its current state blocks this operation.
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
