@@ -1,45 +1,54 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useLocalizedError } from "@/features/i18n/use-localized-error";
+import { queryInvalidation } from "@/lib/query/invalidation";
 
 export function useApiQuery<T>(loader: () => Promise<T>, queryKey = "default", enabled = true) {
   const localizeError = useLocalizedError();
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
+  const loaderRef = useRef(loader);
+  const localizeErrorRef = useRef(localizeError);
+  const activeRef = useRef(false);
+  const requestRef = useRef(0);
 
-  async function load() {
+  useEffect(() => {
+    loaderRef.current = loader;
+    localizeErrorRef.current = localizeError;
+  }, [loader, localizeError]);
+
+  const load = useCallback(async () => {
     if (!enabled) return;
+    const request = ++requestRef.current;
     setLoading(true);
     setError("");
     try {
-      setData(await loader());
+      const result = await loaderRef.current();
+      if (activeRef.current && request === requestRef.current) setData(result);
     } catch (reason) {
-      setError(localizeError(reason));
+      if (activeRef.current && request === requestRef.current) {
+        setError(localizeErrorRef.current(reason));
+      }
     } finally {
-      setLoading(false);
+      if (activeRef.current && request === requestRef.current) setLoading(false);
     }
-  }
+  }, [enabled]);
 
   useEffect(() => {
-    if (!enabled) return;
-    let active = true;
-    void Promise.resolve()
-      .then(loader)
-      .then((result) => {
-        if (active) { setData(result); setError(""); setLoading(false); }
-      })
-      .catch((reason: unknown) => {
-        if (active) {
-          setError(localizeError(reason));
-          setLoading(false);
-        }
-      });
-    return () => { active = false; };
-  // The caller supplies a semantic key for each loader input.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, enabled]);
+    activeRef.current = true;
+    if (!enabled) {
+      return () => { activeRef.current = false; };
+    }
+    void Promise.resolve().then(load);
+    const unsubscribe = queryInvalidation.subscribe(queryKey, () => void load());
+    return () => {
+      activeRef.current = false;
+      requestRef.current += 1;
+      unsubscribe();
+    };
+  }, [enabled, load, queryKey]);
   return { data, loading, error, refetch: load, setData };
 }

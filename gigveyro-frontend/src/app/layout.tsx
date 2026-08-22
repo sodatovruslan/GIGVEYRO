@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AuthProvider } from "@/features/auth/auth-provider";
 import { ThemeProvider } from "@/features/theme/theme-provider";
 import { LocaleProvider } from "@/features/i18n/locale-provider";
+import { RealtimeProvider } from "@/features/realtime/realtime-provider";
 
 import "./globals.css";
 
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="ru" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: `${themeBootstrap};${localeBootstrap}` }} /></head>
       <body>
-        <LocaleProvider><ThemeProvider><AuthProvider>{children}</AuthProvider></ThemeProvider></LocaleProvider>
+        <LocaleProvider><ThemeProvider><AuthProvider><RealtimeProvider>{children}</RealtimeProvider></AuthProvider></ThemeProvider></LocaleProvider>
       </body>
     </html>
   );
