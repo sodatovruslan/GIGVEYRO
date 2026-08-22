@@ -10,12 +10,14 @@ from app.enums.account import UserRole
 from app.enums.deal import DealStatus
 from app.models.account import Account
 from app.models.deal import Deal
+from app.realtime.contracts import RealtimeEventName
 from app.repositories.account import AccountRepository
 from app.repositories.deal import DealRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.traffic import TrafficRepository
 from app.schemas.payment_requisite import mask_card_number
 from app.services.exchange_rate import ExchangeRateProvider
+from app.services.realtime import RealtimeEventService
 from app.services.wallet import WalletService
 
 USDT_QUANTUM = Decimal("0.00000001")
@@ -104,6 +106,7 @@ class DealService:
         account_repository: AccountRepository,
         wallet_service: WalletService,
         rate_provider: ExchangeRateProvider,
+        realtime_service: RealtimeEventService | None = None,
     ):
         self._deals = deal_repository
         self._requisites = requisite_repository
@@ -111,6 +114,7 @@ class DealService:
         self._accounts = account_repository
         self._wallet_service = wallet_service
         self._rate_provider = rate_provider
+        self._realtime = realtime_service
 
     # -- MERCHANT -------------------------------------------------------
 
@@ -138,7 +142,9 @@ class DealService:
             raise last_error
 
         transition_deal(deal, DealStatus.AVAILABLE)
-        return await self._deals.save(deal)
+        deal = await self._deals.save(deal)
+        await self._emit(RealtimeEventName.DEAL_CREATED, deal)
+        return deal
 
     async def get_for_merchant(self, merchant_id: uuid.UUID, deal_id: uuid.UUID) -> Deal:
         deal = await self._get_or_raise(deal_id)
@@ -149,7 +155,7 @@ class DealService:
     async def list_for_merchant(
         self, merchant_id: uuid.UUID, *, status: DealStatus | None, limit: int, offset: int
     ) -> tuple[list[Deal], int]:
-        await self._deals.expire_stale_available()
+        await self._expire_stale_available()
         items = await self._deals.list_for_merchant(
             merchant_id, status=status, limit=limit, offset=offset
         )
@@ -162,7 +168,7 @@ class DealService:
         self, account_id: uuid.UUID, *, limit: int, offset: int
     ) -> tuple[list[Deal], int]:
         await self._ensure_user_eligible(account_id)
-        await self._deals.expire_stale_available()
+        await self._expire_stale_available()
         items = await self._deals.list_available(limit=limit, offset=offset)
         total = await self._deals.count_available()
         return items, total
@@ -217,7 +223,9 @@ class DealService:
         deal.amount_usdt = amount_usdt
         transition_deal(deal, DealStatus.ACCEPTED)
 
-        return await self._deals.save(deal)
+        deal = await self._deals.save(deal)
+        await self._emit(RealtimeEventName.DEAL_ACCEPTED, deal)
+        return deal
 
     # -- STAGE 9: SETTLEMENT & RELEASE ----------------------------------
 
@@ -245,7 +253,9 @@ class DealService:
         )
 
         transition_deal(deal, DealStatus.COMPLETED)
-        return await self._deals.save(deal)
+        deal = await self._deals.save(deal)
+        await self._emit(RealtimeEventName.DEAL_COMPLETED, deal)
+        return deal
 
     async def cancel_or_release_deal(
         self, deal_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
@@ -269,7 +279,9 @@ class DealService:
         )
 
         transition_deal(deal, DealStatus.CANCELLED)
-        return await self._deals.save(deal)
+        deal = await self._deals.save(deal)
+        await self._emit(RealtimeEventName.DEAL_RELEASED, deal)
+        return deal
 
     # -- OWNER (read-only) ------------------------------------------------
 
@@ -289,7 +301,7 @@ class DealService:
         limit: int,
         offset: int,
     ) -> tuple[list[Deal], int]:
-        await self._deals.expire_stale_available()
+        await self._expire_stale_available()
         items = await self._deals.list_all(
             status=status,
             merchant_id=merchant_id,
@@ -322,7 +334,16 @@ class DealService:
         if deal.status == DealStatus.AVAILABLE and deal.expires_at <= datetime.now(UTC):
             transition_deal(deal, DealStatus.EXPIRED)
             await self._deals.save(deal)
+            await self._emit(RealtimeEventName.DEAL_EXPIRED, deal)
         return deal
+
+    async def _expire_stale_available(self) -> None:
+        for deal in await self._deals.expire_stale_available():
+            await self._emit(RealtimeEventName.DEAL_EXPIRED, deal)
+
+    async def _emit(self, event: RealtimeEventName, deal: Deal) -> None:
+        if self._realtime is not None:
+            await self._realtime.enqueue_deal(event, deal)
 
     async def _ensure_user_eligible(
         self, account_id: uuid.UUID, *, account: Account | None = None

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.deal import DealStatus
@@ -32,15 +32,18 @@ class DealRepository:
         await self._session.refresh(deal)
         return deal
 
-    async def expire_stale_available(self) -> None:
-        """Bulk-flip AVAILABLE deals past their expiry to EXPIRED. Called
-        before any listing/read path - there is no background worker in
-        Stage 7, expiration is purely lazy."""
-        await self._session.execute(
-            update(Deal)
+    async def expire_stale_available(self) -> list[Deal]:
+        """Lock and expire stale deals so callers can enqueue post-commit signals."""
+        result = await self._session.execute(
+            select(Deal)
             .where(Deal.status == DealStatus.AVAILABLE, Deal.expires_at <= func.now())
-            .values(status=DealStatus.EXPIRED)
+            .with_for_update(skip_locked=True)
         )
+        deals = list(result.scalars().all())
+        for deal in deals:
+            deal.status = DealStatus.EXPIRED
+        await self._session.flush()
+        return deals
 
     async def list_available(self, *, limit: int, offset: int) -> list[Deal]:
         result = await self._session.execute(

@@ -15,6 +15,7 @@ from app.repositories.deal import DealRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
+from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.traffic import TrafficRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.deal import DealListResponse, DealRead
@@ -25,6 +26,7 @@ from app.services.deal import (
     InvalidDealTransitionError,
 )
 from app.services.exchange_rate import ConfiguredExchangeRateProvider
+from app.services.realtime import RealtimeEventService
 from app.services.wallet import InsufficientBalanceError, WalletNotFoundError, WalletService
 
 router = APIRouter(
@@ -46,6 +48,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DealService:
         account_repository=account_repo,
         wallet_service=wallet_service,
         rate_provider=ConfiguredExchangeRateProvider(),
+        realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
     )
 
 
