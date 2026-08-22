@@ -41,6 +41,16 @@ if [ ! -f "${BACKUP_FILE}" ]; then
     exit 1
 fi
 
+if [[ ! "${TARGET_DB}" =~ ^[A-Za-z0-9_]+$ ]]; then
+    echo "ERROR: Target database name may contain only letters, numbers, and underscores."
+    exit 1
+fi
+
+if [[ ! "${POSTGRES_USER}" =~ ^[A-Za-z0-9_]+$ ]]; then
+    echo "ERROR: PostgreSQL user name may contain only letters, numbers, and underscores."
+    exit 1
+fi
+
 echo "[restore] Restoring from: ${BACKUP_FILE}"
 echo "[restore] Target database: ${TARGET_DB} @ ${POSTGRES_HOST}:${POSTGRES_PORT}"
 echo ""
@@ -54,14 +64,14 @@ psql \
     --port="${POSTGRES_PORT}" \
     --username="${POSTGRES_USER}" \
     --dbname="postgres" \
-    --command="DROP DATABASE IF EXISTS ${TARGET_DB};"
+    --command="DROP DATABASE IF EXISTS \"${TARGET_DB}\";"
 
 psql \
     --host="${POSTGRES_HOST}" \
     --port="${POSTGRES_PORT}" \
     --username="${POSTGRES_USER}" \
     --dbname="postgres" \
-    --command="CREATE DATABASE ${TARGET_DB} OWNER ${POSTGRES_USER};"
+    --command="CREATE DATABASE \"${TARGET_DB}\" OWNER \"${POSTGRES_USER}\";"
 
 echo "[restore] Database created. Restoring data..."
 
