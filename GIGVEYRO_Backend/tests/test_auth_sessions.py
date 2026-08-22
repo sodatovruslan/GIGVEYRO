@@ -46,9 +46,7 @@ async def test_refresh_rotates_and_rejects_old_token(client, make_account):
     )
     assert first_refresh.status_code == 200
 
-    replay = await client.post(
-        "/auth/refresh", json={"refresh_token": login_body["refresh_token"]}
-    )
+    replay = await client.post("/auth/refresh", json={"refresh_token": login_body["refresh_token"]})
     assert replay.status_code == 409
 
 
@@ -61,9 +59,7 @@ async def test_reuse_detection_revokes_session(client, make_account, db_session)
     )
     assert rotated.status_code == 200
 
-    replay = await client.post(
-        "/auth/refresh", json={"refresh_token": login_body["refresh_token"]}
-    )
+    replay = await client.post("/auth/refresh", json={"refresh_token": login_body["refresh_token"]})
     assert replay.status_code == 409
 
     # The whole family is revoked as a reaction, so even the token issued by
@@ -109,10 +105,14 @@ async def test_logout_revokes_session(client, make_account, db_session):
     )
     assert response.status_code == 204
 
-    replay = await client.post(
-        "/auth/refresh", json={"refresh_token": login_body["refresh_token"]}
-    )
+    replay = await client.post("/auth/refresh", json={"refresh_token": login_body["refresh_token"]})
     assert replay.status_code == 401
+
+    ticket = await client.post(
+        "/api/v1/realtime/ticket",
+        headers={"Authorization": f"Bearer {login_body['access_token']}"},
+    )
+    assert ticket.status_code == 401
 
 
 async def test_logout_is_idempotent(client, make_account):
@@ -177,9 +177,7 @@ async def test_revoke_own_session(client, make_account):
     response = await client.delete(f"/auth/sessions/{session_id}", headers=_auth_headers(account))
     assert response.status_code == 204
 
-    replay = await client.post(
-        "/auth/refresh", json={"refresh_token": login_body["refresh_token"]}
-    )
+    replay = await client.post("/auth/refresh", json={"refresh_token": login_body["refresh_token"]})
     assert replay.status_code == 401
 
 
@@ -198,9 +196,7 @@ async def test_password_reset_revokes_sessions(client, make_account):
     )
     assert response.status_code == 204
 
-    replay = await client.post(
-        "/auth/refresh", json={"refresh_token": login_body["refresh_token"]}
-    )
+    replay = await client.post("/auth/refresh", json={"refresh_token": login_body["refresh_token"]})
     assert replay.status_code == 401
 
 
@@ -209,14 +205,10 @@ async def test_block_revokes_sessions(client, make_account):
     target = await make_account(password="CorrectPassword123")
     login_body = await _login(client, target)
 
-    response = await client.post(
-        f"/owner/accounts/{target.id}/block", headers=_auth_headers(owner)
-    )
+    response = await client.post(f"/owner/accounts/{target.id}/block", headers=_auth_headers(owner))
     assert response.status_code == 200
 
-    replay = await client.post(
-        "/auth/refresh", json={"refresh_token": login_body["refresh_token"]}
-    )
+    replay = await client.post("/auth/refresh", json={"refresh_token": login_body["refresh_token"]})
     assert replay.status_code == 401
 
 

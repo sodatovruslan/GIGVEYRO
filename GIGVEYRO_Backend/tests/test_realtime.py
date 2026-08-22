@@ -8,7 +8,13 @@ from starlette.datastructures import Headers
 
 from app.api.realtime import _authenticate
 from app.core.config import settings
-from app.core.security import TokenError, TokenType, create_access_token, decode_token
+from app.core.security import (
+    TokenError,
+    TokenType,
+    create_access_token,
+    create_realtime_ticket,
+    decode_token,
+)
 from app.enums.account import UserRole
 from app.enums.deal import DealStatus
 from app.models.deal import Deal
@@ -101,6 +107,19 @@ async def test_websocket_auth_rejects_access_token(db_session, make_account):
     assert await _authenticate(websocket, db_session) is None  # type: ignore[arg-type]
 
 
+async def test_websocket_auth_rejects_expired_realtime_ticket(db_session, make_account):
+    account = await make_account()
+    ticket = create_realtime_ticket(account.id, account.role.value, expires_seconds=-1)
+    websocket = FakeWebSocket(
+        {
+            "origin": settings.CORS_ALLOWED_ORIGINS[0],
+            "sec-websocket-protocol": (f"gigveyro.realtime.v1, gigveyro.ticket.{ticket}"),
+        }
+    )
+
+    assert await _authenticate(websocket, db_session) is None  # type: ignore[arg-type]
+
+
 async def test_broker_routes_privately_and_supports_multiple_tabs():
     broker = InMemoryRealtimeBroker()
     user_id = uuid.uuid4()
@@ -163,9 +182,7 @@ async def test_deal_creation_enqueues_transactional_event(client, db_session, ma
     assert response.status_code == 201
     deal_id = uuid.UUID(response.json()["id"])
     entry = (
-        await db_session.execute(
-            select(RealtimeOutbox).where(RealtimeOutbox.entity_id == deal_id)
-        )
+        await db_session.execute(select(RealtimeOutbox).where(RealtimeOutbox.entity_id == deal_id))
     ).scalar_one()
     assert entry.event == RealtimeEventName.DEAL_CREATED.value
     assert entry.recipient_account_ids == [str(merchant.id)]
@@ -199,9 +216,7 @@ async def test_accept_and_lazy_expiry_enqueue_events(
 
     assert accept_response.status_code == 200
     assert list_response.status_code == 200
-    assert await _event_names(db_session, accepted.id) == [
-        RealtimeEventName.DEAL_ACCEPTED.value
-    ]
+    assert await _event_names(db_session, accepted.id) == [RealtimeEventName.DEAL_ACCEPTED.value]
     assert await _event_names(db_session, expired.id) == [RealtimeEventName.DEAL_EXPIRED.value]
 
 
@@ -240,9 +255,7 @@ async def test_owner_settlement_enqueues_terminal_event(
     assert await _event_names(db_session, deal.id) == [expected_event.value]
 
 
-async def test_appeal_open_enqueues_disputed_event(
-    client, db_session, make_account, make_deal
-):
+async def test_appeal_open_enqueues_disputed_event(client, db_session, make_account, make_deal):
     merchant = await make_account(role=UserRole.MERCHANT)
     user = await make_account(role=UserRole.USER)
     deal = await make_deal(
