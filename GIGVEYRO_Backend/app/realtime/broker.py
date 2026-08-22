@@ -140,11 +140,20 @@ class RedisRealtimeBroker:
         self._lock = asyncio.Lock()
         self._listener_task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
+        self._ready_event = asyncio.Event()
 
     async def startup(self) -> None:
         """Start background pub/sub listener task."""
+        if self._listener_task is not None and not self._listener_task.done():
+            return
         self._stop_event.clear()
+        self._ready_event.clear()
         self._listener_task = asyncio.create_task(self._listen_loop())
+        try:
+            await asyncio.wait_for(self._ready_event.wait(), timeout=5)
+        except TimeoutError as exc:
+            await self.shutdown()
+            raise RuntimeError("Redis realtime subscription did not become ready") from exc
 
     async def shutdown(self) -> None:
         """Stop background pub/sub listener task."""
@@ -156,6 +165,7 @@ class RedisRealtimeBroker:
             except asyncio.CancelledError:
                 pass
             self._listener_task = None
+        self._ready_event.clear()
 
     async def _listen_loop(self) -> None:
         """Background listener loop subscribing to Redis channel."""
@@ -176,6 +186,7 @@ class RedisRealtimeBroker:
                 pubsub = client.pubsub()
                 async with pubsub as ps:
                     await ps.subscribe(channel_name)
+                    self._ready_event.set()
                     logger.debug("Subscribed to Redis channel: %s", channel_name)
 
                     while not self._stop_event.is_set():
@@ -207,9 +218,11 @@ class RedisRealtimeBroker:
                         except Exception as exc:
                             logger.error("Failed to parse pubsub message: %s", exc)
             except RedisError as exc:
+                self._ready_event.clear()
                 logger.warning("Redis pub/sub disconnect: %s. Reconnecting in 5s...", exc)
                 await asyncio.sleep(5)
             except Exception as exc:
+                self._ready_event.clear()
                 logger.error("Unexpected error in pub/sub listener loop: %s", exc)
                 await asyncio.sleep(5)
 

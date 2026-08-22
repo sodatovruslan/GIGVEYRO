@@ -71,6 +71,9 @@ async def test_redis_broker_mock_pubsub_delivery():
     # Run broker loop with mocked get_redis
     with patch("app.infra.redis_client.get_redis", return_value=mock_redis):
         await broker.startup()
+        listener_task = broker._listener_task
+        await broker.startup()
+        assert broker._listener_task is listener_task
         # Allow the background task to run one iteration
         await asyncio.sleep(0.1)
         await broker.shutdown()
