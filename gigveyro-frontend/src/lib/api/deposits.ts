@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { Deposit, DepositStatus, Paginated } from "@/lib/api/types";
+import type { Deposit, DepositStatus, Paginated, UnmatchedTransfer } from "@/lib/api/types";
 
 export interface DepositOwnerFilters {
   search?: string;
@@ -17,12 +17,35 @@ function queryString(values: Record<string, string | number | undefined>) {
 }
 
 export const depositsApi = {
-  list: (owner: boolean, status?: DepositStatus, filters: DepositOwnerFilters = {}) => apiFetch<Paginated<Deposit>>(`${owner ? "/owner" : ""}/deposits?${queryString({
+  list: (owner: boolean, status?: DepositStatus, filters: DepositOwnerFilters = {}, limit = 20, offset = 0) => apiFetch<Paginated<Deposit>>(`${owner ? "/owner" : ""}/deposits?${queryString({
     status,
-    limit: 100,
-    offset: 0,
+    limit,
+    offset,
     ...(owner ? { search: filters.search, tx_hash: filters.txHash, date_from: filters.dateFrom, date_to: filters.dateTo } : {}),
   })}`),
   get: (owner: boolean, id: string) => apiFetch<Deposit>(`${owner ? "/owner" : ""}/deposits/${id}`),
   create: (amount: string) => apiFetch<Deposit>("/deposits", { method: "POST", body: { amount } }),
+};
+
+export interface UnmatchedTransferFilters {
+  status?: "MATCHED" | "AMBIGUOUS" | "UNMATCHED";
+  txHash?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minAmount?: string;
+  maxAmount?: string;
+}
+
+export const unmatchedTransfersApi = {
+  list: (filters: UnmatchedTransferFilters = {}, limit = 20, offset = 0) => apiFetch<Paginated<UnmatchedTransfer>>(`/owner/deposits/unmatched?${queryString({
+    status: filters.status,
+    tx_hash: filters.txHash,
+    date_from: filters.dateFrom,
+    date_to: filters.dateTo,
+    min_amount: filters.minAmount,
+    max_amount: filters.maxAmount,
+    limit,
+    offset,
+  })}`),
+  get: (id: string) => apiFetch<UnmatchedTransfer>(`/owner/deposits/unmatched/${id}`),
 };

@@ -26,6 +26,7 @@
     "back": "Back",
     "next": "Next",
     "fromTotal": "{from}–{to} of {total}",
+    "pageOf": "Page {page}",
     "network": "Network",
     "address": "Address",
     "validUntil": "Valid until",
@@ -323,7 +324,20 @@
     "detailTitle": "Deposit details",
     "depositId": "Deposit ID",
     "depositAddress": "Deposit address",
-    "expiresAt": "Expires at"
+    "expiresAt": "Expires at",
+    "unmatchedTitle": "Unmatched transfers",
+    "unmatchedSubtitle": "On-chain transfers the correlation scanner could not safely match to a deposit intent",
+    "unmatchedEmpty": "No unmatched transfers",
+    "unmatchedDetailTitle": "Transfer details",
+    "minAmount": "Min amount",
+    "maxAmount": "Max amount",
+    "fromAddress": "From address",
+    "toAddress": "To address",
+    "correlation": {
+      "UNMATCHED": "Unmatched",
+      "AMBIGUOUS": "Ambiguous",
+      "MATCHED": "Matched"
+    }
   },
   "withdrawals": {
     "eyebrow": "PAYOUTS",
@@ -352,7 +366,13 @@
     "cancelFailed": "Failed to cancel request.",
     "actionFailed": "Failed to update request.",
     "trc20Address": "TRC20 address",
-    "validation": { "amount": "Enter a valid positive amount.", "destination": "Check the destination details.", "trc20": "Invalid TRC20 address.", "comment": "Check the comment length." }
+    "staleStateError": "This withdrawal was already updated by someone else. The list has been refreshed.",
+    "validation": {
+      "amount": "Enter a valid positive amount.",
+      "destination": "Check the destination details.",
+      "trc20": "Invalid TRC20 address.",
+      "comment": "Check the comment length."
+    }
   },
   "appeals": {
     "eyebrow": "DISPUTE RESOLUTION",

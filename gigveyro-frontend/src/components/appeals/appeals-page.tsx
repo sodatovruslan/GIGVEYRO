@@ -11,8 +11,11 @@ import { appealsApi } from "@/lib/api/appeals";
 import { dealsApi } from "@/lib/api/deals";
 import type { Appeal, AppealReason, UserRole } from "@/lib/api/types";
 import { useApiQuery } from "@/lib/hooks/use-api-query";
+import { Pager } from "@/components/ui/pager";
 
 import styles from "./appeals-page.module.css";
+
+const PAGE_SIZE = 20;
 
 export function AppealsPage({ role }: { role: UserRole }) {
   const t = useTranslations("appeals");
@@ -21,7 +24,8 @@ export function AppealsPage({ role }: { role: UserRole }) {
   const format = useAppFormat();
   const localizeError = useLocalizedError();
   const owner = role === "owner";
-  const query = useApiQuery(() => appealsApi.list(owner), `${role}-appeals`);
+  const [offset, setOffset] = useState(0);
+  const query = useApiQuery(() => appealsApi.list(owner, PAGE_SIZE, offset), `${role}-appeals:${offset}`);
   const deals = useApiQuery(role === "merchant" ? dealsApi.merchantList : dealsApi.userList, `${role}-appeal-deals`, !owner);
   const [dialog, setDialog] = useState<"open" | "resolve" | null>(null);
   const [selected, setSelected] = useState<Appeal | null>(null);
@@ -49,6 +53,7 @@ export function AppealsPage({ role }: { role: UserRole }) {
 
   return <section><div className={styles.heading}><div><span>{t("eyebrow")}</span><h1>{t("title")}</h1><p>{owner ? t("subtitleOwner") : t("subtitleParticipant")}</p></div>{!owner && <button onClick={() => { setDialog("open"); setDealId(deals.data?.items[0]?.id || ""); setFieldErrors({}); setError(""); }}>＋ {t("open")}</button>}</div>{error && <div className={styles.error}>{error}</div>}
     <div className={styles.list}>{query.loading ? <div className={styles.state}>{t("loading")}</div> : query.error ? <div className={`${styles.state} ${styles.errorText}`}>{query.error}</div> : !query.data?.items.length ? <div className={styles.state}>{t("empty")}</div> : query.data.items.map((item) => <article key={item.id}><div className={styles.appealTop}><div><span>{item.public_id}</span><small>{format.dateTime(item.created_at)}</small></div><i className={styles[item.status]}>{labels.appeal(item.status)}</i></div><h2>{labels.appealReason(item.reason_code)}</h2><p>{item.message}</p><dl><div><dt>{t("deal")}</dt><dd>{item.deal_id.slice(0, 8)}…</dd></div><div><dt>{t("openedBy")}</dt><dd>{labels.role(item.opened_by_role)}</dd></div><div><dt>{t("resolution")}</dt><dd>{item.resolution === "settle_to_merchant" ? t("settleMerchant") : item.resolution === "release_to_user" ? t("releaseUser") : "—"}</dd></div></dl>{item.owner_note && <blockquote>{item.owner_note}</blockquote>}<div className={styles.actions}>{owner && item.status === "open" && <button onClick={() => void mutate(() => appealsApi.review(item.id, ""))}>{t("review")}</button>}{owner && ["open", "under_review"].includes(item.status) && <button onClick={() => { setSelected(item); setDialog("resolve"); setMessage(""); setFieldErrors({}); setError(""); }}>{t("resolve")}</button>}{!owner && ["open", "under_review"].includes(item.status) && <button onClick={() => void mutate(() => appealsApi.cancel(item.id))}>{t("cancelAction")}</button>}</div></article>)}</div>
+    {query.data && <Pager offset={offset} limit={PAGE_SIZE} itemCount={query.data.items.length} total={query.data.total} onPage={setOffset} />}
     {dialog === "open" && <Modal title={t("openTitle")} close={() => setDialog(null)}><form onSubmit={openAppeal}><label>{t("deal")}<select required aria-invalid={Boolean(fieldErrors.deal_id)} value={dealId} onChange={(event) => { setDealId(event.target.value); setFieldErrors((value) => ({ ...value, deal_id: undefined })); }}><option value="">{t("chooseDeal")}</option>{deals.data?.items.map((deal) => <option value={deal.id} key={deal.id}>{deal.public_id} · {deal.amount_tjs} TJS · {labels.deal(deal.status)}</option>)}</select>{fieldErrors.deal_id && <span className={styles.fieldError}>{fieldErrors.deal_id}</span>}</label><label>{t("reason")}<select value={reason} onChange={(event) => setReason(event.target.value as AppealReason)}>{(["payment_not_received", "wrong_amount", "payment_proof_issue", "timeout_dispute", "other"] as AppealReason[]).map((value) => <option value={value} key={value}>{labels.appealReason(value)}</option>)}</select></label><label>{t("message")}<textarea required minLength={5} maxLength={2000} aria-invalid={Boolean(fieldErrors.message)} value={message} onChange={(event) => { setMessage(event.target.value); setFieldErrors((value) => ({ ...value, message: undefined })); }} />{fieldErrors.message && <span className={styles.fieldError}>{fieldErrors.message}</span>}</label>{error && <div className={styles.error}>{error}</div>}<FormActions saving={saving} close={() => setDialog(null)} /></form></Modal>}
     {dialog === "resolve" && <Modal title={t("resolveTitle", { id: selected?.public_id ?? "" })} close={() => setDialog(null)}><form onSubmit={resolveAppeal}><label>{t("resolution")}<select value={resolution} onChange={(event) => setResolution(event.target.value as typeof resolution)}><option value="release_to_user">{t("releaseUser")}</option><option value="settle_to_merchant">{t("settleMerchant")}</option></select></label><label>{t("ownerNote")}<textarea required minLength={3} maxLength={2000} aria-invalid={Boolean(fieldErrors.owner_note)} value={message} onChange={(event) => { setMessage(event.target.value); setFieldErrors((value) => ({ ...value, owner_note: undefined })); }} />{fieldErrors.owner_note && <span className={styles.fieldError}>{fieldErrors.owner_note}</span>}</label>{error && <div className={styles.error}>{error}</div>}<FormActions saving={saving} close={() => setDialog(null)} /></form></Modal>}
   </section>;

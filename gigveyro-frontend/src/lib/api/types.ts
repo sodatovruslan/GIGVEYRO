@@ -205,6 +205,19 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
+export type CorrelationStatus = "MATCHED" | "AMBIGUOUS" | "UNMATCHED";
+export interface UnmatchedTransfer {
+  id: string;
+  tx_hash: string;
+  from_address: string;
+  to_address: string;
+  amount: string;
+  asset_contract: string;
+  correlation_status: CorrelationStatus;
+  reason: string;
+  created_at: string;
+}
+
 export type DepositStatus = "waiting" | "detected" | "confirming" | "confirmed" | "credited" | "expired" | "failed" | "amount_mismatch";
 export interface Deposit {
   id: string;

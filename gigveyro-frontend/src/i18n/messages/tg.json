@@ -26,6 +26,7 @@
     "back": "Қафо",
     "next": "Баъдӣ",
     "fromTotal": "{from}–{to} аз {total}",
+    "pageOf": "Саҳифаи {page}",
     "network": "Шабака",
     "address": "Суроға",
     "validUntil": "Муҳлат то",
@@ -323,7 +324,20 @@
     "detailTitle": "Тафсилоти депозит",
     "depositId": "ID-и депозит",
     "depositAddress": "Суроғаи депозит",
-    "expiresAt": "Мӯҳлат"
+    "expiresAt": "Мӯҳлат",
+    "unmatchedTitle": "Интиқолҳои номувофиқ",
+    "unmatchedSubtitle": "Интиқолҳои занҷира, ки сканер натавонист бехатар бо депозит мувофиқат кунад",
+    "unmatchedEmpty": "Интиқоли номувофиқ нест",
+    "unmatchedDetailTitle": "Тафсилоти интиқол",
+    "minAmount": "Маблағи ҳадди ақал",
+    "maxAmount": "Маблағи ҳадди аксар",
+    "fromAddress": "Суроғаи фиристанда",
+    "toAddress": "Суроғаи қабулкунанда",
+    "correlation": {
+      "UNMATCHED": "Номувофиқ",
+      "AMBIGUOUS": "Дучанда",
+      "MATCHED": "Мувофиқ"
+    }
   },
   "withdrawals": {
     "eyebrow": "ПАРДОХТҲО",
@@ -352,7 +366,13 @@
     "cancelFailed": "Дархост бекор нашуд.",
     "actionFailed": "Дархост тағйир наёфт.",
     "trc20Address": "Суроғаи TRC20",
-    "validation": { "amount": "Маблағи мусбати дурустро ворид кунед.", "destination": "Маълумоти таъинотро санҷед.", "trc20": "Суроғаи TRC20 нодуруст аст.", "comment": "Дарозии шарҳро санҷед." }
+    "staleStateError": "Ин дархост аллакай аз ҷониби дигар корбар навсозӣ шудааст. Рӯйхат навсозӣ шуд.",
+    "validation": {
+      "amount": "Маблағи мусбати дурустро ворид кунед.",
+      "destination": "Маълумоти таъинотро санҷед.",
+      "trc20": "Суроғаи TRC20 нодуруст аст.",
+      "comment": "Дарозии шарҳро санҷед."
+    }
   },
   "appeals": {
     "eyebrow": "ҲАЛЛИ БАҲСҲО",
