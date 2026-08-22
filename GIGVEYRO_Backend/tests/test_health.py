@@ -55,3 +55,19 @@ async def test_health_db_failure():
     assert "gigveyro_user" not in response.text
     assert "CHANGE_ME" not in response.text
     assert "Traceback" not in response.text
+
+
+async def test_lifespan_startup_and_health_endpoints():
+    from app.main import app
+    from httpx import ASGITransport, AsyncClient
+
+    transport = ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            res_live = await client.get("/health/live")
+            res_ready = await client.get("/health/ready")
+
+    assert res_live.status_code == 200
+    assert res_live.json() == {"status": "alive"}
+    assert res_ready.status_code in (200, 503)
+

@@ -40,7 +40,7 @@ from app.infra.logging_config import configure_logging
 from app.infra.metrics import setup_metrics
 from app.infra.redis_client import close_redis, init_redis
 from app.infra.sentry import init_sentry
-from app.realtime.runtime import realtime_dispatcher
+from app.realtime.runtime import realtime_broker, realtime_dispatcher
 
 # Configure structured logging before anything else
 configure_logging(app_env=settings.APP_ENV, log_level="DEBUG" if settings.DEBUG else "INFO")
