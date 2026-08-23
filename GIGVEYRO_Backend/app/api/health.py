@@ -94,6 +94,7 @@ async def health_diagnostics():
     Consider protecting this endpoint in production (e.g. internal network only).
     """
     from app.infra.redis_client import get_redis
+    from app.services.market_data.runtime import get_market_diagnostics
     from app.services.provider_factory import get_provider_diagnostics
 
     redis_client = get_redis()
@@ -110,6 +111,7 @@ async def health_diagnostics():
         "app_env": settings.APP_ENV,
         "payout_enabled": settings.PAYOUT_ENABLED,
         "providers": get_provider_diagnostics(),
+        "market_data": await get_market_diagnostics(),
         "redis": await redis_health_check(),
         "docs_enabled": settings.DOCS_ENABLED,
         "rate_limiting": {

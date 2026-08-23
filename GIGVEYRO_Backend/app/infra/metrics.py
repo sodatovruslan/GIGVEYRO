@@ -29,6 +29,7 @@ try:
         REGISTRY,
         Counter,
         Gauge,
+        Histogram,
         generate_latest,
     )
 
@@ -87,6 +88,31 @@ if _PROMETHEUS_AVAILABLE:
         "Total external provider errors",
         labelnames=["provider"],  # e.g. exchange_rate, payout, trongrid
     )
+    MARKET_PROVIDER_REQUESTS = Counter(
+        "gigveyro_market_provider_requests_total",
+        "Public market provider requests",
+        labelnames=["provider", "status"],
+    )
+    MARKET_PROVIDER_LATENCY = Histogram(
+        "gigveyro_market_provider_latency_seconds",
+        "Public market provider request latency",
+        labelnames=["provider"],
+    )
+    MARKET_PROVIDER_FAILOVERS = Counter(
+        "gigveyro_market_provider_failovers_total",
+        "Public market provider failovers",
+        labelnames=["from_provider", "to_provider"],
+    )
+    MARKET_PROVIDER_CACHE_HITS = Counter(
+        "gigveyro_market_provider_cache_hits_total",
+        "Public market provider cache hits",
+        labelnames=["provider"],
+    )
+    MARKET_PROVIDER_QUOTE_AGE = Gauge(
+        "gigveyro_market_provider_quote_age_seconds",
+        "Age of the latest public market quote",
+        labelnames=["provider"],
+    )
 else:
     # Stub objects so callers don't need to guard every usage
     class _NoopMetric:
@@ -106,6 +132,11 @@ else:
     DEPOSIT_EVENTS_UNMATCHED = _NoopMetric()  # type: ignore[assignment]
     WORKER_JOBS = _NoopMetric()  # type: ignore[assignment]
     PROVIDER_ERRORS = _NoopMetric()  # type: ignore[assignment]
+    MARKET_PROVIDER_REQUESTS = _NoopMetric()  # type: ignore[assignment]
+    MARKET_PROVIDER_LATENCY = _NoopMetric()  # type: ignore[assignment]
+    MARKET_PROVIDER_FAILOVERS = _NoopMetric()  # type: ignore[assignment]
+    MARKET_PROVIDER_CACHE_HITS = _NoopMetric()  # type: ignore[assignment]
+    MARKET_PROVIDER_QUOTE_AGE = _NoopMetric()  # type: ignore[assignment]
 
 
 # ── FastAPI instrumentator setup ───────────────────────────────────────────
@@ -179,6 +210,25 @@ def record_deposit_scan_error() -> None:
 def record_provider_error(provider: str) -> None:
     """Record an external provider error."""
     PROVIDER_ERRORS.labels(provider=provider).inc()
+
+
+def record_market_request(provider: str, status: str, latency_seconds: float) -> None:
+    MARKET_PROVIDER_REQUESTS.labels(provider=provider, status=status).inc()
+    MARKET_PROVIDER_LATENCY.labels(provider=provider).observe(latency_seconds)
+
+
+def record_market_failover(from_provider: str, to_provider: str) -> None:
+    MARKET_PROVIDER_FAILOVERS.labels(
+        from_provider=from_provider, to_provider=to_provider
+    ).inc()
+
+
+def record_market_cache_hit(provider: str) -> None:
+    MARKET_PROVIDER_CACHE_HITS.labels(provider=provider).inc()
+
+
+def observe_market_quote_age(provider: str, age_seconds: float) -> None:
+    MARKET_PROVIDER_QUOTE_AGE.labels(provider=provider).set(age_seconds)
 
 
 def set_outbox_pending(count: int) -> None:

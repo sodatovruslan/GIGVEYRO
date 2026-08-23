@@ -244,9 +244,31 @@ export interface IntegrationDiagnostics {
   };
   safety: {
     payout_enabled: boolean;
+    trading_enabled: boolean;
     usdt_contract_address: string;
     required_confirmations: number;
   };
+  market_data: {
+    primary: "binance" | "bybit";
+    secondary: "binance" | "bybit";
+    active_provider: "binance" | "bybit" | null;
+    status: "connected" | "degraded" | "unavailable";
+    cache: "redis" | "direct" | "unavailable";
+    symbol: string;
+    deviation_bps: string | null;
+    providers: Record<"binance" | "bybit", MarketProviderDiagnostic>;
+  };
+}
+
+export interface MarketProviderDiagnostic {
+  status: "connected" | "degraded" | "unavailable";
+  public_api: boolean;
+  read_only: boolean;
+  base_url: string;
+  latency_ms: number | null;
+  last_success_at: string | null;
+  role: "primary" | "fallback";
+  circuit: "open" | "closed";
 }
 
 export interface AuditLogEntry {

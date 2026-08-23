@@ -54,4 +54,8 @@ def get_provider_diagnostics() -> dict:
         "allow_mock_in_production": settings.ALLOW_MOCK_PROVIDERS_IN_PRODUCTION,
         "trongrid_configured": bool(settings.TRONGRID_API_KEY),
         "payout_api_configured": bool(settings.PAYOUT_API_KEY),
+        "market_data_primary": settings.MARKET_DATA_PRIMARY,
+        "market_data_secondary": settings.MARKET_DATA_SECONDARY,
+        "market_data_symbols": settings.MARKET_DATA_SYMBOLS,
+        "market_data_public_only": True,
     }

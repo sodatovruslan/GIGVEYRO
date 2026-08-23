@@ -65,6 +65,20 @@ class Settings(BaseSettings):
     EXCHANGE_RATE_MAX_RETRIES: int = 3
     EXCHANGE_RATE_CACHE_TTL_SECONDS: int = 60
 
+    # Public/read-only exchange market data (observation only; never used for Deal rates)
+    BINANCE_PUBLIC_BASE_URL: str = "https://data-api.binance.vision"
+    BYBIT_PUBLIC_BASE_URL: str = "https://api.bybit.com"
+    MARKET_DATA_PRIMARY: str = "binance"
+    MARKET_DATA_SECONDARY: str = "bybit"
+    MARKET_DATA_SYMBOLS: list[str] = ["BTCUSDT", "ETHUSDT"]
+    MARKET_DATA_CACHE_TTL_SECONDS: int = 10
+    MARKET_DATA_TIMEOUT_SECONDS: float = 5.0
+    MARKET_DATA_MAX_RETRIES: int = 2
+    MARKET_DATA_MAX_CONCURRENCY: int = 4
+    MARKET_MAX_DEVIATION_BPS: int = 100
+    MARKET_CIRCUIT_FAILURE_THRESHOLD: int = 3
+    MARKET_CIRCUIT_COOLDOWN_SECONDS: int = 30
+
     # USDT TRC20 & TRON Settings
     USDT_TRC20_CONTRACT_ADDRESS: str = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
     USDT_TRC20_DEPOSIT_ADDRESS: str = "TMOCK_GIGVEYRO_DEPOSIT_ADDRESS"
@@ -194,6 +208,20 @@ class Settings(BaseSettings):
                     "METRICS_AUTH_TOKEN must be strong (>=32 chars) when metrics are "
                     "enabled in production"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def validate_market_data_settings(self) -> "Settings":
+        providers = {"binance", "bybit"}
+        if self.MARKET_DATA_PRIMARY not in providers:
+            raise ValueError("MARKET_DATA_PRIMARY must be 'binance' or 'bybit'")
+        if self.MARKET_DATA_SECONDARY not in providers:
+            raise ValueError("MARKET_DATA_SECONDARY must be 'binance' or 'bybit'")
+        if self.MARKET_DATA_PRIMARY == self.MARKET_DATA_SECONDARY:
+            raise ValueError("MARKET_DATA_PRIMARY and MARKET_DATA_SECONDARY must differ")
+        if not self.MARKET_DATA_SYMBOLS:
+            raise ValueError("MARKET_DATA_SYMBOLS must not be empty")
+        self.MARKET_DATA_SYMBOLS = [symbol.upper() for symbol in self.MARKET_DATA_SYMBOLS]
         return self
 
 
