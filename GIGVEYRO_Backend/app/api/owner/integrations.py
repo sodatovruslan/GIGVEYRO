@@ -6,6 +6,12 @@ from app.api.deps import require_roles
 from app.core.config import settings
 from app.enums.account import UserRole
 from app.models.account import Account
+from app.services.exchange_rate import ExchangeRateError
+from app.services.fiat_rate.runtime import (
+    get_business_exchange_rate_service,
+    get_business_rate_diagnostics,
+    get_fiat_diagnostics,
+)
 from app.services.market_data.errors import ProviderError
 from app.services.market_data.runtime import (
     get_market_data_aggregator,
@@ -37,6 +43,8 @@ async def get_integrations_diagnostics(
             "required_confirmations": settings.TRC20_REQUIRED_CONFIRMATIONS,
         },
         "market_data": await get_market_diagnostics(),
+        "fiat_rate": await get_fiat_diagnostics(),
+        "business_rate": await get_business_rate_diagnostics(),
     }
 
 
@@ -59,3 +67,18 @@ async def get_market_quote(
             detail="Public market data providers are unavailable",
         ) from exc
     return quote.to_dict()
+
+
+@router.get("/exchange-rate/preview")
+async def get_exchange_rate_preview(
+    current_account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+):
+    """Calculate the current rate snapshot without mutating any Deal."""
+    try:
+        snapshot = await get_business_exchange_rate_service().calculate()
+    except (RuntimeError, ExchangeRateError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authoritative exchange rate is temporarily unavailable",
+        ) from exc
+    return snapshot.to_dict()

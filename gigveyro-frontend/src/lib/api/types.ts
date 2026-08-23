@@ -258,6 +258,41 @@ export interface IntegrationDiagnostics {
     deviation_bps: string | null;
     providers: Record<"binance" | "bybit", MarketProviderDiagnostic>;
   };
+  fiat_rate: {
+    status: "connected" | "degraded" | "unavailable";
+    primary: string;
+    secondary: string;
+    active_provider: string | null;
+    cache: "redis" | "direct" | "unavailable";
+    max_age_seconds: number;
+    deviation_bps: string | null;
+    providers: Record<string, FiatProviderDiagnostic>;
+  };
+  business_rate: {
+    status: "connected" | "degraded" | "unavailable";
+    rate_tjs_per_usdt: string | null;
+    fiat_rate_tjs_per_usd?: string;
+    usdt_usd_rate?: string;
+    fiat_provider: string | null;
+    market_provider: string | null;
+    peg_mode: string;
+    policy_version: string;
+    calculated_at: string | null;
+    is_degraded: boolean;
+  };
+}
+
+export interface FiatProviderDiagnostic {
+  status: "connected" | "degraded" | "unavailable" | "stale";
+  source_type: "official" | "indicative_fx";
+  pair: string;
+  rate: string | null;
+  published_at: string | null;
+  received_at: string | null;
+  latency_ms: number | null;
+  cached: boolean;
+  role: "primary" | "secondary";
+  business_fallback_allowed: boolean;
 }
 
 export interface MarketProviderDiagnostic {
