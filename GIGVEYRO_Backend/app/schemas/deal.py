@@ -28,6 +28,10 @@ class DealRead(BaseModel):
     amount_tjs: Money
     exchange_rate: Money | None
     amount_usdt: Money | None
+    rate_source: str | None
+    rate_timestamp: datetime | None
+    rate_policy_version: str | None
+    rate_mode: str | None
     requisite_type: PaymentRequisiteType | None
     requisite_bank_name: str | None
     requisite_holder_name: str | None

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -13,6 +14,17 @@ class ExchangeRateError(Exception):
     """Base exception for exchange rate provider failures."""
 
 
+@dataclass(frozen=True, slots=True)
+class ExchangeRateSnapshot:
+    rate: Decimal
+    source: str
+    published_at: datetime
+    calculated_at: datetime
+    policy_version: str
+    mode: str
+    degraded: bool
+
+
 class ExchangeRateProvider(ABC):
     """DealService only depends on this abstraction, never on where a rate
     actually comes from - a future stage can swap in a live provider
@@ -21,6 +33,18 @@ class ExchangeRateProvider(ABC):
     @abstractmethod
     async def get_usdt_tjs_rate(self) -> Decimal:
         """How many TJS one USDT is worth."""
+
+    async def get_rate_snapshot(self) -> ExchangeRateSnapshot:
+        now = datetime.now(UTC)
+        return ExchangeRateSnapshot(
+            rate=await self.get_usdt_tjs_rate(),
+            source=type(self).__name__,
+            published_at=now,
+            calculated_at=now,
+            policy_version="legacy-provider-v1",
+            mode="configured",
+            degraded=True,
+        )
 
 
 class ConfiguredExchangeRateProvider(ExchangeRateProvider):

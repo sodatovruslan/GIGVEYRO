@@ -50,6 +50,10 @@ class Deal(Base):
     amount_tjs: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     exchange_rate: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     amount_usdt: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
+    rate_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rate_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rate_policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rate_mode: Mapped[str | None] = mapped_column(String(24), nullable=True)
 
     status: Mapped[DealStatus] = mapped_column(
         SAEnum(

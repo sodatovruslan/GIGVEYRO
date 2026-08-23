@@ -23,7 +23,8 @@ from app.services.deal import (
     RequisiteNotEligibleError,
     UserNotEligibleError,
 )
-from app.services.exchange_rate import ConfiguredExchangeRateProvider
+from app.services.exchange_rate import ExchangeRateError
+from app.services.provider_factory import get_exchange_rate_provider
 from app.services.realtime import RealtimeEventService
 from app.services.wallet import InsufficientBalanceError, WalletNotFoundError, WalletService
 
@@ -43,7 +44,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DealService:
         TrafficRepository(db),
         account_repository,
         wallet_service,
-        ConfiguredExchangeRateProvider(),
+        get_exchange_rate_provider(),
         RealtimeEventService(RealtimeOutboxRepository(db)),
     )
 
@@ -118,3 +119,8 @@ async def accept_deal(
         ) from exc
     except InsufficientBalanceError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ExchangeRateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="exchange rate is temporarily unavailable",
+        ) from exc

@@ -206,7 +206,8 @@ class DealService:
         if requisite.is_archived or not requisite.is_active:
             raise RequisiteNotEligibleError("requisite is not active")
 
-        rate = await self._rate_provider.get_usdt_tjs_rate()
+        rate_snapshot = await self._rate_provider.get_rate_snapshot()
+        rate = rate_snapshot.rate
         amount_usdt = calculate_amount_usdt(deal.amount_tjs, rate)
 
         await self._wallet_service.freeze_for_deal(
@@ -221,6 +222,10 @@ class DealService:
         deal.requisite_masked_card_number = mask_card_number(requisite.card_number)
         deal.exchange_rate = rate
         deal.amount_usdt = amount_usdt
+        deal.rate_source = rate_snapshot.source
+        deal.rate_timestamp = rate_snapshot.published_at
+        deal.rate_policy_version = rate_snapshot.policy_version
+        deal.rate_mode = rate_snapshot.mode
         transition_deal(deal, DealStatus.ACCEPTED)
 
         deal = await self._deals.save(deal)

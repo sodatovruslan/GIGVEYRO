@@ -131,6 +131,10 @@ async def test_accept_deal_success_full_flow(
     assert body["user_id"] == str(user.id)
     assert body["payment_requisite_id"] == str(requisite.id)
     assert body["exchange_rate"] == "10.90000000"
+    assert body["rate_source"] == "FallbackExchangeRateProvider"
+    assert body["rate_timestamp"] is not None
+    assert body["rate_policy_version"] == "legacy-provider-v1"
+    assert body["rate_mode"] == "configured"
 
     expected_usdt = calculate_amount_usdt(Decimal("200"), app_settings.DEMO_USDT_TJS_RATE)
     assert Decimal(body["amount_usdt"]) == expected_usdt
@@ -142,6 +146,50 @@ async def test_accept_deal_success_full_flow(
     assert body["requisite_holder_name"] == requisite.holder_name
     assert body["requisite_masked_card_number"] == "**** **** **** 1234"
     assert "card_number" not in response.text.replace("masked_card_number", "")
+
+
+async def test_accepted_deal_rate_snapshot_is_immutable_when_provider_rate_changes(
+    client,
+    make_account,
+    make_wallet,
+    make_requisite,
+    make_traffic_settings,
+    make_deal,
+    monkeypatch,
+):
+    merchant = await make_account(role=UserRole.MERCHANT)
+    first_user, first_requisite = await _make_ready_user(
+        make_account, make_wallet, make_requisite, make_traffic_settings
+    )
+    second_user, second_requisite = await _make_ready_user(
+        make_account, make_wallet, make_requisite, make_traffic_settings
+    )
+    first_deal = await make_deal(merchant, amount_tjs=Decimal("200"))
+    second_deal = await make_deal(merchant, amount_tjs=Decimal("200"))
+
+    monkeypatch.setattr(app_settings, "DEMO_USDT_TJS_RATE", Decimal("10.50"))
+    first_accept = await client.post(
+        f"/deals/{first_deal.id}/accept",
+        json={"payment_requisite_id": str(first_requisite.id)},
+        headers=_auth_headers(first_user),
+    )
+    assert first_accept.status_code == 200
+    assert first_accept.json()["exchange_rate"] == "10.50000000"
+
+    monkeypatch.setattr(app_settings, "DEMO_USDT_TJS_RATE", Decimal("11.25"))
+    second_accept = await client.post(
+        f"/deals/{second_deal.id}/accept",
+        json={"payment_requisite_id": str(second_requisite.id)},
+        headers=_auth_headers(second_user),
+    )
+    assert second_accept.status_code == 200
+    assert second_accept.json()["exchange_rate"] == "11.25000000"
+
+    historical = await client.get(
+        f"/deals/{first_deal.id}", headers=_auth_headers(first_user)
+    )
+    assert historical.status_code == 200
+    assert historical.json()["exchange_rate"] == "10.50000000"
 
 
 async def test_accept_deal_freezes_wallet_and_preserves_total(
