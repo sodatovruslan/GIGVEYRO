@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -53,6 +55,32 @@ class MarketHttpClient:
         url: str,
         params: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
+        response = await self._get_response(provider=provider, url=url, params=params)
+        try:
+            payload = json.loads(response.text, parse_float=Decimal)
+        except ValueError as exc:
+            raise ProviderBadResponse(f"{provider} returned invalid JSON") from exc
+        if not isinstance(payload, dict):
+            raise ProviderBadResponse(f"{provider} returned a non-object response")
+        return payload
+
+    async def get_text(
+        self,
+        *,
+        provider: str,
+        url: str,
+        params: Mapping[str, str] | None = None,
+    ) -> str:
+        response = await self._get_response(provider=provider, url=url, params=params)
+        return response.text
+
+    async def _get_response(
+        self,
+        *,
+        provider: str,
+        url: str,
+        params: Mapping[str, str] | None,
+    ) -> httpx.Response:
         last_error: Exception | None = None
         for attempt in range(1, self._max_retries + 2):
             try:
@@ -76,13 +104,7 @@ class MarketHttpClient:
                     raise ProviderUnsupportedSymbol(
                         f"{provider} rejected the requested symbol (HTTP {response.status_code})"
                     )
-                try:
-                    payload = response.json()
-                except ValueError as exc:
-                    raise ProviderBadResponse(f"{provider} returned invalid JSON") from exc
-                if not isinstance(payload, dict):
-                    raise ProviderBadResponse(f"{provider} returned a non-object response")
-                return payload
+                return response
             except httpx.TimeoutException as exc:
                 last_error = ProviderTimeout(f"{provider} request timed out")
                 if attempt <= self._max_retries:

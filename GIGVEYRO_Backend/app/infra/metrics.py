@@ -113,6 +113,35 @@ if _PROMETHEUS_AVAILABLE:
         "Age of the latest public market quote",
         labelnames=["provider"],
     )
+    FIAT_PROVIDER_REQUESTS = Counter(
+        "gigveyro_fiat_provider_requests_total",
+        "Fiat provider requests",
+        labelnames=["provider", "status"],
+    )
+    FIAT_PROVIDER_LATENCY = Histogram(
+        "gigveyro_fiat_provider_latency_seconds",
+        "Fiat provider request latency",
+        labelnames=["provider"],
+    )
+    FIAT_PROVIDER_FAILOVERS = Counter(
+        "gigveyro_fiat_provider_failovers_total",
+        "Fiat provider failovers",
+        labelnames=["from_provider", "to_provider"],
+    )
+    FIAT_RATE_AGE = Gauge(
+        "gigveyro_fiat_rate_age_seconds",
+        "Age of the latest fiat quote",
+        labelnames=["provider"],
+    )
+    BUSINESS_RATE_CALCULATIONS = Counter(
+        "gigveyro_business_rate_calculations_total",
+        "Business exchange-rate calculations",
+        labelnames=["mode"],
+    )
+    BUSINESS_RATE_DEVIATION = Gauge(
+        "gigveyro_business_rate_deviation_bps",
+        "Deviation between configured fiat providers",
+    )
 else:
     # Stub objects so callers don't need to guard every usage
     class _NoopMetric:
@@ -137,6 +166,12 @@ else:
     MARKET_PROVIDER_FAILOVERS = _NoopMetric()  # type: ignore[assignment]
     MARKET_PROVIDER_CACHE_HITS = _NoopMetric()  # type: ignore[assignment]
     MARKET_PROVIDER_QUOTE_AGE = _NoopMetric()  # type: ignore[assignment]
+    FIAT_PROVIDER_REQUESTS = _NoopMetric()  # type: ignore[assignment]
+    FIAT_PROVIDER_LATENCY = _NoopMetric()  # type: ignore[assignment]
+    FIAT_PROVIDER_FAILOVERS = _NoopMetric()  # type: ignore[assignment]
+    FIAT_RATE_AGE = _NoopMetric()  # type: ignore[assignment]
+    BUSINESS_RATE_CALCULATIONS = _NoopMetric()  # type: ignore[assignment]
+    BUSINESS_RATE_DEVIATION = _NoopMetric()  # type: ignore[assignment]
 
 
 # ── FastAPI instrumentator setup ───────────────────────────────────────────
@@ -229,6 +264,29 @@ def record_market_cache_hit(provider: str) -> None:
 
 def observe_market_quote_age(provider: str, age_seconds: float) -> None:
     MARKET_PROVIDER_QUOTE_AGE.labels(provider=provider).set(age_seconds)
+
+
+def record_fiat_request(provider: str, status: str, latency_seconds: float) -> None:
+    FIAT_PROVIDER_REQUESTS.labels(provider=provider, status=status).inc()
+    FIAT_PROVIDER_LATENCY.labels(provider=provider).observe(latency_seconds)
+
+
+def record_fiat_failover(from_provider: str, to_provider: str) -> None:
+    FIAT_PROVIDER_FAILOVERS.labels(
+        from_provider=from_provider, to_provider=to_provider
+    ).inc()
+
+
+def observe_fiat_rate_age(provider: str, age_seconds: float) -> None:
+    FIAT_RATE_AGE.labels(provider=provider).set(age_seconds)
+
+
+def record_business_rate(mode: str) -> None:
+    BUSINESS_RATE_CALCULATIONS.labels(mode=mode).inc()
+
+
+def observe_business_rate_deviation(deviation_bps: float) -> None:
+    BUSINESS_RATE_DEVIATION.set(deviation_bps)
 
 
 def set_outbox_pending(count: int) -> None:

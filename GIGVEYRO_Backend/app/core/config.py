@@ -55,7 +55,7 @@ class Settings(BaseSettings):
 
     # Provider Selector Settings
     DEPOSIT_PROVIDER_TYPE: str = "mock"  # "mock" or "trongrid"
-    EXCHANGE_RATE_PROVIDER_TYPE: str = "fallback"  # "configured", "external", "fallback"
+    EXCHANGE_RATE_PROVIDER_TYPE: str = "fallback"  # "configured", "fallback", "business"
     PAYOUT_PROVIDER_TYPE: str = "mock"  # "mock" or "external_adapter"
     PAYOUT_ENABLED: bool = False  # Production safety switch - Disabled by default!
 
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     BYBIT_PUBLIC_BASE_URL: str = "https://api.bybit.com"
     MARKET_DATA_PRIMARY: str = "binance"
     MARKET_DATA_SECONDARY: str = "bybit"
-    MARKET_DATA_SYMBOLS: list[str] = ["BTCUSDT", "ETHUSDT"]
+    MARKET_DATA_SYMBOLS: list[str] = ["BTCUSDT", "ETHUSDT", "USDCUSDT"]
     MARKET_DATA_CACHE_TTL_SECONDS: int = 10
     MARKET_DATA_TIMEOUT_SECONDS: float = 5.0
     MARKET_DATA_MAX_RETRIES: int = 2
@@ -78,6 +78,28 @@ class Settings(BaseSettings):
     MARKET_MAX_DEVIATION_BPS: int = 100
     MARKET_CIRCUIT_FAILURE_THRESHOLD: int = 3
     MARKET_CIRCUIT_COOLDOWN_SECONDS: int = 30
+
+    # Authoritative fiat-rate composition (official USD/TJS + explicit USDT peg policy)
+    NBT_FIAT_BASE_URL: str = "https://nbt.tj/en/kurs/export_xml.php"
+    EXCHANGE_RATE_API_BASE_URL: str = "https://open.er-api.com/v6/latest/USD"
+    FIAT_RATE_PRIMARY: str = "nbt"
+    FIAT_RATE_SECONDARY: str = "exchange_rate_api"
+    FIAT_ALLOW_INDICATIVE_FALLBACK: bool = False
+    FIAT_RATE_CACHE_TTL_SECONDS: int = 21600
+    FIAT_RATE_MAX_AGE_SECONDS: int = 345600
+    FIAT_RATE_MAX_DEVIATION_BPS: int = 500
+    FIAT_RATE_TIMEOUT_SECONDS: float = 8.0
+    FIAT_RATE_MAX_RETRIES: int = 1
+    FIAT_RATE_MAX_CONCURRENCY: int = 2
+    FIAT_RATE_MIN_TJS_PER_USD: Decimal = Decimal("5")
+    FIAT_RATE_MAX_TJS_PER_USD: Decimal = Decimal("20")
+    USDT_PEG_MODE: str = "fixed"
+    USDT_FIXED_USD_RATE: Decimal = Decimal("1.0")
+    BUSINESS_RATE_MARKUP_BPS: int = 0
+    BUSINESS_RATE_SPREAD_BPS: int = 0
+    BUSINESS_RATE_POLICY_VERSION: str = "official-fiat-fixed-peg-v1"
+    BUSINESS_RATE_MIN_TJS_PER_USDT: Decimal = Decimal("5")
+    BUSINESS_RATE_MAX_TJS_PER_USDT: Decimal = Decimal("20")
 
     # USDT TRC20 & TRON Settings
     USDT_TRC20_CONTRACT_ADDRESS: str = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
@@ -222,6 +244,25 @@ class Settings(BaseSettings):
         if not self.MARKET_DATA_SYMBOLS:
             raise ValueError("MARKET_DATA_SYMBOLS must not be empty")
         self.MARKET_DATA_SYMBOLS = [symbol.upper() for symbol in self.MARKET_DATA_SYMBOLS]
+        return self
+
+    @model_validator(mode="after")
+    def validate_fiat_rate_settings(self) -> "Settings":
+        providers = {"nbt", "exchange_rate_api"}
+        if self.FIAT_RATE_PRIMARY not in providers:
+            raise ValueError("FIAT_RATE_PRIMARY must be 'nbt' or 'exchange_rate_api'")
+        if self.FIAT_RATE_SECONDARY not in providers:
+            raise ValueError("FIAT_RATE_SECONDARY must be 'nbt' or 'exchange_rate_api'")
+        if self.FIAT_RATE_PRIMARY == self.FIAT_RATE_SECONDARY:
+            raise ValueError("FIAT_RATE_PRIMARY and FIAT_RATE_SECONDARY must differ")
+        if self.USDT_PEG_MODE not in {"fixed", "market"}:
+            raise ValueError("USDT_PEG_MODE must be 'fixed' or 'market'")
+        if self.FIAT_RATE_MIN_TJS_PER_USD >= self.FIAT_RATE_MAX_TJS_PER_USD:
+            raise ValueError("FIAT rate sanity minimum must be below maximum")
+        if not Decimal("0.5") <= self.USDT_FIXED_USD_RATE <= Decimal("1.5"):
+            raise ValueError("USDT_FIXED_USD_RATE is outside the broad safety range")
+        if self.BUSINESS_RATE_MIN_TJS_PER_USDT >= self.BUSINESS_RATE_MAX_TJS_PER_USDT:
+            raise ValueError("Business rate sanity minimum must be below maximum")
         return self
 
 

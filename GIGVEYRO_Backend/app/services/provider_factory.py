@@ -20,6 +20,10 @@ def get_deposit_provider() -> CryptoDepositProvider:
 
 
 def get_exchange_rate_provider() -> ExchangeRateProvider:
+    if settings.EXCHANGE_RATE_PROVIDER_TYPE == "business":
+        from app.services.fiat_rate.runtime import get_business_exchange_rate_service
+
+        return get_business_exchange_rate_service()
     if settings.EXCHANGE_RATE_PROVIDER_TYPE == "external":
         return ExternalExchangeRateProvider()
     if settings.EXCHANGE_RATE_PROVIDER_TYPE == "fallback":
@@ -58,4 +62,9 @@ def get_provider_diagnostics() -> dict:
         "market_data_secondary": settings.MARKET_DATA_SECONDARY,
         "market_data_symbols": settings.MARKET_DATA_SYMBOLS,
         "market_data_public_only": True,
+        "fiat_rate_primary": settings.FIAT_RATE_PRIMARY,
+        "fiat_rate_secondary": settings.FIAT_RATE_SECONDARY,
+        "fiat_rate_public_only": True,
+        "fiat_indicative_fallback_allowed": settings.FIAT_ALLOW_INDICATIVE_FALLBACK,
+        "usdt_peg_mode": settings.USDT_PEG_MODE,
     }

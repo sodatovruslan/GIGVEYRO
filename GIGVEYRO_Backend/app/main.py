@@ -41,6 +41,7 @@ from app.infra.metrics import setup_metrics
 from app.infra.redis_client import close_redis, init_redis
 from app.infra.sentry import init_sentry
 from app.realtime.runtime import realtime_broker, realtime_dispatcher
+from app.services.fiat_rate.runtime import close_fiat_rate, init_fiat_rate
 from app.services.market_data.runtime import close_market_data, init_market_data
 
 # Configure structured logging before anything else
@@ -57,6 +58,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Initialise Redis connection pool (with retry/backoff)
     await init_redis()
     await init_market_data()
+    await init_fiat_rate()
 
     if hasattr(realtime_broker, "startup"):
         await realtime_broker.startup()
@@ -76,6 +78,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await dispatcher_task
         if hasattr(realtime_broker, "shutdown"):
             await realtime_broker.shutdown()
+        await close_fiat_rate()
         await close_market_data()
         # Close Redis pool on shutdown
         await close_redis()
