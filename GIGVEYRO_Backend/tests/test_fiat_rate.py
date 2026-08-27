@@ -5,9 +5,11 @@ import httpx
 import pytest
 from redis.exceptions import RedisError
 
+from app.enums.wallet import Currency
 from app.services.exchange_rate import ExchangeRateError
 from app.services.fiat_rate.aggregator import FiatRateAggregator
 from app.services.fiat_rate.business import BusinessExchangeRateService
+from app.services.fiat_rate.conversion import FiatConversionRateService
 from app.services.fiat_rate.errors import (
     FiatProviderBadResponse,
     FiatProviderRateLimited,
@@ -105,6 +107,62 @@ async def test_nbt_normalizes_timeout():
 
     with pytest.raises(FiatProviderTimeout):
         await _nbt(handler).get_rate()
+
+
+@pytest.mark.asyncio
+async def test_nbt_rub_normalizes_official_nominal_before_rate_use():
+    xml = _nbt_xml(value="11.09", nominal="100", code="RUB")
+    provider = NbtFiatRateProvider(
+        _client(lambda _: httpx.Response(200, text=xml)),
+        "https://nbt.test/export_xml.php",
+        minimum_rate=Decimal("0.01"),
+        maximum_rate=Decimal("1"),
+        today=lambda: date(2026, 8, 23),
+    )
+    quote = await provider.get_rate("RUB", "TJS")
+    assert quote.rate == Decimal("0.1109")
+    assert quote.provider_nominal == Decimal("100")
+    assert quote.provider_rate == Decimal("11.09")
+
+
+@pytest.mark.asyncio
+async def test_tjs_rub_conversion_rate_has_destination_per_source_semantics():
+    provider = StubFiatProvider(
+        "nbt", FiatSourceType.OFFICIAL, _quote("nbt", "0.1109")
+    )
+    service = FiatConversionRateService(
+        provider=provider,
+        redis=None,
+        redis_prefix="gigveyro:test",
+        cache_ttl_seconds=60,
+        max_age_seconds=3600,
+        markup_bps=0,
+        fee_bps=0,
+        policy_version="test-v1",
+    )
+    rub_tjs = await service.get_quote(Currency.RUB, Currency.TJS)
+    tjs_rub = await service.get_quote(Currency.TJS, Currency.RUB)
+    assert rub_tjs.rate == Decimal("0.11090000")
+    assert tjs_rub.rate == Decimal("9.01713255")
+    assert abs((rub_tjs.rate * tjs_rub.rate) - Decimal("1")) < Decimal("1e-8")
+
+
+@pytest.mark.asyncio
+async def test_tjs_rub_conversion_rejects_stale_official_quote():
+    stale = _quote("nbt", "0.1109", age_seconds=7200)
+    provider = StubFiatProvider("nbt", FiatSourceType.OFFICIAL, stale)
+    service = FiatConversionRateService(
+        provider=provider,
+        redis=None,
+        redis_prefix="gigveyro:test",
+        cache_ttl_seconds=60,
+        max_age_seconds=3600,
+        markup_bps=0,
+        fee_bps=0,
+        policy_version="test-v1",
+    )
+    with pytest.raises(FiatProviderStale):
+        await service.get_quote(Currency.RUB, Currency.TJS)
 
 
 def _exchange_api(handler) -> ExchangeRateApiProvider:
