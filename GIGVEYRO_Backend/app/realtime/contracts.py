@@ -13,6 +13,8 @@ class RealtimeEventName(StrEnum):
     DEAL_RELEASED = "deal.released"
     DEAL_EXPIRED = "deal.expired"
     DEAL_DISPUTED = "deal.disputed"
+    FIAT_ALLOCATED = "fiat.allocated"
+    FIAT_CONVERTED = "fiat.converted"
 
 
 class RealtimeEvent(BaseModel):

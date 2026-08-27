@@ -12,6 +12,7 @@ from app.api.appeals import router as appeals_router
 from app.api.auth import router as auth_router
 from app.api.deals import router as deals_router
 from app.api.deposits import router as deposits_router
+from app.api.fiat_wallets import router as fiat_wallets_router
 from app.api.health import router as health_router
 from app.api.merchant.deals import router as merchant_deals_router
 from app.api.merchant.wallet import router as merchant_wallet_router
@@ -23,6 +24,7 @@ from app.api.owner.appeals import router as owner_appeals_router
 from app.api.owner.audit import router as owner_audit_router
 from app.api.owner.deals import router as owner_deals_router
 from app.api.owner.deposits import router as owner_deposits_router
+from app.api.owner.fiat_wallets import router as owner_fiat_wallets_router
 from app.api.owner.integrations import router as owner_integrations_router
 from app.api.owner.requisites import router as owner_requisites_router
 from app.api.owner.traffic import router as owner_traffic_router
@@ -122,6 +124,7 @@ app.include_router(owner_withdrawals_router)
 app.include_router(owner_appeals_router)
 app.include_router(owner_analytics_router)
 app.include_router(owner_integrations_router)
+app.include_router(owner_fiat_wallets_router)
 app.include_router(owner_audit_router)
 app.include_router(wallet_router)
 app.include_router(merchant_wallet_router)
@@ -130,6 +133,7 @@ app.include_router(requisites_router)
 app.include_router(traffic_router)
 app.include_router(merchant_deals_router)
 app.include_router(deals_router)
+app.include_router(fiat_wallets_router)
 app.include_router(appeals_router)
 app.include_router(deposits_router)
 app.include_router(notifications_router)

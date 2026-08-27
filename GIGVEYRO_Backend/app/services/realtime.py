@@ -37,6 +37,30 @@ class RealtimeEventService:
             )
         )
 
+    async def enqueue_fiat(
+        self,
+        event: RealtimeEventName,
+        *,
+        operation_id: uuid.UUID,
+        target_account_id: uuid.UUID,
+        owner_account_id: uuid.UUID,
+        currency: str,
+    ) -> RealtimeOutbox:
+        if event not in (RealtimeEventName.FIAT_ALLOCATED, RealtimeEventName.FIAT_CONVERTED):
+            raise ValueError("Unsupported fiat realtime event")
+        return await self._repository.create(
+            RealtimeOutbox(
+                event=event.value,
+                entity_id=operation_id,
+                recipient_account_ids=sorted(
+                    {str(target_account_id), str(owner_account_id)}
+                ),
+                recipient_roles=[],
+                data={"currency": currency},
+                occurred_at=datetime.now(UTC),
+            )
+        )
+
 
 class RealtimeOutboxDispatcher:
     def __init__(self, broker: RealtimeBroker):
