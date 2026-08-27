@@ -562,6 +562,41 @@
       "market": "Рыночный ориентир"
     }
   },
+  "fiatWallets": {
+    "eyebrow": "УПРАВЛЯЕМЫЙ ФИАТ",
+    "title": "Балансы TJS и RUB",
+    "subtitle": "Фиатные балансы под управлением владельца платформы",
+    "balance": "Баланс {currency}",
+    "ownerManagedHint": "Эти фиатные балансы управляются OWNER. Они отделены от USDT, пользователь не может самостоятельно пополнять или выводить их.",
+    "userManagedHint": "Этими балансами управляет владелец платформы. По вопросам начислений и конвертаций обратитесь в поддержку.",
+    "allocate": "Начислить средства",
+    "convert": "Конвертировать",
+    "allocateTitle": "Начисление фиатных средств",
+    "convertTitle": "Конвертация TJS / RUB",
+    "allocated": "Средства начислены",
+    "convertedResult": "Конвертация выполнена: {amount} {currency}",
+    "historyEyebrow": "СНИМКИ КУРСА",
+    "conversionHistory": "История конвертаций",
+    "ledgerEyebrow": "ФИАТНЫЙ ЖУРНАЛ",
+    "operations": "Фиатные операции",
+    "noConversions": "Конвертаций пока нет",
+    "noOperations": "Фиатных операций пока нет",
+    "from": "Из",
+    "to": "В",
+    "rate": "Курс",
+    "provider": "Источник",
+    "sourceAmount": "Сумма конвертации",
+    "loadingRate": "Загружаем актуальный курс…",
+    "currentRate": "Текущий курс",
+    "recipientGets": "На баланс поступит",
+    "enterAmount": "Введите сумму, чтобы получить курс backend",
+    "balanceAfter": "Баланс после",
+    "ledgerTypes": {
+      "owner_allocation": "Начисление OWNER",
+      "conversion_debit": "Списание при конвертации",
+      "conversion_credit": "Зачисление при конвертации"
+    }
+  },
   "audit": {
     "eyebrow": "ЦЕНТР УПРАВЛЕНИЯ OWNER",
     "title": "Журнал аудита",
@@ -581,6 +616,8 @@
     "entities": {
       "account": "Аккаунт",
       "wallet": "Кошелёк",
+      "fiat_wallet": "Фиатный кошелёк",
+      "fiat_conversion": "Конвертация фиата",
       "deal": "Сделка",
       "appeal": "Апелляция",
       "withdrawal": "Вывод"
@@ -597,6 +634,10 @@
         "allocate": "Начислен баланс",
         "adjust_insurance": "Изменена страховка",
         "manual_adjust": "Скорректирован баланс"
+      },
+      "fiat": {
+        "allocate": "Начислены фиатные средства",
+        "convert": "Выполнена конвертация фиата"
       },
       "deal": {
         "complete": "Завершена сделка",
@@ -699,7 +740,8 @@
       "APPEAL_RESOLVED": "Апелляция решена",
       "DEPOSIT_CONFIRMED": "Депозит подтверждён",
       "WITHDRAWAL_STATUS_CHANGED": "Статус вывода изменён",
-      "SECURITY_EVENT": "Событие безопасности"
+      "SECURITY_EVENT": "Событие безопасности",
+      "FIAT_BALANCE_UPDATED": "Фиатный баланс изменён"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",

@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { Account, LedgerEntry, MerchantWallet, Paginated, PaymentRequisite, TrafficSettings, UserRole, Wallet } from "@/lib/api/types";
+import type { Account, FiatAllocation, FiatBalanceList, FiatConversion, FiatConversionPreview, FiatCurrency, FiatLedgerEntry, LedgerEntry, MerchantWallet, Paginated, PaymentRequisite, TrafficSettings, UserRole, Wallet } from "@/lib/api/types";
 
 export interface AccountFilters {
   search?: string;
@@ -45,4 +45,10 @@ export const ownerAccountsApi = {
       method: "POST",
       body: action === "adjust" ? { amount, reason: description } : { amount, description },
     }),
+  fiatBalances: (id: string) => apiFetch<FiatBalanceList>(`/owner/accounts/${id}/fiat-wallets`),
+  fiatLedger: (id: string, offset = 0) => apiFetch<Paginated<FiatLedgerEntry>>(`/owner/accounts/${id}/fiat-wallets/ledger?limit=20&offset=${offset}`),
+  fiatConversions: (id: string, offset = 0) => apiFetch<Paginated<FiatConversion>>(`/owner/fiat-conversions?account_id=${encodeURIComponent(id)}&limit=20&offset=${offset}`),
+  allocateFiat: (id: string, currency: FiatCurrency, amount: string, comment: string, idempotencyKey: string) => apiFetch<FiatAllocation>(`/owner/accounts/${id}/fiat-wallets/allocate`, { method: "POST", body: { currency, amount, comment: comment || null, idempotency_key: idempotencyKey } }),
+  previewFiatConversion: (fromCurrency: FiatCurrency, toCurrency: FiatCurrency, sourceAmount: string) => apiFetch<FiatConversionPreview>("/owner/fiat-conversions/preview", { method: "POST", body: { from_currency: fromCurrency, to_currency: toCurrency, source_amount: sourceAmount } }),
+  convertFiat: (id: string, fromCurrency: FiatCurrency, toCurrency: FiatCurrency, sourceAmount: string, comment: string, idempotencyKey: string) => apiFetch<FiatConversion>(`/owner/accounts/${id}/fiat-conversions`, { method: "POST", body: { from_currency: fromCurrency, to_currency: toCurrency, source_amount: sourceAmount, comment: comment || null, idempotency_key: idempotencyKey } }),
 };

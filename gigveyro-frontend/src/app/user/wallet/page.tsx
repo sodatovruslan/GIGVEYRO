@@ -9,6 +9,7 @@ import { useApiQuery } from "@/lib/hooks/use-api-query";
 
 import { BalanceCard, PageHeading } from "../user-components";
 import styles from "../user.module.css";
+import { FiatWalletSection } from "./fiat-wallet-section";
 
 export default function UserWalletPage() {
   const t = useTranslations("wallet");
@@ -24,5 +25,6 @@ export default function UserWalletPage() {
     <div className={styles.contentCard} style={{ marginTop: 14 }}><div className={styles.contentHeader}><h2>{t("history")}</h2><button onClick={ledger.refetch}>{common("refresh")}</button></div>
       {ledger.loading ? <div className={styles.state}>{t("loadingOperations")}</div> : ledger.error ? <div className={`${styles.state} ${styles.errorText}`}>{ledger.error}</div> : !ledger.data?.items.length ? <div className={styles.state}>{t("noOperations")}</div> : <div className={styles.tableScroll}><table><thead><tr><th>{common("date")}</th><th>{common("type")}</th><th>{common("description")}</th><th>{common("amount")}</th><th>{t("balanceAfter")}</th></tr></thead><tbody>{ledger.data.items.map((entry) => <tr key={entry.id}><td>{format.dateTime(entry.created_at)}</td><td>{labels.ledger(entry.type)}</td><td>{entry.description || "—"}</td><td className={Number(entry.amount) >= 0 ? styles.positive : styles.negative}>{Number(entry.amount) >= 0 ? "+" : ""}{entry.amount} {entry.currency.toUpperCase()}</td><td>{entry.available_after} USDT</td></tr>)}</tbody></table></div>}
     </div>
+    <FiatWalletSection />
   </section>;
 }

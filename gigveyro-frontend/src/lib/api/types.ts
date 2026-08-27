@@ -103,6 +103,79 @@ export interface MerchantWallet {
   held_balance: string;
 }
 
+export type FiatCurrency = "TJS" | "RUB";
+
+export interface FiatBalance {
+  currency: FiatCurrency;
+  available: string;
+  updated_at: string;
+}
+
+export interface FiatBalanceList {
+  items: FiatBalance[];
+}
+
+export interface FiatAllocation {
+  operation_id: string;
+  account_id: string;
+  currency: FiatCurrency;
+  amount: string;
+  balance_before: string;
+  balance_after: string;
+  created_at: string;
+}
+
+export interface FiatConversionPreview {
+  from_currency: FiatCurrency;
+  to_currency: FiatCurrency;
+  source_amount: string;
+  destination_amount: string;
+  exchange_rate: string;
+  provider: string;
+  published_at: string;
+  received_at: string;
+  provider_nominal: string;
+  provider_rate: string;
+  policy_version: string;
+  mode: string;
+  is_stale: boolean;
+}
+
+export interface FiatConversion {
+  id: string;
+  account_id: string;
+  initiated_by_account_id: string;
+  from_currency: FiatCurrency;
+  to_currency: FiatCurrency;
+  source_amount: string;
+  destination_amount: string;
+  exchange_rate: string;
+  source_balance_before: string;
+  source_balance_after: string;
+  destination_balance_before: string;
+  destination_balance_after: string;
+  rate_provider: string;
+  rate_published_at: string;
+  rate_policy_version: string;
+  rate_mode: string;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface FiatLedgerEntry {
+  id: string;
+  currency: FiatCurrency;
+  type: "owner_allocation" | "conversion_debit" | "conversion_credit";
+  amount: string;
+  balance_before: string;
+  balance_after: string;
+  reference_type: string;
+  reference_id: string;
+  description: string | null;
+  created_by_account_id: string;
+  created_at: string;
+}
+
 export interface LedgerEntry {
   id: string;
   type: string;

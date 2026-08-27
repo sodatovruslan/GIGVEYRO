@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { LedgerEntry, Paginated, PaymentRequisite, TrafficSettings, Wallet } from "@/lib/api/types";
+import type { FiatBalanceList, FiatConversion, FiatLedgerEntry, LedgerEntry, Paginated, PaymentRequisite, TrafficSettings, Wallet } from "@/lib/api/types";
 
 export interface RequisiteCreateInput {
   type: "bank_card";
@@ -12,6 +12,9 @@ export interface RequisiteCreateInput {
 export const userApi = {
   wallet: () => apiFetch<Wallet>("/wallet"),
   ledger: () => apiFetch<Paginated<LedgerEntry>>("/wallet/ledger?limit=100&offset=0"),
+  fiatBalances: () => apiFetch<FiatBalanceList>("/fiat-wallets"),
+  fiatLedger: (offset = 0) => apiFetch<Paginated<FiatLedgerEntry>>(`/fiat-wallets/ledger?limit=20&offset=${offset}`),
+  fiatConversions: (offset = 0) => apiFetch<Paginated<FiatConversion>>(`/fiat-wallets/conversions?limit=20&offset=${offset}`),
   requisites: () => apiFetch<PaymentRequisite[]>("/requisites"),
   createRequisite: (input: RequisiteCreateInput) => apiFetch<PaymentRequisite>("/requisites", { method: "POST", body: input }),
   updateRequisite: (id: string, input: Pick<PaymentRequisite, "bank_name" | "holder_name" | "phone_number">) => apiFetch<PaymentRequisite>(`/requisites/${id}`, { method: "PATCH", body: input }),

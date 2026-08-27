@@ -562,6 +562,41 @@
       "market": "Market reference"
     }
   },
+  "fiatWallets": {
+    "eyebrow": "MANAGED FIAT",
+    "title": "TJS and RUB balances",
+    "subtitle": "Fiat balances managed by the platform owner",
+    "balance": "{currency} balance",
+    "ownerManagedHint": "These fiat balances are managed by OWNER. They are separate from USDT and cannot be funded or withdrawn by the user.",
+    "userManagedHint": "These balances are managed by the platform owner. Contact support if you have questions about an allocation or conversion.",
+    "allocate": "Allocate funds",
+    "convert": "Convert",
+    "allocateTitle": "Allocate fiat funds",
+    "convertTitle": "Convert TJS / RUB",
+    "allocated": "Funds allocated",
+    "convertedResult": "Conversion completed: {amount} {currency}",
+    "historyEyebrow": "RATE SNAPSHOTS",
+    "conversionHistory": "Conversion history",
+    "ledgerEyebrow": "FIAT LEDGER",
+    "operations": "Fiat operations",
+    "noConversions": "No conversions yet",
+    "noOperations": "No fiat operations yet",
+    "from": "From",
+    "to": "To",
+    "rate": "Rate",
+    "provider": "Provider",
+    "sourceAmount": "Amount to convert",
+    "loadingRate": "Loading the current rate…",
+    "currentRate": "Current rate",
+    "recipientGets": "Balance will receive",
+    "enterAmount": "Enter an amount to get a backend rate",
+    "balanceAfter": "Balance after",
+    "ledgerTypes": {
+      "owner_allocation": "OWNER allocation",
+      "conversion_debit": "Conversion debit",
+      "conversion_credit": "Conversion credit"
+    }
+  },
   "audit": {
     "eyebrow": "OWNER CONTROL CENTER",
     "title": "Audit log",
@@ -581,6 +616,8 @@
     "entities": {
       "account": "Account",
       "wallet": "Wallet",
+      "fiat_wallet": "Fiat wallet",
+      "fiat_conversion": "Fiat conversion",
       "deal": "Deal",
       "appeal": "Appeal",
       "withdrawal": "Withdrawal"
@@ -597,6 +634,10 @@
         "allocate": "Balance allocated",
         "adjust_insurance": "Insurance adjusted",
         "manual_adjust": "Balance adjusted"
+      },
+      "fiat": {
+        "allocate": "Fiat funds allocated",
+        "convert": "Fiat funds converted"
       },
       "deal": {
         "complete": "Deal completed",
@@ -699,7 +740,8 @@
       "APPEAL_RESOLVED": "Appeal resolved",
       "DEPOSIT_CONFIRMED": "Deposit confirmed",
       "WITHDRAWAL_STATUS_CHANGED": "Withdrawal status changed",
-      "SECURITY_EVENT": "Security event"
+      "SECURITY_EVENT": "Security event",
+      "FIAT_BALANCE_UPDATED": "Fiat balance updated"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",

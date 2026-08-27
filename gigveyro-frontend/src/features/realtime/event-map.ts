@@ -7,6 +7,8 @@ export const realtimeEventNames = [
   "deal.released",
   "deal.expired",
   "deal.disputed",
+  "fiat.allocated",
+  "fiat.converted",
 ] as const;
 
 export type RealtimeEventName = (typeof realtimeEventNames)[number];
@@ -18,6 +20,13 @@ const merchantDeals = ["merchant-deals", "merchant-appeal-deals"];
 const merchantFunds = ["merchant-dashboard-wallet", "merchant-wallet", "merchant-ledger"];
 
 export function queryKeysForRealtimeEvent(event: RealtimeEventName, role: UserRole) {
+  if (event === "fiat.allocated" || event === "fiat.converted") {
+    return role === "owner"
+      ? ["owner-fiat:*"]
+      : role === "user"
+        ? ["user-fiat:*"]
+        : [];
+  }
   if (role === "owner") {
     return event === "deal.disputed" ? [...ownerCore, "owner-appeals"] : ownerCore;
   }

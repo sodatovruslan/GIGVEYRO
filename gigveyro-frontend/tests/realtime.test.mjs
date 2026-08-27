@@ -126,6 +126,22 @@ test("deal events invalidate only role-relevant REST resources", () => {
   assert.ok(queryKeysForRealtimeEvent("deal.completed", "owner").includes("analytics:*"));
 });
 
+test("fiat events refetch exact owner/user resources without merchant leakage", () => {
+  assert.deepEqual(queryKeysForRealtimeEvent("fiat.allocated", "owner"), ["owner-fiat:*"]);
+  assert.deepEqual(queryKeysForRealtimeEvent("fiat.converted", "user"), ["user-fiat:*"]);
+  assert.deepEqual(queryKeysForRealtimeEvent("fiat.converted", "merchant"), []);
+
+  const bus = new QueryInvalidationBus();
+  let balances = 0;
+  let ledger = 0;
+  let usdt = 0;
+  bus.subscribe("user-fiat:balances", () => { balances += 1; });
+  bus.subscribe("user-fiat:ledger", () => { ledger += 1; });
+  bus.subscribe("wallet-page", () => { usdt += 1; });
+  assert.equal(bus.invalidate(queryKeysForRealtimeEvent("fiat.allocated", "user")), 2);
+  assert.deepEqual({ balances, ledger, usdt }, { balances: 1, ledger: 1, usdt: 0 });
+});
+
 test("query invalidation supports exact and scoped prefix keys", () => {
   const bus = new QueryInvalidationBus();
   let deals = 0;

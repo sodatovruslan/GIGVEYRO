@@ -562,6 +562,41 @@
       "market": "Нишондиҳандаи бозор"
     }
   },
+  "fiatWallets": {
+    "eyebrow": "АСЪОРИ ИДОРАШАВАНДА",
+    "title": "Тавозунҳои TJS ва RUB",
+    "subtitle": "Тавозунҳои асъорӣ таҳти идораи соҳиби платформа",
+    "balance": "Тавозуни {currency}",
+    "ownerManagedHint": "Ин тавозунҳои асъорӣ аз ҷониби OWNER идора мешаванд. Онҳо аз USDT ҷудо буда, корбар мустақилона онҳоро пур ё бардошта наметавонад.",
+    "userManagedHint": "Ин тавозунҳоро соҳиби платформа идора мекунад. Барои саволҳо оид ба ҷудокунии маблағ ё табдил ба дастгирӣ муроҷиат кунед.",
+    "allocate": "Ҷудо кардани маблағ",
+    "convert": "Табдил додан",
+    "allocateTitle": "Ҷудокунии маблағи асъорӣ",
+    "convertTitle": "Табдили TJS / RUB",
+    "allocated": "Маблағ ҷудо карда шуд",
+    "convertedResult": "Табдил анҷом ёфт: {amount} {currency}",
+    "historyEyebrow": "САБТИ ҚУРБ",
+    "conversionHistory": "Таърихи табдилҳо",
+    "ledgerEyebrow": "ДАФТАРИ АСЪОР",
+    "operations": "Амалиёти асъорӣ",
+    "noConversions": "Ҳоло табдил нест",
+    "noOperations": "Ҳоло амалиёти асъорӣ нест",
+    "from": "Аз",
+    "to": "Ба",
+    "rate": "Қурб",
+    "provider": "Манбаъ",
+    "sourceAmount": "Маблағи табдил",
+    "loadingRate": "Қурби ҷорӣ бор мешавад…",
+    "currentRate": "Қурби ҷорӣ",
+    "recipientGets": "Ба тавозун ворид мешавад",
+    "enterAmount": "Барои гирифтани қурби backend маблағро ворид кунед",
+    "balanceAfter": "Тавозун баъд аз амал",
+    "ledgerTypes": {
+      "owner_allocation": "Ҷудокунии OWNER",
+      "conversion_debit": "Сонидани маблағи табдил",
+      "conversion_credit": "Воридшавии маблағи табдил"
+    }
+  },
   "audit": {
     "eyebrow": "МАРКАЗИ ИДОРАКУНИИ СОҲИБ",
     "title": "Сабти аудит",
@@ -581,6 +616,8 @@
     "entities": {
       "account": "Ҳисоб",
       "wallet": "Ҳамён",
+      "fiat_wallet": "Ҳамёни асъорӣ",
+      "fiat_conversion": "Табдили асъор",
       "deal": "Муомила",
       "appeal": "Шикоят",
       "withdrawal": "Бардошт"
@@ -597,6 +634,10 @@
         "allocate": "Тавозун илова шуд",
         "adjust_insurance": "Суғурта тағйир ёфт",
         "manual_adjust": "Тавозун ислоҳ шуд"
+      },
+      "fiat": {
+        "allocate": "Маблағи асъорӣ ҷудо шуд",
+        "convert": "Асъор табдил дода шуд"
       },
       "deal": {
         "complete": "Муомила анҷом ёфт",
@@ -699,7 +740,8 @@
       "APPEAL_RESOLVED": "Шикоят ҳал шуд",
       "DEPOSIT_CONFIRMED": "Депозит тасдиқ шуд",
       "WITHDRAWAL_STATUS_CHANGED": "Вазъи гирифтани маблағ тағйир ёфт",
-      "SECURITY_EVENT": "Рӯйдоди бехатарӣ"
+      "SECURITY_EVENT": "Рӯйдоди бехатарӣ",
+      "FIAT_BALANCE_UPDATED": "Тавозуни асъорӣ тағйир ёфт"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",
