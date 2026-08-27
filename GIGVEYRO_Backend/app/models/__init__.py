@@ -4,6 +4,7 @@ from app.models.audit import AuditLog
 from app.models.auth_session import AuthSession
 from app.models.deal import Deal
 from app.models.deposit import Deposit, UnmatchedTransfer
+from app.models.fiat_wallet import FiatConversion, FiatLedgerEntry, FiatWalletBalance
 from app.models.ledger import LedgerEntry
 from app.models.merchant_wallet import MerchantWallet
 from app.models.notification import (
@@ -38,6 +39,9 @@ __all__ = [
     "Deposit",
     "UnmatchedTransfer",
     "LedgerEntry",
+    "FiatConversion",
+    "FiatLedgerEntry",
+    "FiatWalletBalance",
     "MerchantWallet",
     "Notification",
     "NotificationDelivery",

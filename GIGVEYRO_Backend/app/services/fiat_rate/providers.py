@@ -75,6 +75,12 @@ class NbtFiatRateProvider(FiatRateProvider):
         super().__init__(*args, **kwargs)
         self._today = today or (lambda: datetime.now(_DUSHANBE).date())
 
+    def validate_pair(self, base: str, quote: str) -> tuple[str, str]:
+        normalized = (base.upper(), quote.upper())
+        if normalized not in {("USD", "TJS"), ("RUB", "TJS")}:
+            raise FiatProviderUnsupportedPair(f"Unsupported NBT pair: {base}/{quote}")
+        return normalized
+
     async def get_rate(self, base: str = "USD", quote: str = "TJS") -> FiatQuote:
         base, quote = self.validate_pair(base, quote)
         last_error: FiatProviderError | None = None
@@ -138,6 +144,8 @@ class NbtFiatRateProvider(FiatRateProvider):
             received_at=datetime.now(UTC),
             latency_ms=latency_ms,
             source_type=self.source_type,
+            provider_nominal=nominal,
+            provider_rate=raw_rate,
         )
 
 

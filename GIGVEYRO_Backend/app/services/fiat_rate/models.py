@@ -22,6 +22,8 @@ class FiatQuote:
     received_at: datetime
     latency_ms: float
     source_type: FiatSourceType
+    provider_nominal: Decimal = Decimal("1")
+    provider_rate: Decimal | None = None
     is_stale: bool = False
     cached: bool = False
 
@@ -38,6 +40,10 @@ class FiatQuote:
         payload["published_at"] = self.published_at.isoformat()
         payload["received_at"] = self.received_at.isoformat()
         payload["source_type"] = self.source_type.value
+        payload["provider_nominal"] = str(self.provider_nominal)
+        payload["provider_rate"] = (
+            str(self.provider_rate) if self.provider_rate is not None else None
+        )
         return payload
 
     @classmethod
@@ -51,6 +57,12 @@ class FiatQuote:
             received_at=datetime.fromisoformat(str(payload["received_at"])),
             latency_ms=float(payload["latency_ms"]),
             source_type=FiatSourceType(str(payload["source_type"])),
+            provider_nominal=Decimal(str(payload.get("provider_nominal", "1"))),
+            provider_rate=(
+                Decimal(str(payload["provider_rate"]))
+                if payload.get("provider_rate") is not None
+                else None
+            ),
             is_stale=bool(payload.get("is_stale", False)),
             cached=cached,
         )
@@ -81,3 +93,47 @@ class BusinessRateSnapshot:
             value = payload[key]
             payload[key] = value.isoformat() if value is not None else None
         return payload
+
+
+@dataclass(frozen=True, slots=True)
+class FiatConversionQuote:
+    from_currency: str
+    to_currency: str
+    rate: Decimal
+    provider: str
+    published_at: datetime
+    received_at: datetime
+    source_type: FiatSourceType
+    provider_nominal: Decimal
+    provider_rate: Decimal
+    policy_version: str
+    mode: str
+    is_stale: bool
+    cached: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        for key in ("rate", "provider_nominal", "provider_rate"):
+            payload[key] = str(payload[key])
+        payload["source_type"] = self.source_type.value
+        payload["published_at"] = self.published_at.isoformat()
+        payload["received_at"] = self.received_at.isoformat()
+        return payload
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any], *, cached: bool = False) -> FiatConversionQuote:
+        return cls(
+            from_currency=str(payload["from_currency"]),
+            to_currency=str(payload["to_currency"]),
+            rate=Decimal(str(payload["rate"])),
+            provider=str(payload["provider"]),
+            published_at=datetime.fromisoformat(str(payload["published_at"])),
+            received_at=datetime.fromisoformat(str(payload["received_at"])),
+            source_type=FiatSourceType(str(payload["source_type"])),
+            provider_nominal=Decimal(str(payload["provider_nominal"])),
+            provider_rate=Decimal(str(payload["provider_rate"])),
+            policy_version=str(payload["policy_version"]),
+            mode=str(payload["mode"]),
+            is_stale=bool(payload["is_stale"]),
+            cached=cached,
+        )

@@ -5,6 +5,7 @@ from app.infra.redis_client import get_redis
 from app.services.exchange_rate import ExchangeRateError
 from app.services.fiat_rate.aggregator import FiatRateAggregator
 from app.services.fiat_rate.business import BusinessExchangeRateService
+from app.services.fiat_rate.conversion import FiatConversionRateService
 from app.services.fiat_rate.providers import ExchangeRateApiProvider, NbtFiatRateProvider
 from app.services.market_data.http import MarketHttpClient
 from app.services.market_data.runtime import get_market_data_aggregator
@@ -12,10 +13,11 @@ from app.services.market_data.runtime import get_market_data_aggregator
 _client: MarketHttpClient | None = None
 _aggregator: FiatRateAggregator | None = None
 _business: BusinessExchangeRateService | None = None
+_conversion: FiatConversionRateService | None = None
 
 
 async def init_fiat_rate() -> None:
-    global _aggregator, _business, _client  # noqa: PLW0603
+    global _aggregator, _business, _client, _conversion  # noqa: PLW0603
     if _business is not None:
         return
     _client = MarketHttpClient(
@@ -64,15 +66,32 @@ async def init_fiat_rate() -> None:
         maximum_rate=settings.BUSINESS_RATE_MAX_TJS_PER_USDT,
         policy_version=settings.BUSINESS_RATE_POLICY_VERSION,
     )
+    conversion_provider = NbtFiatRateProvider(
+        _client,
+        settings.NBT_FIAT_BASE_URL,
+        minimum_rate=settings.FIAT_CONVERSION_MIN_TJS_PER_RUB,
+        maximum_rate=settings.FIAT_CONVERSION_MAX_TJS_PER_RUB,
+    )
+    _conversion = FiatConversionRateService(
+        provider=conversion_provider,
+        redis=redis,
+        redis_prefix=settings.REDIS_KEY_PREFIX,
+        cache_ttl_seconds=settings.FIAT_CONVERSION_CACHE_TTL_SECONDS,
+        max_age_seconds=settings.FIAT_CONVERSION_MAX_AGE_SECONDS,
+        markup_bps=settings.FIAT_CONVERSION_MARKUP_BPS,
+        fee_bps=settings.FIAT_CONVERSION_FEE_BPS,
+        policy_version=settings.FIAT_CONVERSION_POLICY_VERSION,
+    )
 
 
 async def close_fiat_rate() -> None:
-    global _aggregator, _business, _client  # noqa: PLW0603
+    global _aggregator, _business, _client, _conversion  # noqa: PLW0603
     if _client is not None:
         await _client.close()
     _client = None
     _aggregator = None
     _business = None
+    _conversion = None
 
 
 def get_fiat_rate_aggregator() -> FiatRateAggregator:
@@ -85,6 +104,12 @@ def get_business_exchange_rate_service() -> BusinessExchangeRateService:
     if _business is None:
         raise RuntimeError("Business exchange-rate runtime is not initialised")
     return _business
+
+
+def get_fiat_conversion_rate_service() -> FiatConversionRateService:
+    if _conversion is None:
+        raise RuntimeError("Fiat conversion runtime is not initialised")
+    return _conversion
 
 
 async def get_fiat_diagnostics() -> dict:

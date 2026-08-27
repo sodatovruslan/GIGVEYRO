@@ -100,6 +100,13 @@ class Settings(BaseSettings):
     BUSINESS_RATE_POLICY_VERSION: str = "official-fiat-fixed-peg-v1"
     BUSINESS_RATE_MIN_TJS_PER_USDT: Decimal = Decimal("5")
     BUSINESS_RATE_MAX_TJS_PER_USDT: Decimal = Decimal("20")
+    FIAT_CONVERSION_CACHE_TTL_SECONDS: int = 21600
+    FIAT_CONVERSION_MAX_AGE_SECONDS: int = 345600
+    FIAT_CONVERSION_MIN_TJS_PER_RUB: Decimal = Decimal("0.01")
+    FIAT_CONVERSION_MAX_TJS_PER_RUB: Decimal = Decimal("1")
+    FIAT_CONVERSION_MARKUP_BPS: int = 0
+    FIAT_CONVERSION_FEE_BPS: int = 0
+    FIAT_CONVERSION_POLICY_VERSION: str = "nbt-official-zero-adjustment-v1"
 
     # USDT TRC20 & TRON Settings
     USDT_TRC20_CONTRACT_ADDRESS: str = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
@@ -263,6 +270,10 @@ class Settings(BaseSettings):
             raise ValueError("USDT_FIXED_USD_RATE is outside the broad safety range")
         if self.BUSINESS_RATE_MIN_TJS_PER_USDT >= self.BUSINESS_RATE_MAX_TJS_PER_USDT:
             raise ValueError("Business rate sanity minimum must be below maximum")
+        if self.FIAT_CONVERSION_MIN_TJS_PER_RUB >= self.FIAT_CONVERSION_MAX_TJS_PER_RUB:
+            raise ValueError("TJS/RUB sanity minimum must be below maximum")
+        if self.FIAT_CONVERSION_MARKUP_BPS != 0 or self.FIAT_CONVERSION_FEE_BPS != 0:
+            raise ValueError("TJS/RUB markup and fee must remain zero until explicitly approved")
         return self
 
 

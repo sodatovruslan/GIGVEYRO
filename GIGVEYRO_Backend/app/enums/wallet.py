@@ -7,6 +7,12 @@ class Currency(StrEnum):
     """
 
     USDT = "USDT"
+    TJS = "TJS"
+    RUB = "RUB"
+
+    @classmethod
+    def managed_fiat(cls) -> tuple["Currency", "Currency"]:
+        return cls.TJS, cls.RUB
 
 
 class BalanceBucket(StrEnum):
@@ -37,3 +43,9 @@ class LedgerEntryType(StrEnum):
     WITHDRAWAL_HOLD = "withdrawal_hold"
     WITHDRAWAL_RELEASE = "withdrawal_release"
     WITHDRAWAL_PAID = "withdrawal_paid"
+
+
+class FiatLedgerEntryType(StrEnum):
+    OWNER_ALLOCATION = "owner_allocation"
+    CONVERSION_DEBIT = "conversion_debit"
+    CONVERSION_CREDIT = "conversion_credit"
