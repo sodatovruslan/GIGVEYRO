@@ -1,8 +1,8 @@
 import { apiFetch } from "@/lib/api/client";
-import type { AuditLogEntry, IntegrationDiagnostics, MerchantWithdrawal, Paginated } from "@/lib/api/types";
+import type { AuditLogEntry, FeePolicy, FeePreview, FeeType, IntegrationDiagnostics, MerchantWithdrawal, Paginated, ProfitEntry, ProfitSummary } from "@/lib/api/types";
 
-export const auditActions = ["account.create", "account.update", "account.block", "account.unblock", "account.reset_password", "wallet.allocate", "wallet.adjust_insurance", "wallet.manual_adjust", "fiat.allocate", "fiat.convert", "deal.complete", "deal.release", "appeal.review", "appeal.resolve", "withdrawal.approve", "withdrawal.reject", "withdrawal.mark_paid"] as const;
-export const auditEntityTypes = ["account", "wallet", "fiat_wallet", "fiat_conversion", "deal", "appeal", "withdrawal"] as const;
+export const auditActions = ["account.create", "account.update", "account.block", "account.unblock", "account.reset_password", "wallet.allocate", "wallet.adjust_insurance", "wallet.manual_adjust", "fiat.allocate", "fiat.convert", "fee_policy.created", "fee_policy.activated", "fee_policy.disabled", "deal.complete", "deal.release", "appeal.review", "appeal.resolve", "withdrawal.approve", "withdrawal.reject", "withdrawal.mark_paid"] as const;
+export const auditEntityTypes = ["account", "wallet", "fiat_wallet", "fiat_conversion", "fee_policy", "fee_policy_component", "deal", "appeal", "withdrawal"] as const;
 
 interface AuditFilters {
   actorAccountId?: string;
@@ -21,6 +21,12 @@ function queryString(values: Record<string, string | number | undefined>) {
 
 export const ownerOperationsApi = {
   integrations: () => apiFetch<IntegrationDiagnostics>("/api/v1/owner/integrations/diagnostics"),
+  feePolicy: () => apiFetch<FeePolicy>("/api/v1/owner/fees/policy"),
+  createFeePolicy: (components: Record<FeeType, { enabled: boolean; percent_bps: number; fixed_fee: string; min_fee: string | null; max_fee: string | null; payer: "USER" | "MERCHANT" | null }>) => apiFetch<FeePolicy>("/api/v1/owner/fees/policies", { method: "POST", body: { components } }),
+  activateFeePolicy: (id: string) => apiFetch<FeePolicy>(`/api/v1/owner/fees/policies/${id}/activate`, { method: "POST" }),
+  previewFee: (feeType: FeeType, currency: "TJS" | "RUB" | "USDT", amount: string, policyId?: string) => apiFetch<FeePreview>("/api/v1/owner/fees/preview", { method: "POST", body: { policy_id: policyId, fee_type: feeType, currency, amount } }),
+  profitSummary: () => apiFetch<ProfitSummary>("/api/v1/owner/profit/summary"),
+  profitEntries: (filters: { feeType?: FeeType; currency?: string; offset?: number } = {}) => apiFetch<Paginated<ProfitEntry>>(`/api/v1/owner/profit/entries?${queryString({ fee_type: filters.feeType, currency: filters.currency, limit: 20, offset: filters.offset ?? 0 })}`),
   auditLogs: (filters: AuditFilters = {}) => apiFetch<Paginated<AuditLogEntry>>(`/api/v1/owner/audit-logs?${queryString({
     actor_account_id: filters.actorAccountId,
     action: filters.action,

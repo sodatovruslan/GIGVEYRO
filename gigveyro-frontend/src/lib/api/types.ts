@@ -130,7 +130,12 @@ export interface FiatConversionPreview {
   to_currency: FiatCurrency;
   source_amount: string;
   destination_amount: string;
+  gross_destination_amount: string;
+  fee_amount: string;
   exchange_rate: string;
+  reference_rate: string;
+  effective_rate: string;
+  fee_policy_version: number;
   provider: string;
   published_at: string;
   received_at: string;
@@ -149,7 +154,12 @@ export interface FiatConversion {
   to_currency: FiatCurrency;
   source_amount: string;
   destination_amount: string;
+  gross_destination_amount: string;
+  fee_amount: string;
   exchange_rate: string;
+  reference_rate: string;
+  effective_rate: string;
+  fee_policy_version: number;
   source_balance_before: string;
   source_balance_after: string;
   destination_balance_before: string;
@@ -159,6 +169,57 @@ export interface FiatConversion {
   rate_policy_version: string;
   rate_mode: string;
   comment: string | null;
+  created_at: string;
+}
+
+export type FeeType = "deal_fee" | "fiat_conversion_spread" | "withdrawal_fee" | "merchant_fee";
+export interface FeeComponent {
+  fee_type: FeeType;
+  enabled: boolean;
+  percent_bps: number;
+  fixed_fee: string;
+  min_fee: string | null;
+  max_fee: string | null;
+  payer: "USER" | "MERCHANT" | null;
+  supported_for_charging: boolean;
+}
+export interface FeePolicy {
+  id: string;
+  version: number;
+  status: "draft" | "active" | "retired";
+  effective_from: string | null;
+  created_at: string;
+  activated_at: string | null;
+  components: FeeComponent[];
+}
+export interface FeePreview {
+  policy_version: number;
+  fee_type: FeeType;
+  currency: FiatCurrency | "USDT";
+  gross: string;
+  percent_fee: string;
+  fixed_fee: string;
+  total_fee: string;
+  net: string;
+}
+export interface ProfitMetric {
+  currency: FiatCurrency | "USDT";
+  fee_type: FeeType;
+  gross_volume: string;
+  total_fees: string;
+  transaction_count: number;
+  average_fee: string;
+}
+export interface ProfitSummary { periods: Record<"today" | "7d" | "30d" | "all", ProfitMetric[]>; }
+export interface ProfitEntry {
+  id: string;
+  source_type: string;
+  source_id: string;
+  fee_type: FeeType;
+  currency: FiatCurrency | "USDT";
+  gross_amount: string;
+  fee_amount: string;
+  policy_version: number;
   created_at: string;
 }
 

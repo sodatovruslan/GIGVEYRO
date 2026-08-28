@@ -1,0 +1,315 @@
+.topGrid,
+.componentGrid,
+.metrics {
+  display: grid;
+  gap: 13px;
+}
+
+.topGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 24px;
+}
+
+.componentGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel,
+.component,
+.previewPanel,
+.metricCard,
+.tableWrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+}
+
+.panel,
+.component,
+.previewPanel,
+.metricCard {
+  padding: 20px;
+}
+
+.panel > span,
+.sectionHeader span,
+.previewPanel > div > span,
+.componentTitle span {
+  color: var(--primary);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.panel h2,
+.sectionHeader h2,
+.previewPanel h2 {
+  margin: 7px 0;
+  font: 700 20px/1.2 var(--font-display);
+}
+
+.panel p,
+.component p {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.safe {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--success);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 24px 0 13px;
+}
+
+.sectionHeader select,
+.filters select,
+.previewPanel input,
+.component input,
+.component select {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.componentTitle {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.componentTitle h3 {
+  margin: 6px 0;
+  font: 700 18px var(--font-display);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.fields label,
+.previewPanel label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.fields input:disabled,
+.fields select:disabled {
+  opacity: 0.55;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+}
+
+.toggle i {
+  display: block;
+  width: 40px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-subtle);
+}
+
+.toggle i::after {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  content: "";
+  transition: 0.2s;
+}
+
+.toggle input:checked + i {
+  border-color: var(--success);
+  background: var(--success-soft);
+}
+
+.toggle input:checked + i::after {
+  transform: translateX(18px);
+  background: var(--success);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 14px 0 24px;
+}
+
+.actions button,
+.previewPanel button {
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--primary);
+  color: white;
+  font-weight: 700;
+}
+
+.previewPanel {
+  display: grid;
+  grid-template-columns: 1fr minmax(160px, 240px) auto;
+  align-items: end;
+  gap: 15px;
+}
+
+.previewValues {
+  grid-column: 1/-1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.previewValues div {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+
+.previewValues span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.previewValues strong {
+  display: block;
+  margin-top: 5px;
+}
+
+.previewPanel .activate {
+  grid-column: 1/-1;
+  justify-self: end;
+  background: var(--success);
+}
+
+.metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metricCard span,
+.metricCard small {
+  display: block;
+  color: var(--text-secondary);
+}
+
+.metricCard strong {
+  display: block;
+  margin: 9px 0;
+  color: var(--success);
+  font: 700 25px var(--font-display);
+}
+
+.metricCard small + small {
+  margin-top: 5px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.tableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tableWrap th,
+.tableWrap td {
+  padding: 13px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tableWrap th {
+  color: var(--text-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.positive {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.empty {
+  padding: 28px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.error,
+.notice {
+  margin-bottom: 13px;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.notice {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+@media (max-width: 950px) {
+  .componentGrid,
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .previewPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .previewValues,
+  .previewPanel .activate {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 700px) {
+  .topGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .fields,
+  .previewValues {
+    grid-template-columns: 1fr;
+  }
+}
