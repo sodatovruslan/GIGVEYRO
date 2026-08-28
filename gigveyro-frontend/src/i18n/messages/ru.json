@@ -97,6 +97,7 @@
     "notifications": "Уведомления",
     "analytics": "Аналитика",
     "fees": "Комиссии и прибыль",
+    "treasury": "Казначейство и риски",
     "integrations": "Интеграции",
     "audit": "Журнал",
     "wallet": "Баланс",
@@ -653,6 +654,7 @@
       "fiat_conversion": "Конвертация фиата",
       "fee_policy": "Политика комиссий",
       "fee_policy_component": "Компонент комиссии",
+      "risk_policy": "Политика риска",
       "deal": "Сделка",
       "appeal": "Апелляция",
       "withdrawal": "Вывод"
@@ -679,6 +681,7 @@
         "activated": "Политика комиссий активирована",
         "disabled": "Компонент комиссии отключён"
       },
+      "risk_policy": {"created": "Политика риска создана", "activated": "Политика риска активирована", "disabled": "Контроль риска отключён"},
       "deal": {
         "complete": "Завершена сделка",
         "release": "Освобождена сделка"
@@ -749,6 +752,17 @@
       "withdrawal_fee": "Комиссия вывода",
       "merchant_fee": "Комиссия мерчанта"
     }
+  },
+  "treasury": {
+    "title": "Казначейство и риски", "subtitle": "Наблюдаемые резервы, внутренние обязательства и настраиваемые ограничения",
+    "observed": "Наблюдение", "notObserved": "Внешний резерв ещё не считан", "refresh": "Безопасно обновить только чтением", "policyVersion": "Политика риска v{version}",
+    "externalUsdt": "Внешний Bybit USDT", "externalUsdc": "Внешний Bybit USDC", "liquidReserve": "Допустимый наблюдаемый USDT-резерв", "usdcExcluded": "Показан отдельно и не засчитывается как USDT",
+    "totalLiability": "Все внутренние обязательства", "liabilityHint": "Обязательства USER и MERCHANT без двойного счёта", "coverage": "Покрытие", "coverageHint": "Допустимый USDT-резерв / обязательства", "surplus": "Профицит резерва", "deficit": "Дефицит резерва", "reserveOnly": "Прибыль не учитывается",
+    "userLiability": "Обязательства USER", "merchantLiability": "Обязательства MERCHANT", "frozen": "заморожено", "pending": "ожидает вывода", "ownerProfit": "Учётная прибыль Owner", "profitSeparate": "Не treasury и не расходуемый резерв",
+    "riskPolicy": "Версионная политика риска", "defaultOff": "Мониторинг всегда включён. Все блокировки по умолчанию выключены.", "reserveEnforcement": "Контролировать покрытие", "minimumRatio": "Минимум, bps", "warningRatio": "Порог HEALTHY, bps", "freshness": "Максимальный возраст данных, секунд", "singleDeal": "Максимальная одна сделка", "userExposure": "Максимальная заморозка USER", "pendingLimit": "Максимум ожидающих выводов", "openDeals": "Максимум открытых сделок", "preview": "Предпросмотр backend", "createDraft": "Создать черновик", "activate": "Активировать", "noBlockReason": "Причин блокировки нет",
+    "statuses": {"healthy":"Здорово","warning":"Предупреждение","critical":"Критично","stale":"Данные устарели","unknown":"Неизвестно"},
+    "decisions": {"allow":"Разрешить","warn":"Предупредить","block":"Заблокировать"},
+    "reasons": {"reserve_data_stale":"Данные резерва устарели","insufficient_reserve":"Недостаточный резерв","single_deal_limit":"Лимит одной сделки","user_exposure_limit":"Лимит риска пользователя","pending_withdrawal_limit":"Лимит ожидающих выводов","total_open_exposure_limit":"Лимит открытых сделок","minimum_external_reserve":"Минимальный внешний резерв"}
   },
   "errors": {
     "400": "Проверьте введённые данные.",

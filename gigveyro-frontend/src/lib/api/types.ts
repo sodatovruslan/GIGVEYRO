@@ -530,3 +530,34 @@ export interface Deposit {
   created_at: string;
   updated_at: string;
 }
+
+
+export type RiskStatus = "healthy" | "warning" | "critical" | "stale" | "unknown";
+export interface TreasurySummary {
+  generated_at: string; external_observed_at: string | null; data_age_seconds: number | null;
+  provider_status: string; external_bybit_usdt: string; external_bybit_usdc: string;
+  total_external_stable_reserve: null; internal_user_liability_usdt: string;
+  merchant_liability_usdt: string; total_internal_liability_usdt: string; frozen_usdt: string;
+  pending_withdrawal_usdt: string; open_deal_exposure_usdt: string; owner_profit_usdt: string;
+  required_reserve_usdt: string; available_reserve_usdt: string; reserve_surplus_usdt: string;
+  reserve_deficit_usdt: string; coverage_ratio_bps: number | null; risk_status: RiskStatus;
+  policy_version: number;
+}
+export interface RiskPolicyInput {
+  reserve_coverage_enabled: boolean; minimum_reserve_ratio_bps: number;
+  warning_reserve_ratio_bps: number; max_treasury_data_age_seconds: number;
+  single_deal_enabled: boolean; max_single_deal_usdt: string | null;
+  user_exposure_enabled: boolean; max_user_exposure_usdt: string | null;
+  pending_withdrawals_enabled: boolean; max_pending_withdrawals_usdt: string | null;
+  total_open_deals_enabled: boolean; max_total_open_deals_usdt: string | null;
+  minimum_external_reserve_enabled: boolean; minimum_external_usdt_reserve: string | null;
+}
+export interface RiskPolicy extends RiskPolicyInput {
+  id: string; version: number; status: "draft" | "active" | "retired";
+  effective_from: string | null; created_at: string; activated_at: string | null;
+}
+export interface RiskPreview {
+  snapshot: TreasurySummary;
+  reserve_decision: "allow" | "warn" | "block";
+  reason_code: string | null;
+}

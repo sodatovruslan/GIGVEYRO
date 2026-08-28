@@ -97,6 +97,7 @@
     "notifications": "Notifications",
     "analytics": "Analytics",
     "fees": "Fees & profit",
+    "treasury": "Treasury & risk",
     "integrations": "Integrations",
     "audit": "Audit log",
     "wallet": "Wallet",
@@ -653,6 +654,7 @@
       "fiat_conversion": "Fiat conversion",
       "fee_policy": "Fee policy",
       "fee_policy_component": "Fee component",
+      "risk_policy": "Risk policy",
       "deal": "Deal",
       "appeal": "Appeal",
       "withdrawal": "Withdrawal"
@@ -679,6 +681,7 @@
         "activated": "Fee policy activated",
         "disabled": "Fee component disabled"
       },
+      "risk_policy": {"created": "Risk policy created", "activated": "Risk policy activated", "disabled": "Risk control disabled"},
       "deal": {
         "complete": "Deal completed",
         "release": "Deal released"
@@ -749,6 +752,17 @@
       "withdrawal_fee": "Withdrawal fee",
       "merchant_fee": "Merchant fee"
     }
+  },
+  "treasury": {
+    "title": "Treasury & Risk", "subtitle": "Observed reserves, internal liabilities and configurable safety controls",
+    "observed": "Observed", "notObserved": "External reserve has not been observed", "refresh": "Safe read-only refresh", "policyVersion": "Risk policy v{version}",
+    "externalUsdt": "External Bybit USDT", "externalUsdc": "External Bybit USDC", "liquidReserve": "Eligible observed USDT reserve", "usdcExcluded": "Displayed separately; not counted as USDT reserve",
+    "totalLiability": "Total internal liability", "liabilityHint": "USER and MERCHANT obligations without double counting", "coverage": "Coverage ratio", "coverageHint": "Eligible USDT reserve / liability", "surplus": "Reserve surplus", "deficit": "Reserve deficit", "reserveOnly": "Profit is excluded",
+    "userLiability": "USER liability", "merchantLiability": "MERCHANT liability", "frozen": "frozen", "pending": "pending withdrawals", "ownerProfit": "Owner accounting profit", "profitSeparate": "Not treasury and not spendable reserve",
+    "riskPolicy": "Versioned risk policy", "defaultOff": "Monitoring is always on. Every enforcement rule defaults to off.", "reserveEnforcement": "Enforce reserve coverage", "minimumRatio": "Minimum ratio, bps", "warningRatio": "Healthy threshold, bps", "freshness": "Maximum data age, seconds", "singleDeal": "Maximum single deal", "userExposure": "Maximum user frozen exposure", "pendingLimit": "Maximum pending withdrawals", "openDeals": "Maximum total open deals", "preview": "Backend preview", "createDraft": "Create draft", "activate": "Activate", "noBlockReason": "No blocking reason",
+    "statuses": {"healthy":"Healthy","warning":"Warning","critical":"Critical","stale":"Stale","unknown":"Unknown"},
+    "decisions": {"allow":"Allow","warn":"Warn","block":"Block"},
+    "reasons": {"reserve_data_stale":"Reserve data is stale","insufficient_reserve":"Insufficient reserve","single_deal_limit":"Single-deal limit","user_exposure_limit":"User exposure limit","pending_withdrawal_limit":"Pending-withdrawal limit","total_open_exposure_limit":"Open-deal exposure limit","minimum_external_reserve":"Minimum external reserve"}
   },
   "errors": {
     "400": "Check the submitted data.",

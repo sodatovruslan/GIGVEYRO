@@ -97,6 +97,7 @@
     "notifications": "Огоҳиҳо",
     "analytics": "Таҳлил",
     "fees": "Комиссияҳо ва фоида",
+    "treasury": "Хазина ва хатарҳо",
     "integrations": "Пайвастҳо",
     "audit": "Сабти аудит",
     "wallet": "Ҳамён",
@@ -653,6 +654,7 @@
       "fiat_conversion": "Табдили асъор",
       "fee_policy": "Сиёсати комиссияҳо",
       "fee_policy_component": "Ҷузъи комиссия",
+      "risk_policy": "Сиёсати хатар",
       "deal": "Муомила",
       "appeal": "Шикоят",
       "withdrawal": "Бардошт"
@@ -679,6 +681,7 @@
         "activated": "Сиёсати комиссияҳо фаъол шуд",
         "disabled": "Ҷузъи комиссия хомӯш шуд"
       },
+      "risk_policy": {"created": "Сиёсати хатар сохта шуд", "activated": "Сиёсати хатар фаъол шуд", "disabled": "Назорати хатар хомӯш шуд"},
       "deal": {
         "complete": "Муомила анҷом ёфт",
         "release": "Муомила озод шуд"
@@ -749,6 +752,17 @@
       "withdrawal_fee": "Комиссияи гирифтани маблағ",
       "merchant_fee": "Комиссияи мерчант"
     }
+  },
+  "treasury": {
+    "title": "Хазина ва идоракунии хатар", "subtitle": "Захираҳои мушоҳидашуда, ӯҳдадориҳои дохилӣ ва маҳдудиятҳои бехатарӣ",
+    "observed": "Мушоҳида шуд", "notObserved": "Захираи беруна ҳанӯз хонда нашудааст", "refresh": "Навсозии бехатари танҳо-хондан", "policyVersion": "Сиёсати хатар v{version}",
+    "externalUsdt": "USDT-и берунаи Bybit", "externalUsdc": "USDC-и берунаи Bybit", "liquidReserve": "Захираи мушоҳидашудаи қобили қабули USDT", "usdcExcluded": "Ҷудо нишон дода мешавад; ҳамчун USDT ҳисоб намешавад",
+    "totalLiability": "Ҳамаи ӯҳдадориҳои дохилӣ", "liabilityHint": "Ӯҳдадориҳои USER ва MERCHANT бе ҳисоби такрорӣ", "coverage": "Таносуби пӯшиш", "coverageHint": "Захираи USDT / ӯҳдадориҳо", "surplus": "Барзиёдии захира", "deficit": "Касри захира", "reserveOnly": "Фоида дохил намешавад",
+    "userLiability": "Ӯҳдадории USER", "merchantLiability": "Ӯҳдадории MERCHANT", "frozen": "яхкардашуда", "pending": "бардоштҳои интизор", "ownerProfit": "Фоидаи ҳисобии Owner", "profitSeparate": "Хазина ё захираи харҷшаванда нест",
+    "riskPolicy": "Сиёсати версиявии хатар", "defaultOff": "Мониторинг ҳамеша фаъол аст. Ҳамаи блокҳо бо нобаёнӣ хомӯшанд.", "reserveEnforcement": "Назорати пӯшиши захира", "minimumRatio": "Ҳадди ақал, bps", "warningRatio": "Ҳадди HEALTHY, bps", "freshness": "Синни ниҳоии маълумот, сония", "singleDeal": "Ҳадди як муомила", "userExposure": "Ҳадди маблағи яхкардаи USER", "pendingLimit": "Ҳадди бардоштҳои интизор", "openDeals": "Ҳадди муомилаҳои кушода", "preview": "Пешнамоии backend", "createDraft": "Сохтани лоиҳа", "activate": "Фаъол кардан", "noBlockReason": "Сабаби блок нест",
+    "statuses": {"healthy":"Солим","warning":"Огоҳӣ","critical":"Бӯҳронӣ","stale":"Маълумот кӯҳна","unknown":"Номаълум"},
+    "decisions": {"allow":"Иҷозат","warn":"Огоҳӣ","block":"Блок"},
+    "reasons": {"reserve_data_stale":"Маълумоти захира кӯҳна аст","insufficient_reserve":"Захира нокифоя аст","single_deal_limit":"Ҳадди як муомила","user_exposure_limit":"Ҳадди хатари корбар","pending_withdrawal_limit":"Ҳадди бардоштҳои интизор","total_open_exposure_limit":"Ҳадди муомилаҳои кушода","minimum_external_reserve":"Ҳадди ақали захираи беруна"}
   },
   "errors": {
     "400": "Маълумоти воридшударо санҷед.",
