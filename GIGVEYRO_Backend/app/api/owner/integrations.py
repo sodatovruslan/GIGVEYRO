@@ -6,6 +6,7 @@ from app.api.deps import require_roles
 from app.core.config import settings
 from app.enums.account import UserRole
 from app.models.account import Account
+from app.services.exchange_private.runtime import get_bybit_private_diagnostics
 from app.services.exchange_rate import ExchangeRateError
 from app.services.fiat_rate.runtime import (
     get_business_exchange_rate_service,
@@ -45,6 +46,16 @@ async def get_integrations_diagnostics(
         "market_data": await get_market_diagnostics(),
         "fiat_rate": await get_fiat_diagnostics(),
         "business_rate": await get_business_rate_diagnostics(),
+        "exchange_private": {
+            "binance": {
+                "configured": False,
+                "enabled": False,
+                "status": "not_configured",
+                "mode": "READ_ONLY",
+                "reason": "kyc_pending",
+            },
+            "bybit": await get_bybit_private_diagnostics(),
+        },
     }
 
 

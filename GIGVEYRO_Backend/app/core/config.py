@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from cryptography.fernet import Fernet
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     MARKET_MAX_DEVIATION_BPS: int = 100
     MARKET_CIRCUIT_FAILURE_THRESHOLD: int = 3
     MARKET_CIRCUIT_COOLDOWN_SECONDS: int = 30
+
+    # Private exchange observation (backend-only; no write capabilities)
+    BYBIT_PRIVATE_ENABLED: bool = False
+    BYBIT_API_KEY: SecretStr = SecretStr("")
+    BYBIT_API_SECRET: SecretStr = SecretStr("")
+    BYBIT_RECV_WINDOW_MS: int = 5000
+    BYBIT_PRIVATE_TIMEOUT_SECONDS: float = 8.0
+    BYBIT_PRIVATE_MAX_RETRIES: int = 2
 
     # Authoritative fiat-rate composition (official USD/TJS + explicit USDT peg policy)
     NBT_FIAT_BASE_URL: str = "https://nbt.tj/en/kurs/export_xml.php"
@@ -274,6 +282,15 @@ class Settings(BaseSettings):
             raise ValueError("TJS/RUB sanity minimum must be below maximum")
         if self.FIAT_CONVERSION_MARKUP_BPS != 0 or self.FIAT_CONVERSION_FEE_BPS != 0:
             raise ValueError("TJS/RUB markup and fee must remain zero until explicitly approved")
+        if self.BYBIT_PRIVATE_ENABLED and (
+            not self.BYBIT_API_KEY.get_secret_value()
+            or not self.BYBIT_API_SECRET.get_secret_value()
+        ):
+            raise ValueError("Bybit private API credentials are required when enabled")
+        if not 1000 <= self.BYBIT_RECV_WINDOW_MS <= 10000:
+            raise ValueError("BYBIT_RECV_WINDOW_MS must be between 1000 and 10000")
+        if not 0 <= self.BYBIT_PRIVATE_MAX_RETRIES <= 3:
+            raise ValueError("BYBIT_PRIVATE_MAX_RETRIES must be between 0 and 3")
         return self
 
 

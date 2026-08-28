@@ -142,6 +142,26 @@ if _PROMETHEUS_AVAILABLE:
         "gigveyro_business_rate_deviation_bps",
         "Deviation between configured fiat providers",
     )
+    EXCHANGE_PRIVATE_REQUESTS = Counter(
+        "gigveyro_exchange_private_requests_total",
+        "Private read-only exchange requests",
+        labelnames=["provider", "status"],
+    )
+    EXCHANGE_PRIVATE_LATENCY = Histogram(
+        "gigveyro_exchange_private_latency_seconds",
+        "Private read-only exchange request latency",
+        labelnames=["provider"],
+    )
+    EXCHANGE_PRIVATE_AUTH_FAILURES = Counter(
+        "gigveyro_exchange_private_auth_failures_total",
+        "Private exchange authentication failures",
+        labelnames=["provider"],
+    )
+    EXCHANGE_PRIVATE_RATE_LIMITS = Counter(
+        "gigveyro_exchange_private_rate_limits_total",
+        "Private exchange rate-limit responses",
+        labelnames=["provider"],
+    )
 else:
     # Stub objects so callers don't need to guard every usage
     class _NoopMetric:
@@ -172,6 +192,10 @@ else:
     FIAT_RATE_AGE = _NoopMetric()  # type: ignore[assignment]
     BUSINESS_RATE_CALCULATIONS = _NoopMetric()  # type: ignore[assignment]
     BUSINESS_RATE_DEVIATION = _NoopMetric()  # type: ignore[assignment]
+    EXCHANGE_PRIVATE_REQUESTS = _NoopMetric()  # type: ignore[assignment]
+    EXCHANGE_PRIVATE_LATENCY = _NoopMetric()  # type: ignore[assignment]
+    EXCHANGE_PRIVATE_AUTH_FAILURES = _NoopMetric()  # type: ignore[assignment]
+    EXCHANGE_PRIVATE_RATE_LIMITS = _NoopMetric()  # type: ignore[assignment]
 
 
 # ── FastAPI instrumentator setup ───────────────────────────────────────────
@@ -287,6 +311,21 @@ def record_business_rate(mode: str) -> None:
 
 def observe_business_rate_deviation(deviation_bps: float) -> None:
     BUSINESS_RATE_DEVIATION.set(deviation_bps)
+
+
+def record_exchange_private_request(
+    provider: str, status: str, latency_seconds: float
+) -> None:
+    EXCHANGE_PRIVATE_REQUESTS.labels(provider=provider, status=status).inc()
+    EXCHANGE_PRIVATE_LATENCY.labels(provider=provider).observe(latency_seconds)
+
+
+def record_exchange_private_auth_failure(provider: str) -> None:
+    EXCHANGE_PRIVATE_AUTH_FAILURES.labels(provider=provider).inc()
+
+
+def record_exchange_private_rate_limit(provider: str) -> None:
+    EXCHANGE_PRIVATE_RATE_LIMITS.labels(provider=provider).inc()
 
 
 def set_outbox_pending(count: int) -> None:
