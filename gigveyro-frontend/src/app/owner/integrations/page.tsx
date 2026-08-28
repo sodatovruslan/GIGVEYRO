@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useAppFormat } from "@/features/i18n/use-app-format";
-import type { FiatProviderDiagnostic, MarketProviderDiagnostic } from "@/lib/api/types";
+import type { ExchangePrivateDiagnostic, FiatProviderDiagnostic, MarketProviderDiagnostic } from "@/lib/api/types";
 import { ownerOperationsApi } from "@/lib/api/owner-operations";
 import { useApiQuery } from "@/lib/hooks/use-api-query";
 import { Heading } from "../owner-components";
@@ -10,7 +10,14 @@ import baseStyles from "../operations.module.css";
 import styles from "./integrations.module.css";
 
 type Tone = "ok" | "warn" | "danger" | "neutral";
-const diagnosticTone = (value: string): Tone => value === "healthy" || value === "enabled" || value === "connected" || value === "closed" ? "ok" : value === "mock" || value === "fallback" || value === "development" || value === "degraded" ? "warn" : value === "disabled" || value === "unavailable" || value === "open" ? "danger" : "neutral";
+type Diagnostic = (value: string) => { label: string; technical: string; tone: Tone };
+
+const diagnosticTone = (value: string): Tone => {
+  if (["healthy", "enabled", "connected", "closed", "valid", "READ_ONLY_SAFE"].includes(value)) return "ok";
+  if (["mock", "fallback", "development", "degraded", "UNKNOWN", "not_checked"].includes(value)) return "warn";
+  if (["unavailable", "open", "invalid", "OVER_PRIVILEGED", "over_privileged", "authentication_error", "permission_denied", "clock_error", "rate_limited"].includes(value)) return "danger";
+  return "neutral";
+};
 
 export default function IntegrationsPage() {
   const t = useTranslations("integrations");
@@ -18,12 +25,15 @@ export default function IntegrationsPage() {
   const format = useAppFormat();
   const query = useApiQuery(ownerOperationsApi.integrations, "owner-integrations");
   const data = query.data;
-  const diagnostic = (value: string) => ({ label: t.has(`values.${value}`) ? t(`values.${value}`) : value, technical: value, tone: diagnosticTone(value) });
+  const diagnostic: Diagnostic = (value) => ({ label: t.has(`values.${value}`) ? t(`values.${value}`) : value, technical: value, tone: diagnosticTone(value) });
+
   return <section><Heading title={t("title")} text={t("subtitle")} />{query.loading ? <div className={baseStyles.state}>{t("checking")}</div> : query.error ? <div className={baseStyles.error}>{query.error}</div> : data && <div className={styles.grid}>
     <Panel eyebrow={t("systemEyebrow")} title={t("system")}><Property label={common("status")} value={diagnostic(data.status)} /><Property label={t("environment")} value={diagnostic(data.environment)} /></Panel>
     <Panel eyebrow={t("providersEyebrow")} title={t("providers")}><Property label={t("deposits")} value={diagnostic(data.providers.deposit_provider)} /><Property label={t("rate")} value={diagnostic(data.providers.exchange_rate_provider)} /><Property label={t("payouts")} value={diagnostic(data.providers.payout_provider)} /></Panel>
     <MarketPanel name="Binance" provider={data.market_data.providers.binance} diagnostic={diagnostic} format={format} t={t} />
     <MarketPanel name="Bybit" provider={data.market_data.providers.bybit} diagnostic={diagnostic} format={format} t={t} />
+    <PrivatePlaceholder diagnostic={diagnostic} t={t} data={data.exchange_private.binance} />
+    <BybitPrivatePanel diagnostic={diagnostic} format={format} t={t} data={data.exchange_private.bybit} />
     <Panel eyebrow={t("marketEyebrow")} title={t("marketReference")}><Property label={common("status")} value={diagnostic(data.market_data.status)} /><Property label={t("activeProvider")} value={diagnostic(data.market_data.active_provider || "unavailable")} /><Property label={t("cache")} value={diagnostic(data.market_data.cache)} /><Property label={t("referenceSymbol")} plain={data.market_data.symbol} /><Property label={t("deviation")} plain={data.market_data.deviation_bps ? `${format.number(data.market_data.deviation_bps, 2)} bps` : "—"} /></Panel>
     {data.fiat_rate.providers[data.fiat_rate.primary] && <FiatPanel title={t("officialFiatRate")} provider={data.fiat_rate.providers[data.fiat_rate.primary]} diagnostic={diagnostic} format={format} t={t} />}
     {data.fiat_rate.providers[data.fiat_rate.secondary] && <FiatPanel title={t("secondaryFiatRate")} provider={data.fiat_rate.providers[data.fiat_rate.secondary]} diagnostic={diagnostic} format={format} t={t} secondary />}
@@ -32,11 +42,19 @@ export default function IntegrationsPage() {
   </div>}</section>;
 }
 
-function FiatPanel({ title, provider, diagnostic, format, t, secondary = false }: { title: string; provider: FiatProviderDiagnostic; diagnostic: (value: string) => { label: string; technical: string; tone: Tone }; format: ReturnType<typeof useAppFormat>; t: ReturnType<typeof useTranslations>; secondary?: boolean }) {
+function PrivatePlaceholder({ data, diagnostic, t }: { data: { configured: boolean; status: string; mode: string; reason: string }; diagnostic: Diagnostic; t: ReturnType<typeof useTranslations> }) {
+  return <Panel eyebrow={t("privateApiEyebrow")} title={t("binancePrivate")}><Property label={t("configured")} value={diagnostic(data.configured ? "enabled" : "not_configured")} /><Property label={t("access")} value={diagnostic(data.mode)} /><Property label={t("reason")} value={diagnostic(data.reason)} /><p className={styles.caption}>{t("binancePrivateHint")}</p></Panel>;
+}
+
+function BybitPrivatePanel({ data, diagnostic, format, t }: { data: ExchangePrivateDiagnostic; diagnostic: Diagnostic; format: ReturnType<typeof useAppFormat>; t: ReturnType<typeof useTranslations> }) {
+  return <Panel eyebrow={t("privateApiEyebrow")} title={t("bybitPrivate")}><Property label={t("connection")} value={diagnostic(data.status)} /><Property label={t("configured")} value={diagnostic(data.configured ? "enabled" : "not_configured")} /><Property label={t("access")} value={diagnostic(data.mode)} /><Property label={t("authentication")} value={diagnostic(data.authentication)} /><Property label={t("permissionSafety")} value={diagnostic(data.permission_safety)} /><Property label={t("ipRestriction")} value={diagnostic(data.ip_restricted === null ? "not_checked" : data.ip_restricted ? "enabled" : "disabled")} />{data.account && <><Property label={t("accountType")} plain={data.account.account_type} /><Property label={t("accountMode")} plain={data.account.account_mode} /><Property label={t("marginMode")} plain={data.account.margin_mode} /></>}<Property label={t("latency")} plain={data.latency_ms === null ? "—" : `${format.number(data.latency_ms, 0)} ms`} /><Property label={t("rateLimitRemaining")} plain={data.rate_limit_remaining === null ? "—" : format.number(data.rate_limit_remaining, 0)} /><p className={styles.caption}>{t("externalTreasuryHint")}</p>{data.balances.map((balance) => <Property key={balance.asset} label={`${balance.asset} ${t("walletBalance")}`} plain={format.number(balance.wallet_balance, 8)} />)}</Panel>;
+}
+
+function FiatPanel({ title, provider, diagnostic, format, t, secondary = false }: { title: string; provider: FiatProviderDiagnostic; diagnostic: Diagnostic; format: ReturnType<typeof useAppFormat>; t: ReturnType<typeof useTranslations>; secondary?: boolean }) {
   return <Panel eyebrow={t("fiatEyebrow")} title={title}><Property label={t("connection")} value={diagnostic(provider.status)} /><Property label={t("sourceType")} value={diagnostic(provider.source_type)} /><Property label={t("role")} value={diagnostic(provider.role)} /><Property label={t("pair")} plain={provider.pair} /><Property label={t("latestRate")} plain={provider.rate ? format.number(provider.rate, 8) : "—"} /><Property label={t("publishedAt")} plain={provider.published_at ? format.dateTime(provider.published_at) : "—"} /><Property label={t("lastFetched")} plain={provider.received_at ? format.dateTime(provider.received_at) : "—"} /><Property label={t("latency")} plain={provider.latency_ms === null ? "—" : `${format.number(provider.latency_ms, 0)} ms`} /><Property label={t("cache")} value={diagnostic(provider.cached ? "cached" : "direct")} />{secondary && <a className={styles.attribution} href="https://www.exchangerate-api.com" target="_blank" rel="noreferrer">{t("fxAttribution")}</a>}</Panel>;
 }
 
-function MarketPanel({ name, provider, diagnostic, format, t }: { name: string; provider: MarketProviderDiagnostic; diagnostic: (value: string) => { label: string; technical: string; tone: Tone }; format: ReturnType<typeof useAppFormat>; t: ReturnType<typeof useTranslations> }) {
+function MarketPanel({ name, provider, diagnostic, format, t }: { name: string; provider: MarketProviderDiagnostic; diagnostic: Diagnostic; format: ReturnType<typeof useAppFormat>; t: ReturnType<typeof useTranslations> }) {
   return <Panel eyebrow={t("publicMarketEyebrow")} title={`${name} ${t("marketData")}`}><Property label={t("connection")} value={diagnostic(provider.status)} /><Property label={t("access")} value={diagnostic(provider.read_only ? "readOnly" : "unavailable")} /><Property label={t("role")} value={diagnostic(provider.role)} /><Property label={t("latency")} plain={provider.latency_ms === null ? "—" : `${format.number(provider.latency_ms, 0)} ms`} /><Property label={t("lastCheck")} plain={provider.last_success_at ? format.dateTime(provider.last_success_at) : "—"} /><Property label={t("circuit")} value={diagnostic(provider.circuit)} /></Panel>;
 }
 

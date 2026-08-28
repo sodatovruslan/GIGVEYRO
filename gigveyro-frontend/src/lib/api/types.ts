@@ -353,6 +353,49 @@ export interface IntegrationDiagnostics {
     calculated_at: string | null;
     is_degraded: boolean;
   };
+  exchange_private: {
+    binance: {
+      configured: boolean;
+      enabled: boolean;
+      status: string;
+      mode: "READ_ONLY";
+      reason: string;
+    };
+    bybit: ExchangePrivateDiagnostic;
+  };
+}
+
+export interface ExchangePrivateDiagnostic {
+  provider: "bybit";
+  configured: boolean;
+  enabled: boolean;
+  status: string;
+  authentication: string;
+  mode: "READ_ONLY";
+  permission_safety: "READ_ONLY_SAFE" | "OVER_PRIVILEGED" | "UNKNOWN";
+  masked_key: string | null;
+  ip_restricted: boolean | null;
+  expires_at: string | null;
+  deadline_days: number | null;
+  account: {
+    provider: "bybit";
+    account_type: string;
+    account_mode: string;
+    margin_mode: string;
+    account_status: string;
+    updated_at: string | null;
+  } | null;
+  balances: Array<{
+    provider: "bybit";
+    asset: "USDT" | "USDC";
+    wallet_balance: string;
+    available_balance: string | null;
+    equity: string | null;
+    received_at: string;
+  }>;
+  latency_ms: number | null;
+  last_success_at: string | null;
+  rate_limit_remaining: number | null;
 }
 
 export interface FiatProviderDiagnostic {
