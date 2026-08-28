@@ -10,8 +10,10 @@ from app.db.session import AsyncSessionLocal
 from app.enums.account import UserRole
 from app.enums.wallet import Currency
 from app.models.account import Account
+from app.models.fees import FeeSnapshot, OwnerProfitEntry
 from app.models.fiat_wallet import FiatConversion, FiatLedgerEntry, FiatWalletBalance
 from app.repositories.account import AccountRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.fiat_wallet import (
     FiatConversionRepository,
     FiatLedgerRepository,
@@ -50,6 +52,7 @@ def _service(session) -> FiatWalletService:
         conversions=FiatConversionRepository(session),
         accounts=AccountRepository(session),
         rates=FixedRates(),
+        fees=FeeRepository(session),
     )
 
 
@@ -85,12 +88,13 @@ async def _setup(initial_tjs: str) -> tuple[uuid.UUID, uuid.UUID]:
 
 async def _cleanup(user_id: uuid.UUID, owner_id: uuid.UUID) -> None:
     async with AsyncSessionLocal() as session:
+        conversion_ids = select(FiatConversion.id).where(FiatConversion.account_id == user_id)
         await session.execute(
-            delete(FiatLedgerEntry).where(FiatLedgerEntry.account_id == user_id)
+            delete(OwnerProfitEntry).where(OwnerProfitEntry.source_id.in_(conversion_ids))
         )
-        await session.execute(
-            delete(FiatConversion).where(FiatConversion.account_id == user_id)
-        )
+        await session.execute(delete(FeeSnapshot).where(FeeSnapshot.source_id.in_(conversion_ids)))
+        await session.execute(delete(FiatLedgerEntry).where(FiatLedgerEntry.account_id == user_id))
+        await session.execute(delete(FiatConversion).where(FiatConversion.account_id == user_id))
         await session.execute(
             delete(FiatWalletBalance).where(FiatWalletBalance.account_id == user_id)
         )
@@ -136,11 +140,14 @@ async def test_two_conversions_racing_cannot_double_spend_or_go_negative():
             assert balances[Currency.TJS] == Decimal("20")
             assert balances[Currency.RUB] == Decimal("800")
             assert all(value >= 0 for value in balances.values())
-            assert await session.scalar(
-                select(func.count()).select_from(FiatConversion).where(
-                    FiatConversion.account_id == user_id
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(FiatConversion)
+                    .where(FiatConversion.account_id == user_id)
                 )
-            ) == 1
+                == 1
+            )
     finally:
         await _cleanup(user_id, owner_id)
 
@@ -190,16 +197,24 @@ async def test_concurrent_same_idempotency_key_creates_one_conversion_and_credit
                 for item in await FiatWalletRepository(session).list_balances(user_id)
             }
             assert balances == {Currency.TJS: Decimal("90"), Currency.RUB: Decimal("100")}
-            assert await session.scalar(
-                select(func.count()).select_from(FiatConversion).where(
-                    FiatConversion.account_id == user_id
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(FiatConversion)
+                    .where(FiatConversion.account_id == user_id)
                 )
-            ) == 1
-            assert await session.scalar(
-                select(func.count()).select_from(FiatLedgerEntry).where(
-                    FiatLedgerEntry.reference_type == "fiat_conversion",
-                    FiatLedgerEntry.account_id == user_id,
+                == 1
+            )
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(FiatLedgerEntry)
+                    .where(
+                        FiatLedgerEntry.reference_type == "fiat_conversion",
+                        FiatLedgerEntry.account_id == user_id,
+                    )
                 )
-            ) == 2
+                == 2
+            )
     finally:
         await _cleanup(user_id, owner_id)
