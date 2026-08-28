@@ -24,6 +24,7 @@ from app.api.owner.appeals import router as owner_appeals_router
 from app.api.owner.audit import router as owner_audit_router
 from app.api.owner.deals import router as owner_deals_router
 from app.api.owner.deposits import router as owner_deposits_router
+from app.api.owner.fees import router as owner_fees_router
 from app.api.owner.fiat_wallets import router as owner_fiat_wallets_router
 from app.api.owner.integrations import router as owner_integrations_router
 from app.api.owner.requisites import router as owner_requisites_router
@@ -131,6 +132,7 @@ app.include_router(owner_appeals_router)
 app.include_router(owner_analytics_router)
 app.include_router(owner_integrations_router)
 app.include_router(owner_fiat_wallets_router)
+app.include_router(owner_fees_router)
 app.include_router(owner_audit_router)
 app.include_router(wallet_router)
 app.include_router(merchant_wallet_router)

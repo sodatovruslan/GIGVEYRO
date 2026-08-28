@@ -47,7 +47,12 @@ class FiatConversionPreviewOut(BaseModel):
     to_currency: Currency
     source_amount: Money
     destination_amount: Money
+    gross_destination_amount: Money
+    fee_amount: Money
     exchange_rate: Money
+    reference_rate: Money
+    effective_rate: Money
+    fee_policy_version: int
     provider: str
     published_at: datetime
     received_at: datetime
@@ -73,7 +78,12 @@ class FiatConversionOut(BaseModel):
     to_currency: Currency
     source_amount: Money
     destination_amount: Money
+    gross_destination_amount: Money
+    fee_amount: Money
     exchange_rate: Money
+    reference_rate: Money
+    effective_rate: Money
+    fee_policy_version: int
     source_balance_before: Money
     source_balance_after: Money
     destination_balance_before: Money

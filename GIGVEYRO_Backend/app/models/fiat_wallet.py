@@ -78,6 +78,13 @@ class FiatConversion(Base):
     source_amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     destination_amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     exchange_rate: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    reference_rate: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    effective_rate: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    gross_destination_amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    fee_amount: Mapped[Decimal] = mapped_column(
+        MONEY, nullable=False, default=Decimal("0"), server_default="0"
+    )
+    fee_policy_version: Mapped[int] = mapped_column(nullable=False, default=0, server_default="0")
     source_balance_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     source_balance_after: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     destination_balance_before: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
@@ -104,9 +111,7 @@ class FiatLedgerEntry(Base):
             "idempotency_key",
             name="uq_fiat_ledger_actor_idempotency",
         ),
-        UniqueConstraint(
-            "reference_id", "type", name="uq_fiat_ledger_reference_type"
-        ),
+        UniqueConstraint("reference_id", "type", name="uq_fiat_ledger_reference_type"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

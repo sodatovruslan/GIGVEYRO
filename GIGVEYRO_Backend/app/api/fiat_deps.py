@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.repositories.account import AccountRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.fiat_wallet import (
     FiatConversionRepository,
     FiatLedgerRepository,
@@ -25,4 +26,5 @@ def get_fiat_wallet_service(
         conversions=FiatConversionRepository(db),
         accounts=AccountRepository(db),
         rates=rates,
+        fees=FeeRepository(db),
     )

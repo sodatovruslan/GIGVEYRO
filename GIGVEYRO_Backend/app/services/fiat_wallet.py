@@ -1,16 +1,27 @@
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from app.enums.account import UserRole
+from app.enums.fees import FeeType
 from app.enums.wallet import Currency, FiatLedgerEntryType
 from app.models.account import Account
+from app.models.fees import FeeSnapshot, OwnerProfitEntry
 from app.models.fiat_wallet import FiatConversion, FiatLedgerEntry, FiatWalletBalance
 from app.repositories.account import AccountRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.fiat_wallet import (
     FiatConversionRepository,
     FiatLedgerRepository,
     FiatWalletRepository,
+)
+from app.services.fees import (
+    FeeCalculation,
+    FeeCalculator,
+    FeePolicyService,
+    component_terms,
+    policy_component,
 )
 from app.services.fiat_rate.conversion import FiatConversionRateService
 from app.services.fiat_rate.models import FiatConversionQuote
@@ -38,6 +49,17 @@ class FiatIdempotencyConflictError(Exception):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class FiatConversionPreview:
+    destination_amount: Decimal
+    gross_destination_amount: Decimal
+    reference_rate: Decimal
+    effective_rate: Decimal
+    fee: FeeCalculation
+    fee_policy_version: int
+    quote: FiatConversionQuote
+
+
 class FiatWalletService:
     def __init__(
         self,
@@ -47,12 +69,15 @@ class FiatWalletService:
         conversions: FiatConversionRepository,
         accounts: AccountRepository,
         rates: FiatConversionRateService,
+        fees: FeeRepository,
     ) -> None:
         self._wallets = wallets
         self._ledger = ledger
         self._conversions = conversions
         self._accounts = accounts
         self._rates = rates
+        self._fees = fees
+        self._fee_policies = FeePolicyService(fees)
 
     async def get_balances(self, account_id: uuid.UUID) -> list[FiatWalletBalance]:
         await self._require_user(account_id, active_required=False)
@@ -122,15 +147,11 @@ class FiatWalletService:
 
     async def preview(
         self, *, from_currency: Currency, to_currency: Currency, source_amount: Decimal
-    ) -> tuple[Decimal, FiatConversionQuote]:
+    ) -> FiatConversionPreview:
         self._validate_conversion(from_currency, to_currency, source_amount)
         quote = await self._rates.get_quote(from_currency, to_currency)
-        destination = (source_amount * quote.rate).quantize(
-            _MONEY_QUANTUM, rounding=ROUND_HALF_UP
-        )
-        if destination <= 0:
-            raise FiatWalletValidationError("Destination amount rounds to zero")
-        return destination, quote
+        policy = await self._fee_policies.active()
+        return self._calculate_preview(source_amount, quote, policy)
 
     async def convert(
         self,
@@ -154,11 +175,9 @@ class FiatWalletService:
             )
             return existing, True
 
-        destination_amount, quote = await self.preview(
-            from_currency=from_currency,
-            to_currency=to_currency,
-            source_amount=source_amount,
-        )
+        quote = await self._rates.get_quote(from_currency, to_currency)
+        policy = await self._fee_policies.active(lock=True)
+        preview = self._calculate_preview(source_amount, quote, policy)
         balances = await self._wallets.lock_balances(target_account_id)
         existing = await self._conversions.by_actor_idempotency(actor.id, idempotency_key)
         if existing is not None:
@@ -175,7 +194,7 @@ class FiatWalletService:
         source_before = source.available
         destination_before = destination.available
         source.available = source_before - source_amount
-        destination.available = destination_before + destination_amount
+        destination.available = destination_before + preview.destination_amount
         await self._wallets.save(source)
         await self._wallets.save(destination)
 
@@ -186,8 +205,13 @@ class FiatWalletService:
                 from_currency=from_currency,
                 to_currency=to_currency,
                 source_amount=source_amount,
-                destination_amount=destination_amount,
-                exchange_rate=quote.rate,
+                destination_amount=preview.destination_amount,
+                exchange_rate=preview.effective_rate,
+                reference_rate=preview.reference_rate,
+                effective_rate=preview.effective_rate,
+                gross_destination_amount=preview.gross_destination_amount,
+                fee_amount=preview.fee.total_fee,
+                fee_policy_version=preview.fee_policy_version,
                 source_balance_before=source_before,
                 source_balance_after=source.available,
                 destination_balance_before=destination_before,
@@ -222,7 +246,7 @@ class FiatWalletService:
                 account_id=target_account_id,
                 currency=to_currency,
                 type=FiatLedgerEntryType.CONVERSION_CREDIT,
-                amount=destination_amount,
+                amount=preview.destination_amount,
                 balance_before=destination_before,
                 balance_after=destination.available,
                 reference_type="fiat_conversion",
@@ -232,7 +256,63 @@ class FiatWalletService:
                 created_by_account_id=actor.id,
             )
         )
+        snapshot = await self._fees.create_snapshot(
+            FeeSnapshot(
+                policy_id=policy.id,
+                policy_version=policy.version,
+                source_type="fiat_conversion",
+                source_id=conversion.id,
+                fee_type=FeeType.FIAT_CONVERSION.value,
+                payer=policy_component(policy, FeeType.FIAT_CONVERSION).payer,
+                currency=to_currency.value,
+                gross_amount=preview.gross_destination_amount,
+                percent_bps=policy_component(policy, FeeType.FIAT_CONVERSION).percent_bps,
+                percent_fee=preview.fee.percent_fee,
+                fixed_fee=preview.fee.fixed_fee,
+                fee_amount=preview.fee.total_fee,
+                net_amount=preview.destination_amount,
+                reference_rate=preview.reference_rate,
+                effective_rate=preview.effective_rate,
+            )
+        )
+        if preview.fee.total_fee > 0:
+            await self._fees.create_profit(
+                OwnerProfitEntry(
+                    fee_snapshot_id=snapshot.id,
+                    source_type="fiat_conversion",
+                    source_id=conversion.id,
+                    fee_type=FeeType.FIAT_CONVERSION.value,
+                    currency=to_currency.value,
+                    gross_amount=preview.gross_destination_amount,
+                    fee_amount=preview.fee.total_fee,
+                    policy_version=policy.version,
+                )
+            )
         return conversion, False
+
+    @staticmethod
+    def _calculate_preview(source_amount, quote, policy) -> FiatConversionPreview:
+        gross = (source_amount * quote.rate).quantize(_MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+        if gross <= 0:
+            raise FiatWalletValidationError("Destination amount rounds to zero")
+        component = policy_component(policy, FeeType.FIAT_CONVERSION)
+        fee = FeeCalculator.calculate(gross, component_terms(component))
+        if fee.net <= 0:
+            raise FiatWalletValidationError("Fee leaves no destination amount")
+        effective_rate = (
+            quote.rate
+            if fee.total_fee == 0
+            else (fee.net / source_amount).quantize(_MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+        )
+        return FiatConversionPreview(
+            destination_amount=fee.net,
+            gross_destination_amount=gross,
+            reference_rate=quote.rate,
+            effective_rate=effective_rate,
+            fee=fee,
+            fee_policy_version=policy.version,
+            quote=quote,
+        )
 
     async def history(
         self,
@@ -263,9 +343,7 @@ class FiatWalletService:
         await self._require_user(account_id, active_required=False)
         return await self._ledger.list_for_account(account_id, limit=limit, offset=offset)
 
-    async def _require_user(
-        self, account_id: uuid.UUID, *, active_required: bool
-    ) -> Account:
+    async def _require_user(self, account_id: uuid.UUID, *, active_required: bool) -> Account:
         account = await self._accounts.get_by_id(account_id)
         if account is None or account.role != UserRole.USER:
             raise FiatWalletNotFoundError("USER account not found")

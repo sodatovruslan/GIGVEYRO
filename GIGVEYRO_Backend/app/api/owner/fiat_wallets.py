@@ -138,7 +138,7 @@ async def preview(
     service: FiatWalletService = Depends(get_fiat_wallet_service),
 ) -> FiatConversionPreviewOut:
     try:
-        destination, quote = await service.preview(
+        calculation = await service.preview(
             from_currency=payload.from_currency,
             to_currency=payload.to_currency,
             source_amount=payload.source_amount,
@@ -149,22 +149,25 @@ async def preview(
         from_currency=payload.from_currency,
         to_currency=payload.to_currency,
         source_amount=payload.source_amount,
-        destination_amount=destination,
-        exchange_rate=quote.rate,
-        provider=quote.provider,
-        published_at=quote.published_at,
-        received_at=quote.received_at,
-        provider_nominal=quote.provider_nominal,
-        provider_rate=quote.provider_rate,
-        policy_version=quote.policy_version,
-        mode=quote.mode,
-        is_stale=quote.is_stale,
+        destination_amount=calculation.destination_amount,
+        gross_destination_amount=calculation.gross_destination_amount,
+        fee_amount=calculation.fee.total_fee,
+        exchange_rate=calculation.effective_rate,
+        reference_rate=calculation.reference_rate,
+        effective_rate=calculation.effective_rate,
+        fee_policy_version=calculation.fee_policy_version,
+        provider=calculation.quote.provider,
+        published_at=calculation.quote.published_at,
+        received_at=calculation.quote.received_at,
+        provider_nominal=calculation.quote.provider_nominal,
+        provider_rate=calculation.quote.provider_rate,
+        policy_version=calculation.quote.policy_version,
+        mode=calculation.quote.mode,
+        is_stale=calculation.quote.is_stale,
     )
 
 
-@router.post(
-    "/accounts/{account_id}/fiat-conversions", response_model=FiatConversionOut
-)
+@router.post("/accounts/{account_id}/fiat-conversions", response_model=FiatConversionOut)
 async def convert(
     account_id: uuid.UUID,
     payload: OwnerFiatConversionRequest,
@@ -204,6 +207,10 @@ async def convert(
                 "from_currency": conversion.from_currency.value,
                 "to_currency": conversion.to_currency.value,
                 "source_amount": str(conversion.source_amount),
+                "gross_destination_amount": str(conversion.gross_destination_amount),
+                "fee_amount": str(conversion.fee_amount),
+                "net_destination_amount": str(conversion.destination_amount),
+                "fee_policy_version": conversion.fee_policy_version,
                 "rate_provider": conversion.rate_provider,
                 "rate_mode": conversion.rate_mode,
             },
@@ -249,9 +256,7 @@ async def history(
     return FiatConversionHistoryOut(items=items, total=total, limit=limit, offset=offset)
 
 
-@router.get(
-    "/accounts/{account_id}/fiat-wallets/ledger", response_model=FiatLedgerListOut
-)
+@router.get("/accounts/{account_id}/fiat-wallets/ledger", response_model=FiatLedgerListOut)
 async def ledger(
     account_id: uuid.UUID,
     limit: int = Query(default=20, ge=1, le=100),
