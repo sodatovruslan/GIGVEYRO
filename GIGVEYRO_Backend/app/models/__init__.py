@@ -16,6 +16,7 @@ from app.models.notification import (
 )
 from app.models.payment_requisite import PaymentRequisite
 from app.models.realtime import RealtimeOutbox
+from app.models.risk import RiskPolicy, TreasurySnapshotRecord
 from app.models.telegram import TelegramAccountLink
 from app.models.traffic import UserTrafficSettings
 from app.models.two_factor import (
@@ -47,6 +48,8 @@ __all__ = [
     "FeePolicyComponent",
     "FeeSnapshot",
     "OwnerProfitEntry",
+    "RiskPolicy",
+    "TreasurySnapshotRecord",
     "MerchantWallet",
     "Notification",
     "NotificationDelivery",

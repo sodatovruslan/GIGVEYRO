@@ -29,6 +29,7 @@ from app.api.owner.fiat_wallets import router as owner_fiat_wallets_router
 from app.api.owner.integrations import router as owner_integrations_router
 from app.api.owner.requisites import router as owner_requisites_router
 from app.api.owner.traffic import router as owner_traffic_router
+from app.api.owner.treasury import router as owner_treasury_router
 from app.api.owner.wallets import router as owner_wallets_router
 from app.api.owner.withdrawals import router as owner_withdrawals_router
 from app.api.realtime import router as realtime_router
@@ -133,6 +134,7 @@ app.include_router(owner_analytics_router)
 app.include_router(owner_integrations_router)
 app.include_router(owner_fiat_wallets_router)
 app.include_router(owner_fees_router)
+app.include_router(owner_treasury_router)
 app.include_router(owner_audit_router)
 app.include_router(wallet_router)
 app.include_router(merchant_wallet_router)
