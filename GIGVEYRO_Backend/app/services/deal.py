@@ -18,6 +18,7 @@ from app.repositories.traffic import TrafficRepository
 from app.schemas.payment_requisite import mask_card_number
 from app.services.exchange_rate import ExchangeRateProvider
 from app.services.realtime import RealtimeEventService
+from app.services.risk import RiskGuard
 from app.services.wallet import WalletService
 
 USDT_QUANTUM = Decimal("0.00000001")
@@ -107,6 +108,7 @@ class DealService:
         wallet_service: WalletService,
         rate_provider: ExchangeRateProvider,
         realtime_service: RealtimeEventService | None = None,
+        risk_guard: RiskGuard | None = None,
     ):
         self._deals = deal_repository
         self._requisites = requisite_repository
@@ -115,6 +117,7 @@ class DealService:
         self._wallet_service = wallet_service
         self._rate_provider = rate_provider
         self._realtime = realtime_service
+        self._risk_guard = risk_guard
 
     # -- MERCHANT -------------------------------------------------------
 
@@ -209,6 +212,9 @@ class DealService:
         rate_snapshot = await self._rate_provider.get_rate_snapshot()
         rate = rate_snapshot.rate
         amount_usdt = calculate_amount_usdt(deal.amount_tjs, rate)
+
+        if self._risk_guard is not None:
+            await self._risk_guard.check_deal(account.id, amount_usdt)
 
         await self._wallet_service.freeze_for_deal(
             account_id=account.id, amount=amount_usdt, deal_id=deal.id

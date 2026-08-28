@@ -16,6 +16,7 @@ from app.models.withdrawal import MerchantWithdrawal
 from app.repositories.account import AccountRepository
 from app.repositories.withdrawal import WithdrawalRepository
 from app.services.notification import NotificationService
+from app.services.risk import RiskGuard
 from app.services.wallet import WalletService
 
 logger = logging.getLogger(__name__)
@@ -143,12 +144,14 @@ class WithdrawalService:
         account_repository: AccountRepository,
         payout_provider: PayoutProvider | None = None,
         notification_service: NotificationService | None = None,
+        risk_guard: RiskGuard | None = None,
     ):
         self._withdrawals = withdrawal_repository
         self._wallet_service = wallet_service
         self._accounts = account_repository
         self._payout_provider = payout_provider or MockPayoutProvider()
         self._notifications = notification_service
+        self._risk_guard = risk_guard
 
     async def _notify_status_changed(self, withdrawal: MerchantWithdrawal) -> None:
         if self._notifications is None:
@@ -188,6 +191,8 @@ class WithdrawalService:
                 raise InvalidDestinationError("invalid TRC20 address length")
 
         merchant_wallet = await self._wallet_service.get_merchant_wallet_for_account(merchant.id)
+        if self._risk_guard is not None:
+            await self._risk_guard.check_withdrawal(amount)
 
         last_error: IntegrityError | None = None
         for _ in range(3):

@@ -12,6 +12,7 @@ from app.repositories.account import AccountRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.notification import NotificationRepository
+from app.repositories.risk import RiskRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.repositories.withdrawal import WithdrawalRepository
@@ -21,6 +22,7 @@ from app.schemas.withdrawal import (
     MerchantWithdrawalRead,
 )
 from app.services.notification import NotificationService
+from app.services.risk import RiskBlockedError, RiskGuard
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import InsufficientBalanceError, WalletService
 from app.services.withdrawal import (
@@ -50,6 +52,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> WithdrawalService:
         notification_service=NotificationService(
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
+        risk_guard=RiskGuard(RiskRepository(db)),
     )
 
 
@@ -67,6 +70,16 @@ async def create_withdrawal(
             destination=payload.destination,
             comment=payload.comment,
         )
+    except RiskBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": exc.reason.value,
+                "current": str(exc.current),
+                "threshold": str(exc.threshold),
+                "policy_version": exc.policy_version,
+            },
+        ) from exc
     except (
         WithdrawalCreationNotAllowedError,
         InvalidDestinationError,

@@ -13,6 +13,7 @@ from app.repositories.deal import DealRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.realtime import RealtimeOutboxRepository
+from app.repositories.risk import RiskRepository
 from app.repositories.traffic import TrafficRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.deal import DealAccept, DealListResponse, DealRead
@@ -26,6 +27,7 @@ from app.services.deal import (
 from app.services.exchange_rate import ExchangeRateError
 from app.services.provider_factory import get_exchange_rate_provider
 from app.services.realtime import RealtimeEventService
+from app.services.risk import RiskBlockedError, RiskGuard
 from app.services.wallet import InsufficientBalanceError, WalletNotFoundError, WalletService
 
 router = APIRouter(
@@ -46,6 +48,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DealService:
         wallet_service,
         get_exchange_rate_provider(),
         RealtimeEventService(RealtimeOutboxRepository(db)),
+        RiskGuard(RiskRepository(db)),
     )
 
 
@@ -123,4 +126,14 @@ async def accept_deal(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="exchange rate is temporarily unavailable",
+        ) from exc
+    except RiskBlockedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": exc.reason.value,
+                "current": str(exc.current),
+                "threshold": str(exc.threshold),
+                "policy_version": exc.policy_version,
+            },
         ) from exc
