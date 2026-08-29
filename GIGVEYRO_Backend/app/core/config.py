@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     EXCHANGE_RATE_PROVIDER_TYPE: str = "fallback"  # "configured", "fallback", "business"
     PAYOUT_PROVIDER_TYPE: str = "mock"  # "mock" or "external_adapter"
     PAYOUT_ENABLED: bool = False  # Production safety switch - Disabled by default!
+    PAYOUT_PROVIDER_MODE: str = "disabled"  # controlled plane: disabled|simulated; live rejected
+    PAYOUT_SIMULATION_ENABLED: bool = False
 
     # Exchange Rate External API Provider Settings
     EXCHANGE_RATE_API_URL: str = "https://api.binance.com/api/v3/ticker/price?symbol=USDTUAH"
@@ -218,7 +220,7 @@ class Settings(BaseSettings):
                     "when WEB_CONCURRENCY > 1 (horizontal scaling)."
                 )
 
-            # Production mock provider policy
+            # Production provider policy
             if not self.ALLOW_MOCK_PROVIDERS_IN_PRODUCTION:
                 if self.DEPOSIT_PROVIDER_TYPE == "mock":
                     raise ValueError(
@@ -226,18 +228,11 @@ class Settings(BaseSettings):
                         "Configure a real deposit provider or set "
                         "ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
                     )
-                if self.PAYOUT_PROVIDER_TYPE == "mock" and self.PAYOUT_ENABLED:
+                if self.PAYOUT_PROVIDER_MODE == "simulated" and self.PAYOUT_ENABLED:
                     raise ValueError(
-                        "PAYOUT_ENABLED=True with PAYOUT_PROVIDER_TYPE=mock is "
-                        "forbidden in production. Configure a real payout provider "
-                        "or set ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True."
+                        "PAYOUT_ENABLED=True with simulated payout mode requires "
+                        "ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=True"
                     )
-                if self.PAYOUT_ENABLED:
-                    if not self.PAYOUT_API_KEY or "mock" in self.PAYOUT_API_URL:
-                        raise ValueError(
-                            "PAYOUT_ENABLED=True requires real payout provider settings "
-                            "(PAYOUT_API_KEY and real PAYOUT_API_URL) in production"
-                        )
             if self.DOCS_ENABLED:
                 raise ValueError("DOCS_ENABLED must be False in production")
             if self.METRICS_ENABLED and len(self.METRICS_AUTH_TOKEN) < 32:
@@ -259,6 +254,19 @@ class Settings(BaseSettings):
         if not self.MARKET_DATA_SYMBOLS:
             raise ValueError("MARKET_DATA_SYMBOLS must not be empty")
         self.MARKET_DATA_SYMBOLS = [symbol.upper() for symbol in self.MARKET_DATA_SYMBOLS]
+        return self
+
+    @model_validator(mode="after")
+    def validate_controlled_payout_settings(self) -> "Settings":
+        if self.PAYOUT_PROVIDER_MODE not in {"disabled", "simulated", "live"}:
+            raise ValueError("PAYOUT_PROVIDER_MODE must be disabled or simulated")
+        if self.PAYOUT_PROVIDER_MODE == "live":
+            raise ValueError(
+                "PAYOUT_PROVIDER_MODE=live is unavailable: no approved live provider exists"
+            )
+        if self.PAYOUT_PROVIDER_MODE == "simulated" and not self.PAYOUT_SIMULATION_ENABLED:
+            # Safe configuration is allowed to start, but execution remains blocked.
+            return self
         return self
 
     @model_validator(mode="after")

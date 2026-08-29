@@ -15,6 +15,7 @@ from app.models.notification import (
     NotificationPreference,
 )
 from app.models.payment_requisite import PaymentRequisite
+from app.models.payout import PayoutApproval, PayoutEvent, PayoutIntent, PayoutPolicy
 from app.models.realtime import RealtimeOutbox
 from app.models.risk import RiskPolicy, TreasurySnapshotRecord
 from app.models.telegram import TelegramAccountLink
@@ -56,6 +57,10 @@ __all__ = [
     "NotificationOutbox",
     "NotificationPreference",
     "PaymentRequisite",
+    "PayoutPolicy",
+    "PayoutIntent",
+    "PayoutApproval",
+    "PayoutEvent",
     "RealtimeOutbox",
     "TelegramAccountLink",
     "UserTrafficSettings",
