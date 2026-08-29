@@ -181,7 +181,7 @@ async def test_cannot_cancel_already_approved_withdrawal(
 
 
 @pytest.mark.asyncio
-async def test_owner_approve_then_mark_paid_full_lifecycle(
+async def test_direct_mark_paid_is_blocked_and_does_not_debit_hold(
     client: AsyncClient, db_session: AsyncSession, make_account, make_merchant_wallet
 ):
     merchant = await make_account(role=UserRole.MERCHANT)
@@ -215,34 +215,42 @@ async def test_owner_approve_then_mark_paid_full_lifecycle(
     paid_resp = await client.post(
         f"/owner/withdrawals/{withdrawal_id}/mark-paid", headers=owner_headers
     )
-    assert paid_resp.status_code == 200
-    assert paid_resp.json()["status"] == "paid"
+    assert paid_resp.status_code == 409
+    assert paid_resp.json()["detail"]["code"] == "CONTROLLED_PAYOUT_REQUIRED"
 
     wallet_after_paid = await _wallet(db_session, merchant.id)
     assert wallet_after_paid.available_balance == Decimal("50")
-    assert wallet_after_paid.held_balance == Decimal("0")
+    assert wallet_after_paid.held_balance == Decimal("50")
 
     ledger_entries = (
-        await db_session.execute(
-            select(LedgerEntry).where(LedgerEntry.reference_id == withdrawal_id)
+        (
+            await db_session.execute(
+                select(LedgerEntry).where(LedgerEntry.reference_id == withdrawal_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     entry_types = {entry.type for entry in ledger_entries}
-    assert entry_types == {LedgerEntryType.WITHDRAWAL_HOLD, LedgerEntryType.WITHDRAWAL_PAID}
+    assert entry_types == {LedgerEntryType.WITHDRAWAL_HOLD}
 
-    # idempotent: repeating approve/mark-paid must not create duplicate ledger entries
+    # Retries cannot bypass controlled payout or create a paid ledger entry.
     await client.post(f"/owner/withdrawals/{withdrawal_id}/approve", headers=owner_headers)
     await client.post(f"/owner/withdrawals/{withdrawal_id}/mark-paid", headers=owner_headers)
 
     ledger_entries_after_retry = (
-        await db_session.execute(
-            select(LedgerEntry).where(LedgerEntry.reference_id == withdrawal_id)
+        (
+            await db_session.execute(
+                select(LedgerEntry).where(LedgerEntry.reference_id == withdrawal_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(ledger_entries_after_retry) == len(ledger_entries)
 
     wallet_final = await _wallet(db_session, merchant.id)
-    assert wallet_final.held_balance == Decimal("0")
+    assert wallet_final.held_balance == Decimal("50")
 
 
 @pytest.mark.asyncio

@@ -121,11 +121,12 @@ async def test_withdrawal_status_change_notifies_merchant(
     )
     assert approve_resp.status_code == 200
 
-    reject_resp = await client.post(
+    direct_paid_resp = await client.post(
         f"/owner/withdrawals/{withdrawal_id}/mark-paid", headers=_auth_headers(owner)
     )
-    assert reject_resp.status_code == 200
+    assert direct_paid_resp.status_code == 409
+    assert direct_paid_resp.json()["detail"]["code"] == "CONTROLLED_PAYOUT_REQUIRED"
 
     notifications = await _notifications_for(client, merchant, "WITHDRAWAL_STATUS_CHANGED")
-    # one per distinct status transition (approved, paid) thanks to per-status dedupe keys
-    assert len(notifications) == 2
+    # Approval is emitted, but direct paid finalization is blocked by the payout control plane.
+    assert len(notifications) == 1

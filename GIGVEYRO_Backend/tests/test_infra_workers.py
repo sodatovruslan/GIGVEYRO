@@ -24,7 +24,7 @@ class TestProductionConfigValidation:
 
     def test_payout_enabled_with_mock_provider_rejected_in_production(self):
         """Production must reject PAYOUT_ENABLED=True with mock payout provider."""
-        with pytest.raises(ValueError, match="PAYOUT_ENABLED=True with PAYOUT_PROVIDER_TYPE=mock"):
+        with pytest.raises(ValueError, match="simulated payout mode"):
             Settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
@@ -33,29 +33,15 @@ class TestProductionConfigValidation:
                 CORS_ALLOWED_ORIGINS=["https://example.com"],
                 DEPOSIT_PROVIDER_TYPE="trongrid",
                 PAYOUT_ENABLED=True,
-                PAYOUT_PROVIDER_TYPE="mock",
+                PAYOUT_PROVIDER_MODE="simulated",
+                PAYOUT_SIMULATION_ENABLED=True,
                 ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
             )
 
-    def test_payout_enabled_with_real_provider_allowed_in_production(self):
-        """Production allows PAYOUT_ENABLED=True when using a real provider."""
-        # Should not raise
-        s = Settings(
-            DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
-            JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
-            APP_ENV="production",
-            DEBUG=False,
-            CORS_ALLOWED_ORIGINS=["https://example.com"],
-            DEPOSIT_PROVIDER_TYPE="trongrid",
-            PAYOUT_ENABLED=True,
-            PAYOUT_PROVIDER_TYPE="external_adapter",
-            ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
-            PAYOUT_API_KEY="real-key",
-            PAYOUT_API_URL="https://api.payout.real",
-            DOCS_ENABLED=False,
-            METRICS_ENABLED=False,
-        )
-        assert s.PAYOUT_ENABLED is True
+    def test_live_payout_provider_is_rejected_in_every_environment(self):
+        """This stage has no live provider implementation."""
+        with pytest.raises(ValueError, match="no approved live provider"):
+            Settings(PAYOUT_PROVIDER_MODE="live")
 
     def test_payout_enabled_false_is_always_safe(self):
         """PAYOUT_ENABLED=False is always safe regardless of provider."""
@@ -67,7 +53,7 @@ class TestProductionConfigValidation:
             CORS_ALLOWED_ORIGINS=["https://example.com"],
             DEPOSIT_PROVIDER_TYPE="trongrid",
             PAYOUT_ENABLED=False,
-            PAYOUT_PROVIDER_TYPE="mock",
+            PAYOUT_PROVIDER_MODE="disabled",
             ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
             DOCS_ENABLED=False,
             METRICS_ENABLED=False,
@@ -163,21 +149,18 @@ class TestProductionConfigValidation:
                 WEB_CONCURRENCY=2,
             )
 
-    def test_production_rejects_enabled_payout_missing_credentials(self):
-        """Production rejects PAYOUT_ENABLED=True with missing provider credentials."""
-        with pytest.raises(
-            ValueError, match="PAYOUT_ENABLED=True requires real payout provider settings"
-        ):
+    def test_production_rejects_live_mode_even_with_credentials(self):
+        with pytest.raises(ValueError, match="no approved live provider"):
             Settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
                 DEBUG=False,
                 DEPOSIT_PROVIDER_TYPE="trongrid",
-                PAYOUT_ENABLED=True,
-                PAYOUT_PROVIDER_TYPE="external_adapter",
-                PAYOUT_API_KEY="",  # missing key
+                PAYOUT_PROVIDER_MODE="live",
                 ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
+                DOCS_ENABLED=False,
+                METRICS_ENABLED=False,
             )
 
 

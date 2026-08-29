@@ -1,4 +1,3 @@
-import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -7,18 +6,18 @@ import pytest
 from app.core.config import settings
 from app.enums.account import UserRole
 from app.enums.deposit import CorrelationStatus, DepositNetwork, DepositStatus
+from app.models.payout import PayoutIntent
 from app.repositories.deposit import DepositRepository
 from app.services.deposit import DepositService
 from app.services.deposit_provider import MockTRC20DepositProvider, OnChainTransactionDTO
 from app.services.exchange_rate import (
     FallbackExchangeRateProvider,
 )
+from app.services.payout_provider import DisabledPayoutProvider
 from app.services.provider_factory import (
     get_deposit_provider,
     get_exchange_rate_provider,
-    get_payout_provider,
 )
-from app.services.withdrawal import ExternalPayoutAdapter, MockPayoutProvider, PayoutDisabledError
 
 
 @pytest.mark.asyncio
@@ -28,9 +27,6 @@ async def test_stage15_provider_factories():
 
     rate_provider = get_exchange_rate_provider()
     assert isinstance(rate_provider, FallbackExchangeRateProvider)
-
-    payout_provider = get_payout_provider()
-    assert isinstance(payout_provider, MockPayoutProvider)
 
 
 @pytest.mark.asyncio
@@ -113,9 +109,9 @@ async def test_unmatched_transfer_saved(db_session):
 
 @pytest.mark.asyncio
 async def test_payout_safety_disabled_by_default():
-    adapter = ExternalPayoutAdapter()
-    with pytest.raises(PayoutDisabledError):
-        await adapter.request_payout(uuid.uuid4(), Decimal("100.00"), "TDESTINATION_ADDRESS")
+    provider = DisabledPayoutProvider()
+    with pytest.raises(RuntimeError, match="disabled"):
+        await provider.execute(PayoutIntent())
 
 
 @pytest.mark.asyncio

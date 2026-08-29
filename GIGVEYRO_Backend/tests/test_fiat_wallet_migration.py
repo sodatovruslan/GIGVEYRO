@@ -47,7 +47,7 @@ async def test_managed_fiat_migration_upgrade_downgrade_upgrade_on_disposable_da
         try:
             assert await connection.fetchval(
                 "SELECT version_num FROM alembic_version"
-            ) == "0023"
+            ) == "0024"
             assert await connection.fetchval(
                 "SELECT to_regclass('public.fiat_wallet_balances')::text"
             ) == "fiat_wallet_balances"
