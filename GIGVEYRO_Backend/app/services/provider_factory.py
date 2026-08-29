@@ -10,7 +10,6 @@ from app.services.exchange_rate import (
     ExternalExchangeRateProvider,
     FallbackExchangeRateProvider,
 )
-from app.services.withdrawal import ExternalPayoutAdapter, MockPayoutProvider, PayoutProvider
 
 
 def get_deposit_provider() -> CryptoDepositProvider:
@@ -36,15 +35,6 @@ def get_exchange_rate_provider() -> ExchangeRateProvider:
     return ConfiguredExchangeRateProvider()
 
 
-def get_payout_provider() -> PayoutProvider:
-    if settings.PAYOUT_PROVIDER_TYPE == "external_adapter":
-        return ExternalPayoutAdapter(
-            api_url=settings.PAYOUT_API_URL,
-            api_key=settings.PAYOUT_API_KEY,
-        )
-    return MockPayoutProvider()
-
-
 def get_provider_diagnostics() -> dict:
     """Return current provider configuration for diagnostics endpoint.
 
@@ -53,7 +43,9 @@ def get_provider_diagnostics() -> dict:
     return {
         "deposit_provider": settings.DEPOSIT_PROVIDER_TYPE,
         "exchange_rate_provider": settings.EXCHANGE_RATE_PROVIDER_TYPE,
-        "payout_provider": settings.PAYOUT_PROVIDER_TYPE,
+        "payout_provider": settings.PAYOUT_PROVIDER_MODE,
+        "payout_simulation_enabled": settings.PAYOUT_SIMULATION_ENABLED,
+        "payout_live_provider_available": False,
         "payout_enabled": settings.PAYOUT_ENABLED,
         "allow_mock_in_production": settings.ALLOW_MOCK_PROVIDERS_IN_PRODUCTION,
         "trongrid_configured": bool(settings.TRONGRID_API_KEY),

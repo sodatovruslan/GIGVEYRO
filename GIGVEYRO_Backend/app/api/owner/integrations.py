@@ -35,7 +35,7 @@ async def get_integrations_diagnostics(
         "providers": {
             "deposit_provider": settings.DEPOSIT_PROVIDER_TYPE,
             "exchange_rate_provider": settings.EXCHANGE_RATE_PROVIDER_TYPE,
-            "payout_provider": settings.PAYOUT_PROVIDER_TYPE,
+            "payout_provider": settings.PAYOUT_PROVIDER_MODE,
         },
         "safety": {
             "payout_enabled": settings.PAYOUT_ENABLED,
