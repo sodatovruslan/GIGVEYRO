@@ -1,13 +1,11 @@
-import logging
 import secrets
 import uuid
-from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import IntegrityError
 
-from app.core.config import settings
 from app.enums.account import UserRole
 from app.enums.notification import NotificationType
 from app.enums.withdrawal import WithdrawalDestinationType, WithdrawalStatus
@@ -19,7 +17,8 @@ from app.services.notification import NotificationService
 from app.services.risk import RiskGuard
 from app.services.wallet import WalletService
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from app.services.payout import ControlledPayoutService
 
 
 class WithdrawalNotFoundError(Exception):
@@ -38,65 +37,6 @@ class InvalidDestinationError(Exception):
     """Raised when destination fails basic structural check."""
 
 
-class PayoutProviderError(Exception):
-    """Base exception for payout provider dispatch failures."""
-
-
-class PayoutDisabledError(PayoutProviderError):
-    """Raised when payout execution is triggered but PAYOUT_ENABLED is False."""
-
-
-class PayoutProvider(ABC):
-    """Abstraction for external merchant payout gateways.
-    STRICT SAFETY RULE: Never holds real private keys or mnemonics and never
-    performs real automatic transfers.
-    """
-
-    @abstractmethod
-    async def request_payout(
-        self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str
-    ) -> str:
-        """Submit payout request to provider. Returns provider external reference ID."""
-
-    @abstractmethod
-    async def check_payout_status(self, external_ref: str) -> str:
-        """Check status of submitted payout."""
-
-
-class MockPayoutProvider(PayoutProvider):
-    async def request_payout(
-        self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str
-    ) -> str:
-        if not settings.PAYOUT_ENABLED:
-            logger.info("PAYOUT_ENABLED is False. Safe mock payout recorded without external call.")
-            return f"MOCK-PAYOUT-SAFETY-DISABLED-{secrets.token_hex(4).upper()}"
-        return f"MOCK-PAYOUT-{secrets.token_hex(4).upper()}"
-
-    async def check_payout_status(self, external_ref: str) -> str:
-        return "SUCCESS"
-
-
-class ExternalPayoutAdapter(PayoutProvider):
-    def __init__(self, api_url: str | None = None, api_key: str | None = None):
-        self._api_url = api_url
-        self._api_key = api_key
-
-    async def request_payout(
-        self, withdrawal_id: uuid.UUID, amount: Decimal, destination: str
-    ) -> str:
-        if not settings.PAYOUT_ENABLED:
-            raise PayoutDisabledError(
-                "Real/external payout is disabled by safety configuration (PAYOUT_ENABLED=False)"
-            )
-        logger.info(
-            "Submitting payout request for withdrawal %s to %s", withdrawal_id, self._api_url
-        )
-        return f"EXT-PAYOUT-{uuid.uuid4().hex[:8].upper()}"
-
-    async def check_payout_status(self, external_ref: str) -> str:
-        return "SUCCESS"
-
-
 def generate_withdrawal_public_id() -> str:
     return f"WD-{secrets.token_hex(4).upper()}"
 
@@ -109,6 +49,7 @@ ALLOWED_TRANSITIONS: dict[WithdrawalStatus, set[WithdrawalStatus]] = {
     },
     WithdrawalStatus.APPROVED: {
         WithdrawalStatus.PAID,
+        WithdrawalStatus.CANCELLED,
     },
     WithdrawalStatus.PAID: set(),
     WithdrawalStatus.REJECTED: set(),
@@ -142,16 +83,16 @@ class WithdrawalService:
         withdrawal_repository: WithdrawalRepository,
         wallet_service: WalletService,
         account_repository: AccountRepository,
-        payout_provider: PayoutProvider | None = None,
         notification_service: NotificationService | None = None,
         risk_guard: RiskGuard | None = None,
+        controlled_payout: "ControlledPayoutService | None" = None,
     ):
         self._withdrawals = withdrawal_repository
         self._wallet_service = wallet_service
         self._accounts = account_repository
-        self._payout_provider = payout_provider or MockPayoutProvider()
         self._notifications = notification_service
         self._risk_guard = risk_guard
+        self._controlled_payout = controlled_payout
 
     async def _notify_status_changed(self, withdrawal: MerchantWithdrawal) -> None:
         if self._notifications is None:
@@ -218,6 +159,9 @@ class WithdrawalService:
         await self._wallet_service.hold_for_withdrawal(
             merchant_id=merchant.id, amount=amount, withdrawal_id=withdrawal.id
         )
+
+        if self._controlled_payout is not None:
+            await self._controlled_payout.create_for_withdrawal(withdrawal)
 
         return withdrawal
 
@@ -333,30 +277,9 @@ class WithdrawalService:
                 f"cannot mark paid withdrawal in status {withdrawal.status}"
             )
 
-        if comment:
-            withdrawal.owner_comment = comment
-
-        try:
-            payout_ref = await self._payout_provider.request_payout(
-                withdrawal.id, withdrawal.amount, withdrawal.destination
-            )
-            logger.info(
-                "Payout provider accepted withdrawal %s with ref %s", withdrawal.id, payout_ref
-            )
-        except Exception as exc:
-            logger.error("Payout provider request failed for withdrawal %s: %s", withdrawal.id, exc)
-
-        await self._wallet_service.pay_withdrawal(
-            merchant_id=withdrawal.merchant_id,
-            amount=withdrawal.amount,
-            withdrawal_id=withdrawal.id,
-            actor_id=owner_id,
+        raise InvalidWithdrawalTransitionError(
+            "direct mark-paid is disabled; controlled payout confirmation is required"
         )
-
-        transition_withdrawal(withdrawal, WithdrawalStatus.PAID, actor_id=owner_id)
-        saved = await self._withdrawals.save(withdrawal)
-        await self._notify_status_changed(saved)
-        return saved
 
     async def get_for_owner(self, withdrawal_id: uuid.UUID) -> MerchantWithdrawal:
         withdrawal = await self._withdrawals.get_by_id(withdrawal_id)

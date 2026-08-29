@@ -22,6 +22,7 @@ from app.schemas.withdrawal import (
     MerchantWithdrawalRead,
 )
 from app.services.notification import NotificationService
+from app.services.payout_runtime import build_controlled_payout_service
 from app.services.risk import RiskBlockedError, RiskGuard
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import InsufficientBalanceError, WalletService
@@ -53,6 +54,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> WithdrawalService:
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
         risk_guard=RiskGuard(RiskRepository(db)),
+        controlled_payout=build_controlled_payout_service(db),
     )
 
 

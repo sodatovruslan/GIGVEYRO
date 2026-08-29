@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.enums.account import UserRole
 from app.models.deal import Deal
+from app.models.payout import PayoutIntent
 from app.models.realtime import RealtimeOutbox
 from app.realtime.broker import RealtimeBroker
 from app.realtime.contracts import RealtimeEvent, RealtimeEventName
@@ -52,14 +53,39 @@ class RealtimeEventService:
             RealtimeOutbox(
                 event=event.value,
                 entity_id=operation_id,
-                recipient_account_ids=sorted(
-                    {str(target_account_id), str(owner_account_id)}
-                ),
+                recipient_account_ids=sorted({str(target_account_id), str(owner_account_id)}),
                 recipient_roles=[],
                 data={"currency": currency},
                 occurred_at=datetime.now(UTC),
             )
         )
+
+    async def enqueue_payout(
+        self, intent: PayoutIntent, *, withdrawal_id: uuid.UUID
+    ) -> tuple[RealtimeOutbox, RealtimeOutbox]:
+        recipients = [str(intent.beneficiary_account_id)]
+        occurred_at = datetime.now(UTC)
+        payout = await self._repository.create(
+            RealtimeOutbox(
+                event=RealtimeEventName.PAYOUT_UPDATED.value,
+                entity_id=intent.id,
+                recipient_account_ids=recipients,
+                recipient_roles=[UserRole.OWNER.value],
+                data={"status": intent.status},
+                occurred_at=occurred_at,
+            )
+        )
+        withdrawal = await self._repository.create(
+            RealtimeOutbox(
+                event=RealtimeEventName.WITHDRAWAL_UPDATED.value,
+                entity_id=withdrawal_id,
+                recipient_account_ids=recipients,
+                recipient_roles=[UserRole.OWNER.value],
+                data={"payout_status": intent.status},
+                occurred_at=occurred_at,
+            )
+        )
+        return payout, withdrawal
 
 
 class RealtimeOutboxDispatcher:
