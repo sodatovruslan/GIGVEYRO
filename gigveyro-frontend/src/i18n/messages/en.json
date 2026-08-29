@@ -33,6 +33,7 @@
     "system": "System",
     "yes": "Yes",
     "no": "No",
+    "noData": "No data",
     "operationFailed": "Action failed.",
     "loadFailed": "Failed to load data.",
     "noConnection": "Unable to connect to the server.",
@@ -93,6 +94,7 @@
     "deposits": "Deposits",
     "funding": "Add funds",
     "withdrawals": "Withdrawals",
+    "payouts": "Payout control",
     "appeals": "Appeals",
     "notifications": "Notifications",
     "analytics": "Analytics",
@@ -655,6 +657,7 @@
       "fee_policy": "Fee policy",
       "fee_policy_component": "Fee component",
       "risk_policy": "Risk policy",
+      "payout": "Payout",
       "deal": "Deal",
       "appeal": "Appeal",
       "withdrawal": "Withdrawal"
@@ -682,6 +685,7 @@
         "disabled": "Fee component disabled"
       },
       "risk_policy": {"created": "Risk policy created", "activated": "Risk policy activated", "disabled": "Risk control disabled"},
+      "payout": {"intent_created":"Payout intent created","risk_checked":"Payout risk checked","approved":"Payout approved","rejected":"Payout rejected","queued":"Payout queued","execution_started":"Payout execution started","simulated_succeeded":"Simulated payout succeeded","failed":"Payout failed","reconciliation_required":"Payout reconciliation required","reconciled":"Payout reconciled","cancelled":"Payout cancelled"},
       "deal": {
         "complete": "Deal completed",
         "release": "Deal released"
@@ -752,6 +756,11 @@
       "withdrawal_fee": "Withdrawal fee",
       "merchant_fee": "Merchant fee"
     }
+  },
+  "payouts": {
+    "title":"Payout control center","subtitle":"Approval, simulation and reconciliation without live exchange writes","safetyTitle":"LIVE PAYOUTS DISABLED","safetyText":"PAYOUT_ENABLED and the business switch must both allow execution. No live provider exists in this stage.","businessEnabled":"Business switch enabled","businessDisabled":"Business switch disabled","empty":"No payout intents found","intent":"Intent","destination":"Destination","risk":"Risk","approval":"Approvals","policy":"Payout approval policy","policyHint":"Versioned limits and dual-control capability. Auto approval remains unavailable.","businessSwitch":"Business payout switch","baseApprovals":"Base approvals","dualThreshold":"Dual-control threshold, USDT","highApprovals":"High-value approvals","maxSingle":"Maximum single payout","maxDaily":"Maximum daily payout","maxHourly":"Maximum hourly payout","maxPending":"Maximum pending payout total","maxAsset":"Maximum asset exposure","createDraft":"Create draft","activate":"Activate draft","detail":"Payout details","withdrawal":"Withdrawal","provider":"Provider mode","treasuryAt":"Treasury snapshot","approve":"Approve","reject":"Reject","queueSuccess":"Queue simulated success","queueUnknown":"Queue simulated unknown","manual":"Await manual settlement","reconcile":"Reconcile simulation","externalRef":"External reference","evidence":"Settlement evidence","confirmManual":"Confirm manual settlement","timeline":"Audit timeline",
+    "statuses":{"requested":"Requested","risk_review":"Risk review","approved":"Approved","queued":"Queued","execution_pending":"Execution pending","executing":"Executing","awaiting_manual_settlement":"Awaiting manual settlement","succeeded":"Succeeded","failed":"Failed","rejected":"Rejected","cancelled":"Cancelled","reconciliation_required":"Reconciliation required"},
+    "events":{"payout":{"intent_created":"Intent created","risk_checked":"Risk checked","approved":"Approved","rejected":"Rejected","queued":"Queued","execution_started":"Execution started","simulated_succeeded":"Simulation succeeded","failed":"Failed","reconciliation_required":"Reconciliation required","reconciled":"Reconciled","cancelled":"Cancelled"}}
   },
   "treasury": {
     "title": "Treasury & Risk", "subtitle": "Observed reserves, internal liabilities and configurable safety controls",

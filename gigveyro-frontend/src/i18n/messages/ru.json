@@ -33,6 +33,7 @@
     "system": "Система",
     "yes": "Да",
     "no": "Нет",
+    "noData": "Нет данных",
     "operationFailed": "Не удалось выполнить действие.",
     "loadFailed": "Не удалось загрузить данные.",
     "noConnection": "Нет соединения с сервером.",
@@ -93,6 +94,7 @@
     "deposits": "Депозиты",
     "funding": "Пополнение",
     "withdrawals": "Выводы",
+    "payouts": "Контроль выплат",
     "appeals": "Апелляции",
     "notifications": "Уведомления",
     "analytics": "Аналитика",
@@ -655,6 +657,7 @@
       "fee_policy": "Политика комиссий",
       "fee_policy_component": "Компонент комиссии",
       "risk_policy": "Политика риска",
+      "payout": "Выплата",
       "deal": "Сделка",
       "appeal": "Апелляция",
       "withdrawal": "Вывод"
@@ -682,6 +685,7 @@
         "disabled": "Компонент комиссии отключён"
       },
       "risk_policy": {"created": "Политика риска создана", "activated": "Политика риска активирована", "disabled": "Контроль риска отключён"},
+      "payout": {"intent_created":"Intent выплаты создан","risk_checked":"Риск выплаты проверен","approved":"Выплата согласована","rejected":"Выплата отклонена","queued":"Выплата добавлена в очередь","execution_started":"Исполнение выплаты начато","simulated_succeeded":"Симуляция выплаты успешна","failed":"Ошибка выплаты","reconciliation_required":"Требуется сверка выплаты","reconciled":"Выплата сверена","cancelled":"Выплата отменена"},
       "deal": {
         "complete": "Завершена сделка",
         "release": "Освобождена сделка"
@@ -752,6 +756,11 @@
       "withdrawal_fee": "Комиссия вывода",
       "merchant_fee": "Комиссия мерчанта"
     }
+  },
+  "payouts": {
+    "title":"Центр управления выплатами","subtitle":"Согласование, симуляция и сверка без реальных операций на бирже","safetyTitle":"РЕАЛЬНЫЕ ВЫПЛАТЫ ОТКЛЮЧЕНЫ","safetyText":"Для исполнения нужны глобальный и бизнес-переключатели. Live provider на этом этапе отсутствует.","businessEnabled":"Бизнес-переключатель включён","businessDisabled":"Бизнес-переключатель выключен","empty":"Payout intents не найдены","intent":"Intent","destination":"Назначение","risk":"Риск","approval":"Согласования","policy":"Политика согласования выплат","policyHint":"Версионные лимиты и возможность dual control. Автосогласование недоступно.","businessSwitch":"Бизнес-переключатель выплат","baseApprovals":"Базовые согласования","dualThreshold":"Порог dual control, USDT","highApprovals":"Согласований для крупной суммы","maxSingle":"Максимальная одна выплата","maxDaily":"Максимум выплат за сутки","maxHourly":"Максимум выплат за час","maxPending":"Максимум ожидающих выплат","maxAsset":"Максимальная экспозиция актива","createDraft":"Создать черновик","activate":"Активировать черновик","detail":"Детали выплаты","withdrawal":"Заявка на вывод","provider":"Режим провайдера","treasuryAt":"Снимок treasury","approve":"Согласовать","reject":"Отклонить","queueSuccess":"Поставить успешную симуляцию","queueUnknown":"Симулировать неизвестный результат","manual":"Ожидать ручного расчёта","reconcile":"Выполнить сверку","externalRef":"Внешняя ссылка","evidence":"Подтверждение расчёта","confirmManual":"Подтвердить ручной расчёт","timeline":"Хронология аудита",
+    "statuses":{"requested":"Запрошено","risk_review":"Проверка риска","approved":"Согласовано","queued":"В очереди","execution_pending":"Ожидает исполнения","executing":"Исполняется","awaiting_manual_settlement":"Ожидает ручного расчёта","succeeded":"Успешно","failed":"Ошибка","rejected":"Отклонено","cancelled":"Отменено","reconciliation_required":"Требуется сверка"},
+    "events":{"payout":{"intent_created":"Intent создан","risk_checked":"Риск проверен","approved":"Согласовано","rejected":"Отклонено","queued":"Добавлено в очередь","execution_started":"Исполнение начато","simulated_succeeded":"Симуляция успешна","failed":"Ошибка исполнения","reconciliation_required":"Требуется сверка","reconciled":"Сверено","cancelled":"Отменено"}}
   },
   "treasury": {
     "title": "Казначейство и риски", "subtitle": "Наблюдаемые резервы, внутренние обязательства и настраиваемые ограничения",

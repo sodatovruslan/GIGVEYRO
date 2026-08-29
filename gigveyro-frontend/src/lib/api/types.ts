@@ -561,3 +561,28 @@ export interface RiskPreview {
   reserve_decision: "allow" | "warn" | "block";
   reason_code: string | null;
 }
+
+export type PayoutStatus = "requested" | "risk_review" | "approved" | "queued" | "execution_pending" | "executing" | "awaiting_manual_settlement" | "succeeded" | "failed" | "rejected" | "cancelled" | "reconciliation_required";
+export interface PayoutApproval { id: string; approver_account_id: string; decision: "approved" | "rejected"; intent_hash: string; comment: string | null; created_at: string; }
+export interface PayoutEvent { id: string; event: string; actor_account_id: string | null; event_metadata: Record<string, unknown>; created_at: string; }
+export interface PayoutIntent {
+  id: string; withdrawal_id: string; beneficiary_account_id: string; asset: string; amount: string;
+  network: string; masked_destination: string; fee_amount: string; risk_policy_version: number;
+  risk_decision: "allow" | "warn" | "block"; risk_reason: string | null; treasury_generated_at: string;
+  approval_policy_version: number; required_approvals: number; approval_count: number;
+  provider_mode: "disabled" | "simulated" | "live"; status: PayoutStatus;
+  external_reference_masked: string | null; failure_kind: string | null; failure_code: string | null;
+  created_at: string; approved_at: string | null; queued_at: string | null;
+  execution_started_at: string | null; executed_at: string | null; reconciled_at: string | null;
+  approvals: PayoutApproval[]; events: PayoutEvent[];
+}
+export interface PayoutPolicyInput {
+  payouts_enabled: boolean; auto_approval_enabled: boolean; default_required_approvals: number;
+  dual_approval_threshold_usdt: string | null; high_value_required_approvals: number;
+  max_single_payout_enabled: boolean; max_single_payout_usdt: string | null;
+  max_daily_payout_enabled: boolean; max_daily_payout_usdt: string | null;
+  max_hourly_payout_enabled: boolean; max_hourly_payout_usdt: string | null;
+  max_pending_payout_enabled: boolean; max_pending_payout_usdt: string | null;
+  max_asset_exposure_enabled: boolean; max_asset_exposure_usdt: string | null;
+}
+export interface PayoutPolicy extends PayoutPolicyInput { id: string; version: number; status: "draft" | "active" | "retired"; created_at: string; activated_at: string | null; }

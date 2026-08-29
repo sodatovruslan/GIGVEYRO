@@ -33,6 +33,7 @@
     "system": "Система",
     "yes": "Ҳа",
     "no": "Не",
+    "noData": "Маълумот нест",
     "operationFailed": "Амал иҷро нашуд.",
     "loadFailed": "Маълумот бор нашуд.",
     "noConnection": "Пайвастшавӣ ба сервер нест.",
@@ -93,6 +94,7 @@
     "deposits": "Депозитҳо",
     "funding": "Пур кардани ҳисоб",
     "withdrawals": "Бардоштҳо",
+    "payouts": "Назорати пардохтҳо",
     "appeals": "Шикоятҳо",
     "notifications": "Огоҳиҳо",
     "analytics": "Таҳлил",
@@ -655,6 +657,7 @@
       "fee_policy": "Сиёсати комиссияҳо",
       "fee_policy_component": "Ҷузъи комиссия",
       "risk_policy": "Сиёсати хатар",
+      "payout": "Пардохт",
       "deal": "Муомила",
       "appeal": "Шикоят",
       "withdrawal": "Бардошт"
@@ -682,6 +685,7 @@
         "disabled": "Ҷузъи комиссия хомӯш шуд"
       },
       "risk_policy": {"created": "Сиёсати хатар сохта шуд", "activated": "Сиёсати хатар фаъол шуд", "disabled": "Назорати хатар хомӯш шуд"},
+      "payout": {"intent_created":"Нияти пардохт сохта шуд","risk_checked":"Хатари пардохт санҷида шуд","approved":"Пардохт тасдиқ шуд","rejected":"Пардохт рад шуд","queued":"Пардохт ба навбат гузошта шуд","execution_started":"Иҷрои пардохт оғоз шуд","simulated_succeeded":"Симулятсияи пардохт муваффақ шуд","failed":"Пардохт ноком шуд","reconciliation_required":"Муқоисаи пардохт лозим аст","reconciled":"Пардохт муқоиса шуд","cancelled":"Пардохт бекор шуд"},
       "deal": {
         "complete": "Муомила анҷом ёфт",
         "release": "Муомила озод шуд"
@@ -752,6 +756,11 @@
       "withdrawal_fee": "Комиссияи гирифтани маблағ",
       "merchant_fee": "Комиссияи мерчант"
     }
+  },
+  "payouts": {
+    "title":"Маркази назорати пардохтҳо","subtitle":"Тасдиқ, симулятсия ва муқоиса бе амалиёти воқеии биржа","safetyTitle":"ПАРДОХТҲОИ ВОҚЕӢ ХОМӮШАНД","safetyText":"Барои иҷро ҳам калиди умумӣ ва ҳам калиди бизнес лозим аст. Дар ин марҳила live provider вуҷуд надорад.","businessEnabled":"Калиди бизнес фаъол аст","businessDisabled":"Калиди бизнес хомӯш аст","empty":"Дархости пардохт ёфт нашуд","intent":"Нияти пардохт","destination":"Мақсад","risk":"Хатар","approval":"Тасдиқҳо","policy":"Сиёсати тасдиқи пардохт","policyHint":"Лимитҳои версиявӣ ва имкони назорати дугона. Тасдиқи худкор дастнорас аст.","businessSwitch":"Калиди бизнеси пардохт","baseApprovals":"Тасдиқҳои асосӣ","dualThreshold":"Ҳадди назорати дугона, USDT","highApprovals":"Тасдиқҳои маблағи калон","maxSingle":"Ҳадди як пардохт","maxDaily":"Ҳадди пардохти рӯзона","maxHourly":"Ҳадди пардохти соатона","maxPending":"Ҳадди пардохтҳои интизор","maxAsset":"Ҳадди таъсири дороӣ","createDraft":"Сохтани лоиҳа","activate":"Фаъол кардани лоиҳа","detail":"Тафсилоти пардохт","withdrawal":"Дархости бардошт","provider":"Реҷаи провайдер","treasuryAt":"Сабти хазина","approve":"Тасдиқ кардан","reject":"Рад кардан","queueSuccess":"Симулятсияи муваффақ","queueUnknown":"Симулятсияи натиҷаи номаълум","manual":"Интизори ҳисоббаробаркунии дастӣ","reconcile":"Муқоиса кардан","externalRef":"Истиноди беруна","evidence":"Далели ҳисоббаробаркунӣ","confirmManual":"Тасдиқи ҳисоббаробаркунии дастӣ","timeline":"Таърихи аудит",
+    "statuses":{"requested":"Дархост шуд","risk_review":"Санҷиши хатар","approved":"Тасдиқ шуд","queued":"Дар навбат","execution_pending":"Интизори иҷро","executing":"Иҷро мешавад","awaiting_manual_settlement":"Интизори ҳисоббаробаркунии дастӣ","succeeded":"Муваффақ","failed":"Хато","rejected":"Рад шуд","cancelled":"Бекор шуд","reconciliation_required":"Муқоиса лозим аст"},
+    "events":{"payout":{"intent_created":"Ният сохта шуд","risk_checked":"Хатар санҷида шуд","approved":"Тасдиқ шуд","rejected":"Рад шуд","queued":"Ба навбат гузошта шуд","execution_started":"Иҷро оғоз шуд","simulated_succeeded":"Симулятсия муваффақ шуд","failed":"Иҷро ноком шуд","reconciliation_required":"Муқоиса лозим аст","reconciled":"Муқоиса шуд","cancelled":"Бекор шуд"}}
   },
   "treasury": {
     "title": "Хазина ва идоракунии хатар", "subtitle": "Захираҳои мушоҳидашуда, ӯҳдадориҳои дохилӣ ва маҳдудиятҳои бехатарӣ",

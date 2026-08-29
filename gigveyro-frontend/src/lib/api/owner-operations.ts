@@ -1,8 +1,8 @@
 import { apiFetch } from "@/lib/api/client";
-import type { AuditLogEntry, FeePolicy, FeePreview, FeeType, IntegrationDiagnostics, MerchantWithdrawal, Paginated, ProfitEntry, ProfitSummary, RiskPolicy, RiskPolicyInput, RiskPreview, TreasurySummary } from "@/lib/api/types";
+import type { AuditLogEntry, FeePolicy, FeePreview, FeeType, IntegrationDiagnostics, MerchantWithdrawal, Paginated, PayoutIntent, PayoutPolicy, PayoutPolicyInput, PayoutStatus, ProfitEntry, ProfitSummary, RiskPolicy, RiskPolicyInput, RiskPreview, TreasurySummary } from "@/lib/api/types";
 
-export const auditActions = ["account.create", "account.update", "account.block", "account.unblock", "account.reset_password", "wallet.allocate", "wallet.adjust_insurance", "wallet.manual_adjust", "fiat.allocate", "fiat.convert", "fee_policy.created", "fee_policy.activated", "fee_policy.disabled", "risk_policy.created", "risk_policy.activated", "risk_policy.disabled", "deal.complete", "deal.release", "appeal.review", "appeal.resolve", "withdrawal.approve", "withdrawal.reject", "withdrawal.mark_paid"] as const;
-export const auditEntityTypes = ["account", "wallet", "fiat_wallet", "fiat_conversion", "fee_policy", "fee_policy_component", "risk_policy", "deal", "appeal", "withdrawal"] as const;
+export const auditActions = ["account.create", "account.update", "account.block", "account.unblock", "account.reset_password", "wallet.allocate", "wallet.adjust_insurance", "wallet.manual_adjust", "fiat.allocate", "fiat.convert", "fee_policy.created", "fee_policy.activated", "fee_policy.disabled", "risk_policy.created", "risk_policy.activated", "risk_policy.disabled", "payout.intent_created", "payout.risk_checked", "payout.approved", "payout.rejected", "payout.queued", "payout.execution_started", "payout.simulated_succeeded", "payout.failed", "payout.reconciliation_required", "payout.reconciled", "payout.cancelled", "deal.complete", "deal.release", "appeal.review", "appeal.resolve", "withdrawal.approve", "withdrawal.reject", "withdrawal.mark_paid"] as const;
+export const auditEntityTypes = ["account", "wallet", "fiat_wallet", "fiat_conversion", "fee_policy", "fee_policy_component", "risk_policy", "payout", "deal", "appeal", "withdrawal"] as const;
 
 interface AuditFilters {
   actorAccountId?: string;
@@ -33,6 +33,18 @@ export const ownerOperationsApi = {
   previewRiskPolicy: (body: RiskPolicyInput) => apiFetch<RiskPreview>("/api/v1/owner/risk/preview", { method: "POST", body }),
   createRiskPolicy: (body: RiskPolicyInput) => apiFetch<RiskPolicy>("/api/v1/owner/risk/policies", { method: "POST", body }),
   activateRiskPolicy: (id: string) => apiFetch<RiskPolicy>(`/api/v1/owner/risk/policies/${id}/activate`, { method: "POST" }),
+  payouts: (status?: PayoutStatus, offset = 0) => apiFetch<Paginated<PayoutIntent>>(`/api/v1/owner/payouts?${queryString({ status, limit: 20, offset })}`),
+  payout: (id: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}`),
+  approvePayout: (id: string, comment?: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/approve`, { method: "POST", body: { comment: comment || null } }),
+  rejectPayout: (id: string, comment?: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/reject`, { method: "POST", body: { comment: comment || null } }),
+  cancelPayout: (id: string, comment?: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/cancel`, { method: "POST", body: { comment: comment || null } }),
+  queuePayout: (id: string, outcome: "succeeded" | "failed" | "pending" | "unknown") => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/queue`, { method: "POST", body: { outcome } }),
+  reconcilePayout: (id: string, outcome?: "succeeded" | "failed" | "pending" | "unknown") => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/reconcile`, { method: "POST", body: { outcome: outcome || null } }),
+  beginManualPayout: (id: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/manual`, { method: "POST" }),
+  completeManualPayout: (id: string, externalReference: string, evidence: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/manual/complete`, { method: "POST", body: { external_reference: externalReference, evidence } }),
+  payoutPolicy: () => apiFetch<PayoutPolicy>("/api/v1/owner/payout-policy"),
+  createPayoutPolicy: (body: PayoutPolicyInput) => apiFetch<PayoutPolicy>("/api/v1/owner/payout-policies", { method: "POST", body }),
+  activatePayoutPolicy: (id: string) => apiFetch<PayoutPolicy>(`/api/v1/owner/payout-policies/${id}/activate`, { method: "POST" }),
   auditLogs: (filters: AuditFilters = {}) => apiFetch<Paginated<AuditLogEntry>>(`/api/v1/owner/audit-logs?${queryString({
     actor_account_id: filters.actorAccountId,
     action: filters.action,
