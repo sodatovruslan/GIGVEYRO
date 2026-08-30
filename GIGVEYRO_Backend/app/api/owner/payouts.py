@@ -8,17 +8,25 @@ from app.db.session import get_db
 from app.enums.account import UserRole
 from app.models.account import Account
 from app.models.payout import PayoutIntent
+from app.repositories.audit import AuditRepository
 from app.repositories.payout import PayoutRepository
+from app.repositories.payout_security import PayoutSecurityRepository
+from app.repositories.risk import RiskRepository
 from app.schemas.payout import (
+    LivePayoutReadinessOut,
     PayoutCommentCommand,
+    PayoutDestinationInput,
+    PayoutDestinationOut,
     PayoutIntentOut,
     PayoutListOut,
     PayoutManualCompleteCommand,
+    PayoutNetworkOut,
     PayoutPolicyInput,
     PayoutPolicyOut,
     PayoutQueueCommand,
     PayoutReconcileCommand,
 )
+from app.services.audit import AuditService
 from app.services.payout import (
     ControlledPayoutService,
     PayoutError,
@@ -27,6 +35,9 @@ from app.services.payout import (
     PayoutSafetyError,
     mask_destination,
 )
+from app.services.payout_live.allowlist import PayoutAllowlistService
+from app.services.payout_live.bybit import LivePayoutSecurityError
+from app.services.payout_live.readiness import LivePayoutReadinessService
 from app.services.payout_runtime import build_controlled_payout_service
 
 router = APIRouter(
@@ -42,6 +53,14 @@ def _service(db: AsyncSession = Depends(get_db)) -> ControlledPayoutService:
 
 def _repo(db: AsyncSession = Depends(get_db)) -> PayoutRepository:
     return PayoutRepository(db)
+
+
+def _security_repo(db: AsyncSession = Depends(get_db)) -> PayoutSecurityRepository:
+    return PayoutSecurityRepository(db)
+
+
+def _allowlist(db: AsyncSession = Depends(get_db)) -> PayoutAllowlistService:
+    return PayoutAllowlistService(PayoutSecurityRepository(db), AuditService(AuditRepository(db)))
 
 
 def _external_mask(value: str | None) -> str | None:
@@ -69,6 +88,7 @@ async def _out(
         approval_policy_version=intent.approval_policy_version,
         required_approvals=intent.required_approvals,
         approval_count=sum(1 for item in approvals if item.decision == "approved"),
+        provider_name=intent.provider_name,
         provider_mode=intent.provider_mode,
         status=intent.status,
         external_reference_masked=_external_mask(intent.external_reference),
@@ -254,3 +274,58 @@ async def activate_policy(policy_id: uuid.UUID, repo: PayoutRepository = Depends
         return await PayoutPolicyService(repo).activate(policy_id)
     except PayoutError as exc:
         _raise(exc)
+
+
+@router.get("/payout-readiness", response_model=LivePayoutReadinessOut)
+async def live_readiness(
+    security: PayoutSecurityRepository = Depends(_security_repo),
+    payouts: PayoutRepository = Depends(_repo),
+    db: AsyncSession = Depends(get_db),
+):
+    return await LivePayoutReadinessService(security, payouts, RiskRepository(db)).evaluate()
+
+
+@router.get("/payout-addresses", response_model=list[PayoutDestinationOut])
+async def payout_addresses(repo: PayoutSecurityRepository = Depends(_security_repo)):
+    return await repo.destinations()
+
+
+@router.post("/payout-addresses", response_model=PayoutDestinationOut, status_code=201)
+async def create_payout_address(
+    payload: PayoutDestinationInput,
+    owner: Account = Depends(get_current_account),
+    service: PayoutAllowlistService = Depends(_allowlist),
+):
+    try:
+        return await service.create_destination(owner=owner, **payload.model_dump())
+    except LivePayoutSecurityError as exc:
+        raise HTTPException(status_code=409, detail={"code": str(exc)}) from exc
+
+
+@router.post("/payout-addresses/{destination_id}/disable", response_model=PayoutDestinationOut)
+async def disable_payout_address(
+    destination_id: uuid.UUID,
+    owner: Account = Depends(get_current_account),
+    service: PayoutAllowlistService = Depends(_allowlist),
+):
+    try:
+        return await service.disable_destination(destination_id, owner)
+    except LivePayoutSecurityError as exc:
+        raise HTTPException(status_code=409, detail={"code": str(exc)}) from exc
+
+
+@router.get("/payout-networks", response_model=list[PayoutNetworkOut])
+async def payout_networks(repo: PayoutSecurityRepository = Depends(_security_repo)):
+    return await repo.networks()
+
+
+@router.post("/payout-networks/{network_id}/disable", response_model=PayoutNetworkOut)
+async def disable_payout_network(
+    network_id: uuid.UUID,
+    owner: Account = Depends(get_current_account),
+    service: PayoutAllowlistService = Depends(_allowlist),
+):
+    try:
+        return await service.disable_network(network_id, owner)
+    except LivePayoutSecurityError as exc:
+        raise HTTPException(status_code=409, detail={"code": str(exc)}) from exc

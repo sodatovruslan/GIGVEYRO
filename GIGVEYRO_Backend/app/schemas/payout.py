@@ -79,6 +79,7 @@ class PayoutIntentOut(BaseModel):
     approval_policy_version: int
     required_approvals: int
     approval_count: int = 0
+    provider_name: str
     provider_mode: str
     status: str
     external_reference_masked: str | None = None
@@ -116,3 +117,40 @@ class PayoutReconcileCommand(BaseModel):
 class PayoutManualCompleteCommand(BaseModel):
     external_reference: str = Field(min_length=1, max_length=128)
     evidence: str = Field(min_length=1, max_length=1000)
+
+
+class PayoutDestinationInput(BaseModel):
+    label: str = Field(min_length=1, max_length=100)
+    asset: str = Field(default="USDT", min_length=1, max_length=16)
+    network: str = Field(default="TRC20", min_length=1, max_length=32)
+    address: str = Field(min_length=1, max_length=255)
+
+
+class PayoutDestinationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    label: str
+    asset: str
+    network: str
+    masked_address: str
+    fingerprint: str
+    enabled: bool
+    created_at: datetime
+    disabled_at: datetime | None
+
+
+class PayoutNetworkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    asset: str
+    network: str
+    enabled: bool
+    created_at: datetime
+    disabled_at: datetime | None
+
+
+class LivePayoutReadinessOut(BaseModel):
+    ready: bool
+    capabilities: list[str]
+    blocking_reasons: list[str]
+    checks: dict[str, bool]

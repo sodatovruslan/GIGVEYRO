@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -14,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 
 from app.db.base import Base
 from app.models.wallet import MONEY
@@ -88,6 +89,7 @@ class PayoutIntent(Base):
     treasury_generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     approval_policy_version: Mapped[int] = mapped_column(Integer, nullable=False)
     required_approvals: Mapped[int] = mapped_column(Integer, nullable=False)
+    provider_name: Mapped[str] = mapped_column(String(32), default="disabled", nullable=False)
     provider_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
@@ -148,3 +150,56 @@ class PayoutEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class PayoutDestination(Base):
+    """Immutable approved destination. Disable and recreate instead of editing."""
+
+    __tablename__ = "payout_destinations"
+    __table_args__ = (
+        Index(
+            "uq_payout_destination_enabled_fingerprint",
+            "fingerprint",
+            unique=True,
+            postgresql_where=text("enabled"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    asset: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    network: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    address: Mapped[str] = mapped_column(String(255), nullable=False)
+    masked_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    created_by_account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    disabled_by_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id")
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PayoutNetwork(Base):
+    __tablename__ = "payout_networks"
+    __table_args__ = (UniqueConstraint("asset", "network", name="uq_payout_network_asset_network"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    asset: Mapped[str] = mapped_column(String(16), nullable=False)
+    network: Mapped[str] = mapped_column(String(32), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    created_by_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    disabled_by_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id")
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -4,6 +4,7 @@ from app.services.exchange_private.models import (
     ExchangeAccountInfo,
     ExchangeApiKeyInfo,
     ExchangeBalance,
+    ExchangeWithdrawalNetwork,
 )
 
 
@@ -15,5 +16,7 @@ class ExchangePrivateProvider(Protocol):
     async def get_account_info(self) -> ExchangeAccountInfo: ...
 
     async def get_balances(self) -> list[ExchangeBalance]: ...
+
+    async def get_withdrawal_networks(self, asset: str) -> list[ExchangeWithdrawalNetwork]: ...
 
     async def close(self) -> None: ...

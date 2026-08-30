@@ -89,6 +89,16 @@ class Settings(BaseSettings):
     BYBIT_PRIVATE_TIMEOUT_SECONDS: float = 8.0
     BYBIT_PRIVATE_MAX_RETRIES: int = 2
 
+    # Future payout-write credentials are intentionally isolated from treasury credentials.
+    # This stage contains no network-capable write provider and all values default fail-closed.
+    BYBIT_WRITE_ENABLED: bool = False
+    BYBIT_WRITE_API_KEY: SecretStr = SecretStr("")
+    BYBIT_WRITE_API_SECRET: SecretStr = SecretStr("")
+    BYBIT_WRITE_PERMISSION_VERIFIED: bool = False
+    BYBIT_WRITE_IP_WHITELIST_VERIFIED: bool = False
+    BYBIT_LIVE_RECONCILIATION_VERIFIED: bool = False
+    BYBIT_WITHDRAW_METADATA_MAX_AGE_SECONDS: int = 60
+
     # Authoritative fiat-rate composition (official USD/TJS + explicit USDT peg policy)
     NBT_FIAT_BASE_URL: str = "https://nbt.tj/en/kurs/export_xml.php"
     EXCHANGE_RATE_API_BASE_URL: str = "https://open.er-api.com/v6/latest/USD"
@@ -264,6 +274,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 "PAYOUT_PROVIDER_MODE=live is unavailable: no approved live provider exists"
             )
+        if self.BYBIT_WRITE_ENABLED:
+            raise ValueError(
+                "BYBIT_WRITE_ENABLED=true is unavailable: write network transport is disabled"
+            )
+        if not 10 <= self.BYBIT_WITHDRAW_METADATA_MAX_AGE_SECONDS <= 300:
+            raise ValueError("BYBIT_WITHDRAW_METADATA_MAX_AGE_SECONDS must be between 10 and 300")
         if self.PAYOUT_PROVIDER_MODE == "simulated" and not self.PAYOUT_SIMULATION_ENABLED:
             # Safe configuration is allowed to start, but execution remains blocked.
             return self

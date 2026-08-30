@@ -162,6 +162,15 @@ if _PROMETHEUS_AVAILABLE:
         "Private exchange rate-limit responses",
         labelnames=["provider"],
     )
+    PAYOUT_LIVE_READY = Gauge(
+        "gigveyro_payout_live_ready",
+        "Whether all future live payout readiness checks pass (network remains disabled)",
+    )
+    PAYOUT_LIVE_BLOCKERS = Gauge(
+        "gigveyro_payout_live_blockers_total",
+        "Current live payout readiness blockers",
+        labelnames=["reason"],
+    )
 else:
     # Stub objects so callers don't need to guard every usage
     class _NoopMetric:
@@ -196,6 +205,8 @@ else:
     EXCHANGE_PRIVATE_LATENCY = _NoopMetric()  # type: ignore[assignment]
     EXCHANGE_PRIVATE_AUTH_FAILURES = _NoopMetric()  # type: ignore[assignment]
     EXCHANGE_PRIVATE_RATE_LIMITS = _NoopMetric()  # type: ignore[assignment]
+    PAYOUT_LIVE_READY = _NoopMetric()  # type: ignore[assignment]
+    PAYOUT_LIVE_BLOCKERS = _NoopMetric()  # type: ignore[assignment]
 
 
 # ── FastAPI instrumentator setup ───────────────────────────────────────────
@@ -277,9 +288,7 @@ def record_market_request(provider: str, status: str, latency_seconds: float) ->
 
 
 def record_market_failover(from_provider: str, to_provider: str) -> None:
-    MARKET_PROVIDER_FAILOVERS.labels(
-        from_provider=from_provider, to_provider=to_provider
-    ).inc()
+    MARKET_PROVIDER_FAILOVERS.labels(from_provider=from_provider, to_provider=to_provider).inc()
 
 
 def record_market_cache_hit(provider: str) -> None:
@@ -296,9 +305,7 @@ def record_fiat_request(provider: str, status: str, latency_seconds: float) -> N
 
 
 def record_fiat_failover(from_provider: str, to_provider: str) -> None:
-    FIAT_PROVIDER_FAILOVERS.labels(
-        from_provider=from_provider, to_provider=to_provider
-    ).inc()
+    FIAT_PROVIDER_FAILOVERS.labels(from_provider=from_provider, to_provider=to_provider).inc()
 
 
 def observe_fiat_rate_age(provider: str, age_seconds: float) -> None:
@@ -313,9 +320,7 @@ def observe_business_rate_deviation(deviation_bps: float) -> None:
     BUSINESS_RATE_DEVIATION.set(deviation_bps)
 
 
-def record_exchange_private_request(
-    provider: str, status: str, latency_seconds: float
-) -> None:
+def record_exchange_private_request(provider: str, status: str, latency_seconds: float) -> None:
     EXCHANGE_PRIVATE_REQUESTS.labels(provider=provider, status=status).inc()
     EXCHANGE_PRIVATE_LATENCY.labels(provider=provider).observe(latency_seconds)
 
@@ -326,6 +331,13 @@ def record_exchange_private_auth_failure(provider: str) -> None:
 
 def record_exchange_private_rate_limit(provider: str) -> None:
     EXCHANGE_PRIVATE_RATE_LIMITS.labels(provider=provider).inc()
+
+
+def observe_live_payout_readiness(ready: bool, all_reasons: list[str], blockers: list[str]) -> None:
+    PAYOUT_LIVE_READY.set(1 if ready else 0)
+    blocked = set(blockers)
+    for reason in all_reasons:
+        PAYOUT_LIVE_BLOCKERS.labels(reason=reason).set(1 if reason in blocked else 0)
 
 
 def set_outbox_pending(count: int) -> None:

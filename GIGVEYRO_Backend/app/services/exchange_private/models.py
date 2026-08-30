@@ -47,6 +47,21 @@ class ExchangeBalance:
 
 
 @dataclass(frozen=True, slots=True)
+class ExchangeWithdrawalNetwork:
+    provider: str
+    asset: Literal["USDT", "USDC"]
+    chain: str
+    chain_type: str
+    fixed_fee: Decimal
+    percentage_fee: Decimal
+    minimum_amount: Decimal
+    maximum_amount: Decimal | None
+    decimal_places: int
+    withdraw_enabled: bool
+    received_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class ExchangePrivateDiagnostics:
     provider: str
     configured: bool

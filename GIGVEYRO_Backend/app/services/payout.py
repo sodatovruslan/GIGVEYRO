@@ -140,6 +140,8 @@ def intent_hash(intent: PayoutIntent) -> str:
         "provider_mode": intent.provider_mode,
         "idempotency_key": intent.idempotency_key,
     }
+    if intent.provider_mode == PayoutProviderMode.LIVE.value:
+        payload["provider"] = intent.provider_name
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -260,6 +262,11 @@ class ControlledPayoutService:
             treasury_generated_at=snapshot.generated_at,
             approval_policy_version=policy.version,
             required_approvals=required,
+            provider_name=(
+                "simulator"
+                if settings.PAYOUT_PROVIDER_MODE == PayoutProviderMode.SIMULATED.value
+                else "disabled"
+            ),
             provider_mode=settings.PAYOUT_PROVIDER_MODE,
             status=PayoutStatus.REQUESTED.value,
             idempotency_key=f"withdrawal:{withdrawal.id}",

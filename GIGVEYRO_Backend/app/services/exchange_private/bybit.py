@@ -34,6 +34,7 @@ from app.services.exchange_private.models import (
     ExchangeAccountInfo,
     ExchangeApiKeyInfo,
     ExchangeBalance,
+    ExchangeWithdrawalNetwork,
 )
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,48 @@ class BybitPrivateClient:
             if (row := by_asset.get(asset)) is not None
         ]
 
+    async def get_withdrawal_networks(self, asset: str) -> list[ExchangeWithdrawalNetwork]:
+        coin = asset.upper()
+        if coin not in _ALLOWED_COINS:
+            raise ValueError("asset is not allowed for private observation")
+        result = await self._get("/v5/asset/coin/query-info", {"coin": coin}, "coin_info")
+        rows = result.get("rows")
+        if not isinstance(rows, list):
+            raise ExchangePrivateBadResponse("Bybit coin metadata rows were malformed")
+        row = next(
+            (item for item in rows if isinstance(item, dict) and item.get("coin") == coin), None
+        )
+        if row is None or not isinstance(row.get("chains"), list):
+            raise ExchangePrivateBadResponse("Bybit coin metadata was missing")
+        received_at = datetime.now(UTC)
+        networks: list[ExchangeWithdrawalNetwork] = []
+        for chain in row["chains"]:
+            if not isinstance(chain, dict):
+                continue
+            maximum = _optional_decimal_field(chain.get("withdrawMax"), "withdraw maximum")
+            if maximum == Decimal("-1"):
+                maximum = None
+            networks.append(
+                ExchangeWithdrawalNetwork(
+                    provider=self.provider,
+                    asset=coin,  # type: ignore[arg-type]
+                    chain=_required_string(chain.get("chain"), "withdraw chain"),
+                    chain_type=_required_string(chain.get("chainType"), "withdraw chain type"),
+                    fixed_fee=_decimal(chain.get("withdrawFee"), "withdraw fee"),
+                    percentage_fee=_decimal(
+                        chain.get("withdrawPercentageFee") or "0", "withdraw percentage fee"
+                    ),
+                    minimum_amount=_decimal(chain.get("withdrawMin"), "withdraw minimum"),
+                    maximum_amount=maximum,
+                    decimal_places=_required_nonnegative_int(
+                        chain.get("minAccuracy"), "withdraw precision"
+                    ),
+                    withdraw_enabled=chain.get("chainWithdraw") == "1",
+                    received_at=received_at,
+                )
+            )
+        return networks
+
     async def close(self) -> None:
         if self._owns_client:
             await self._client.aclose()
@@ -269,9 +312,7 @@ class BybitPrivateClient:
                     continue
                 raise last_error from exc
             except httpx.RequestError as exc:
-                last_error = ExchangePrivateUnavailable(
-                    "Bybit private API connection failed"
-                )
+                last_error = ExchangePrivateUnavailable("Bybit private API connection failed")
                 if attempt < self._max_retries:
                     await asyncio.sleep(_backoff(attempt))
                     continue
@@ -279,9 +320,7 @@ class BybitPrivateClient:
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 raise ExchangePrivateBadResponse("Bybit returned malformed JSON") from exc
             except ExchangePrivateError:
-                record_exchange_private_request(
-                    self.provider, "error", time.monotonic() - started
-                )
+                record_exchange_private_request(self.provider, "error", time.monotonic() - started)
                 raise
         raise ExchangePrivateUnavailable("Bybit private API request failed") from last_error
 
@@ -304,9 +343,7 @@ class BybitPrivateClient:
                 extra={"provider": self.provider, "endpoint_class": "server_time"},
             )
         except (httpx.HTTPError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise ExchangePrivateTimestampError(
-                "Bybit timestamp synchronization failed"
-            ) from exc
+            raise ExchangePrivateTimestampError("Bybit timestamp synchronization failed") from exc
 
 
 def _error_for_code(code: object) -> ExchangePrivateError:
@@ -334,9 +371,7 @@ def _mask_key(value: str) -> str:
 
 
 def _account_type(status: int) -> str:
-    return {1: "classic", 3: "uta1", 4: "uta1_pro", 5: "uta2", 6: "uta2_pro"}.get(
-        status, "unknown"
-    )
+    return {1: "classic", 3: "uta1", 4: "uta1_pro", 5: "uta2", 6: "uta2_pro"}.get(status, "unknown")
 
 
 def _decimal(value: object, field: str) -> Decimal:
@@ -351,6 +386,20 @@ def _decimal(value: object, field: str) -> Decimal:
 
 def _optional_decimal(value: object) -> Decimal | None:
     return None if value in (None, "") else _decimal(value, "balance")
+
+
+def _optional_decimal_field(value: object, field: str) -> Decimal | None:
+    return None if value in (None, "") else _decimal(value, field)
+
+
+def _required_nonnegative_int(value: object, field: str) -> int:
+    try:
+        parsed = int(str(value))
+    except (TypeError, ValueError) as exc:
+        raise ExchangePrivateBadResponse(f"Bybit {field} was malformed") from exc
+    if parsed < 0:
+        raise ExchangePrivateBadResponse(f"Bybit {field} was negative")
+    return parsed
 
 
 def _required_string(value: object, field: str) -> str:
