@@ -1,0 +1,25 @@
+.panel{margin:0 0 20px;padding:20px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card-bg);box-shadow:var(--shadow)}
+.panel>p,.allowlist p{color:var(--text-muted)}
+.header,.allowlistHeading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.header span{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--primary)}
+.header h2,.allowlist h3,.networkList h3{margin:4px 0}
+.header>strong{padding:8px 11px;border-radius:999px;background:var(--danger-soft);color:var(--danger);font-size:12px}
+.header>strong[data-ready="true"]{background:var(--success-soft);color:var(--success)}
+.readinessGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:18px 0}
+.readinessGrid>div,.networkList>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-subtle)}
+.readinessGrid strong,.networkList span,.addressList>div>span{color:var(--danger)}
+.readinessGrid strong[data-passed="true"],.networkList span[data-enabled="true"],.addressList>div>span[data-enabled="true"]{color:var(--success)}
+.allowlist,.networkList{margin-top:18px;padding-top:18px;border-top:1px solid var(--border)}
+.addressForm{display:grid;grid-template-columns:minmax(130px,.6fr) minmax(260px,1.4fr) minmax(130px,.5fr) auto;align-items:end;gap:10px;margin:14px 0}
+.addressForm label,.addressForm>div{display:grid;gap:6px}
+.addressForm span{font-size:12px;color:var(--text-muted)}
+.addressForm input{width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--input-bg);color:var(--text)}
+.addressForm button,.addressList button{padding:10px 13px;border:0;border-radius:9px;background:var(--primary);color:white}
+.addressForm button:disabled,.addressList button:disabled{opacity:.5}
+.addressList{display:grid;gap:8px}
+.addressList>div{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:10px}
+.addressList small{display:block;margin-top:3px;color:var(--text-muted)}
+.networkList{display:grid;gap:8px}
+.panel footer{margin-top:18px;padding:12px;border-radius:9px;background:var(--warning-soft);color:var(--warning)}
+@media(max-width:900px){.readinessGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.addressForm{grid-template-columns:1fr 1fr}.addressForm button{min-height:42px}}
+@media(max-width:700px){.header{flex-direction:column}.readinessGrid,.addressForm{grid-template-columns:1fr}.addressList>div{grid-template-columns:1fr auto}.addressList button{grid-column:1/-1}.panel{padding:15px}}

@@ -658,6 +658,8 @@
       "fee_policy_component": "Fee component",
       "risk_policy": "Risk policy",
       "payout": "Payout",
+      "payout_address": "Payout destination",
+      "payout_network": "Payout network",
       "deal": "Deal",
       "appeal": "Appeal",
       "withdrawal": "Withdrawal"
@@ -686,6 +688,8 @@
       },
       "risk_policy": {"created": "Risk policy created", "activated": "Risk policy activated", "disabled": "Risk control disabled"},
       "payout": {"intent_created":"Payout intent created","risk_checked":"Payout risk checked","approved":"Payout approved","rejected":"Payout rejected","queued":"Payout queued","execution_started":"Payout execution started","simulated_succeeded":"Simulated payout succeeded","failed":"Payout failed","reconciliation_required":"Payout reconciliation required","reconciled":"Payout reconciled","cancelled":"Payout cancelled"},
+      "payout_address": {"created":"Payout destination created","disabled":"Payout destination disabled"},
+      "payout_network": {"disabled":"Payout network disabled"},
       "deal": {
         "complete": "Deal completed",
         "release": "Deal released"
@@ -759,6 +763,7 @@
   },
   "payouts": {
     "title":"Payout control center","subtitle":"Approval, simulation and reconciliation without live exchange writes","safetyTitle":"LIVE PAYOUTS DISABLED","safetyText":"PAYOUT_ENABLED and the business switch must both allow execution. No live provider exists in this stage.","businessEnabled":"Business switch enabled","businessDisabled":"Business switch disabled","empty":"No payout intents found","intent":"Intent","destination":"Destination","risk":"Risk","approval":"Approvals","policy":"Payout approval policy","policyHint":"Versioned limits and dual-control capability. Auto approval remains unavailable.","businessSwitch":"Business payout switch","baseApprovals":"Base approvals","dualThreshold":"Dual-control threshold, USDT","highApprovals":"High-value approvals","maxSingle":"Maximum single payout","maxDaily":"Maximum daily payout","maxHourly":"Maximum hourly payout","maxPending":"Maximum pending payout total","maxAsset":"Maximum asset exposure","createDraft":"Create draft","activate":"Activate draft","detail":"Payout details","withdrawal":"Withdrawal","provider":"Provider mode","treasuryAt":"Treasury snapshot","approve":"Approve","reject":"Reject","queueSuccess":"Queue simulated success","queueUnknown":"Queue simulated unknown","manual":"Await manual settlement","reconcile":"Reconcile simulation","externalRef":"External reference","evidence":"Settlement evidence","confirmManual":"Confirm manual settlement","timeline":"Audit timeline",
+    "live":{"eyebrow":"LIVE SECURITY","title":"Live payout readiness","ready":"READY","notReady":"NOT READY","description":"Read-only diagnostics and allowlist management. Live payout network execution is physically disabled.","checks":{"global_payout_enabled":"Global payouts","provider_live":"Provider live mode","write_credentials_configured":"Separate write credentials","write_permission_verified":"Write permission verified","ip_whitelist_verified":"IP allowlist verified","address_allowlist_configured":"Destination allowlisted","network_allowlist_configured":"Network allowlisted","dual_approval_ready":"Dual approval","reconciliation_ready":"Reconciliation ready"},"addresses":"Allowed destinations","addressesHint":"Addresses are immutable. Disable and recreate one to replace it.","label":"Label","address":"TRC20 address","binding":"Exact binding","addAddress":"Add address","noAddresses":"No approved destinations yet.","enabled":"Enabled","disabled":"Disabled","disable":"Disable","networks":"Allowed networks","noNetworks":"No allowed networks.","noLiveAction":"This screen has no control for enabling or sending a live payout."},
     "statuses":{"requested":"Requested","risk_review":"Risk review","approved":"Approved","queued":"Queued","execution_pending":"Execution pending","executing":"Executing","awaiting_manual_settlement":"Awaiting manual settlement","succeeded":"Succeeded","failed":"Failed","rejected":"Rejected","cancelled":"Cancelled","reconciliation_required":"Reconciliation required"},
     "events":{"payout":{"intent_created":"Intent created","risk_checked":"Risk checked","approved":"Approved","rejected":"Rejected","queued":"Queued","execution_started":"Execution started","simulated_succeeded":"Simulation succeeded","failed":"Failed","reconciliation_required":"Reconciliation required","reconciled":"Reconciled","cancelled":"Cancelled"}}
   },

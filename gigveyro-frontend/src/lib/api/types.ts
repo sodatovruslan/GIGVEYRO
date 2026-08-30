@@ -570,7 +570,7 @@ export interface PayoutIntent {
   network: string; masked_destination: string; fee_amount: string; risk_policy_version: number;
   risk_decision: "allow" | "warn" | "block"; risk_reason: string | null; treasury_generated_at: string;
   approval_policy_version: number; required_approvals: number; approval_count: number;
-  provider_mode: "disabled" | "simulated" | "live"; status: PayoutStatus;
+  provider_name: string; provider_mode: "disabled" | "simulated" | "live"; status: PayoutStatus;
   external_reference_masked: string | null; failure_kind: string | null; failure_code: string | null;
   created_at: string; approved_at: string | null; queued_at: string | null;
   execution_started_at: string | null; executed_at: string | null; reconciled_at: string | null;
@@ -586,3 +586,17 @@ export interface PayoutPolicyInput {
   max_asset_exposure_enabled: boolean; max_asset_exposure_usdt: string | null;
 }
 export interface PayoutPolicy extends PayoutPolicyInput { id: string; version: number; status: "draft" | "active" | "retired"; created_at: string; activated_at: string | null; }
+export interface LivePayoutReadiness {
+  ready: boolean;
+  capabilities: string[];
+  blocking_reasons: string[];
+  checks: Record<string, boolean>;
+}
+export interface PayoutDestination {
+  id: string; label: string; asset: string; network: string; masked_address: string;
+  fingerprint: string; enabled: boolean; created_at: string; disabled_at: string | null;
+}
+export interface PayoutNetwork {
+  id: string; asset: string; network: string; enabled: boolean;
+  created_at: string; disabled_at: string | null;
+}

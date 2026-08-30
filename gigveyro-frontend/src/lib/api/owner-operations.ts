@@ -1,8 +1,8 @@
 import { apiFetch } from "@/lib/api/client";
-import type { AuditLogEntry, FeePolicy, FeePreview, FeeType, IntegrationDiagnostics, MerchantWithdrawal, Paginated, PayoutIntent, PayoutPolicy, PayoutPolicyInput, PayoutStatus, ProfitEntry, ProfitSummary, RiskPolicy, RiskPolicyInput, RiskPreview, TreasurySummary } from "@/lib/api/types";
+import type { AuditLogEntry, FeePolicy, FeePreview, FeeType, IntegrationDiagnostics, LivePayoutReadiness, MerchantWithdrawal, Paginated, PayoutDestination, PayoutIntent, PayoutNetwork, PayoutPolicy, PayoutPolicyInput, PayoutStatus, ProfitEntry, ProfitSummary, RiskPolicy, RiskPolicyInput, RiskPreview, TreasurySummary } from "@/lib/api/types";
 
-export const auditActions = ["account.create", "account.update", "account.block", "account.unblock", "account.reset_password", "wallet.allocate", "wallet.adjust_insurance", "wallet.manual_adjust", "fiat.allocate", "fiat.convert", "fee_policy.created", "fee_policy.activated", "fee_policy.disabled", "risk_policy.created", "risk_policy.activated", "risk_policy.disabled", "payout.intent_created", "payout.risk_checked", "payout.approved", "payout.rejected", "payout.queued", "payout.execution_started", "payout.simulated_succeeded", "payout.failed", "payout.reconciliation_required", "payout.reconciled", "payout.cancelled", "deal.complete", "deal.release", "appeal.review", "appeal.resolve", "withdrawal.approve", "withdrawal.reject", "withdrawal.mark_paid"] as const;
-export const auditEntityTypes = ["account", "wallet", "fiat_wallet", "fiat_conversion", "fee_policy", "fee_policy_component", "risk_policy", "payout", "deal", "appeal", "withdrawal"] as const;
+export const auditActions = ["account.create", "account.update", "account.block", "account.unblock", "account.reset_password", "wallet.allocate", "wallet.adjust_insurance", "wallet.manual_adjust", "fiat.allocate", "fiat.convert", "fee_policy.created", "fee_policy.activated", "fee_policy.disabled", "risk_policy.created", "risk_policy.activated", "risk_policy.disabled", "payout.intent_created", "payout.risk_checked", "payout.approved", "payout.rejected", "payout.queued", "payout.execution_started", "payout.simulated_succeeded", "payout.failed", "payout.reconciliation_required", "payout.reconciled", "payout.cancelled", "payout_address.created", "payout_address.disabled", "payout_network.disabled", "deal.complete", "deal.release", "appeal.review", "appeal.resolve", "withdrawal.approve", "withdrawal.reject", "withdrawal.mark_paid"] as const;
+export const auditEntityTypes = ["account", "wallet", "fiat_wallet", "fiat_conversion", "fee_policy", "fee_policy_component", "risk_policy", "payout", "payout_address", "payout_network", "deal", "appeal", "withdrawal"] as const;
 
 interface AuditFilters {
   actorAccountId?: string;
@@ -45,6 +45,11 @@ export const ownerOperationsApi = {
   payoutPolicy: () => apiFetch<PayoutPolicy>("/api/v1/owner/payout-policy"),
   createPayoutPolicy: (body: PayoutPolicyInput) => apiFetch<PayoutPolicy>("/api/v1/owner/payout-policies", { method: "POST", body }),
   activatePayoutPolicy: (id: string) => apiFetch<PayoutPolicy>(`/api/v1/owner/payout-policies/${id}/activate`, { method: "POST" }),
+  payoutReadiness: () => apiFetch<LivePayoutReadiness>("/api/v1/owner/payout-readiness"),
+  payoutAddresses: () => apiFetch<PayoutDestination[]>("/api/v1/owner/payout-addresses"),
+  createPayoutAddress: (body: { label: string; asset: "USDT"; network: "TRC20"; address: string }) => apiFetch<PayoutDestination>("/api/v1/owner/payout-addresses", { method: "POST", body }),
+  disablePayoutAddress: (id: string) => apiFetch<PayoutDestination>(`/api/v1/owner/payout-addresses/${id}/disable`, { method: "POST" }),
+  payoutNetworks: () => apiFetch<PayoutNetwork[]>("/api/v1/owner/payout-networks"),
   auditLogs: (filters: AuditFilters = {}) => apiFetch<Paginated<AuditLogEntry>>(`/api/v1/owner/audit-logs?${queryString({
     actor_account_id: filters.actorAccountId,
     action: filters.action,
