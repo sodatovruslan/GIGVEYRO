@@ -28,9 +28,9 @@ async def test_payout_migration_roundtrip_on_disposable_database():
             "DATABASE_URL": url.render_as_string(hide_password=False),
         }
         for arguments in (
-            ("upgrade", "0023"),
+            ("upgrade", "0024"),
             ("upgrade", "head"),
-            ("downgrade", "0023"),
+            ("downgrade", "0024"),
             ("upgrade", "head"),
         ):
             await asyncio.to_thread(
@@ -46,7 +46,7 @@ async def test_payout_migration_roundtrip_on_disposable_database():
             url.set(drivername="postgresql").render_as_string(hide_password=False)
         )
         try:
-            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0024"
+            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0025"
             assert (
                 await connection.fetchval(
                     "SELECT count(*) FROM payout_policies WHERE status='active'"
@@ -55,6 +55,21 @@ async def test_payout_migration_roundtrip_on_disposable_database():
             )
             assert await connection.fetchval("SELECT payouts_enabled FROM payout_policies") is False
             assert await connection.fetchval("SELECT count(*) FROM payout_intents") == 0
+            assert await connection.fetchval("SELECT count(*) FROM payout_destinations") == 0
+            assert (
+                await connection.fetchval(
+                    "SELECT count(*) FROM information_schema.columns "
+                    "WHERE table_name='payout_intents' AND column_name='provider_name'"
+                )
+                == 1
+            )
+            assert (
+                await connection.fetchval(
+                    "SELECT count(*) FROM payout_networks "
+                    "WHERE asset='USDT' AND network='TRC20' AND enabled=true"
+                )
+                == 1
+            )
         finally:
             await connection.close()
     finally:
