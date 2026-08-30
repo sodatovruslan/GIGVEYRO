@@ -14,7 +14,8 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "GIGVEYRO"
     APP_ENV: str = "development"
-    DEBUG: bool = False
+    # Development is verbose by default. Staging/production must explicitly set false.
+    DEBUG: bool = True
     DOCS_ENABLED: bool = True
     DATABASE_URL: str
 
@@ -204,25 +205,31 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def validate_environment_mode(self) -> "Settings":
+        allowed = {"development", "test", "staging", "production"}
+        if self.APP_ENV not in allowed:
+            raise ValueError(f"APP_ENV must be one of: {', '.join(sorted(allowed))}")
+        if self.APP_ENV in {"staging", "production"} and self.DEBUG:
+            raise ValueError(f"DEBUG must be False in {self.APP_ENV}")
+        return self
+
+    @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
         if self.APP_ENV == "production":
-            if self.DEBUG:
-                raise ValueError("DEBUG must be False in production")
             if "CHANGE_ME" in self.JWT_SECRET_KEY or len(self.JWT_SECRET_KEY) < 32:
                 raise ValueError("JWT_SECRET_KEY must be strong (>=32 chars) in production")
             if "CHANGE_ME" in self.TOTP_ENCRYPTION_KEY:
                 raise ValueError("TOTP_ENCRYPTION_KEY must be a real generated key in production")
             if "*" in self.CORS_ALLOWED_ORIGINS:
                 raise ValueError("Wildcard CORS origins are forbidden in production")
-            # Production Redis requirement
-            if "localhost" in self.REDIS_URL or "127.0.0.1" in self.REDIS_URL:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "REDIS_URL points to localhost in production — "
-                    "ensure this is intentional (e.g. Docker internal network)."
-                )
-
+            if not self.CORS_ALLOWED_ORIGINS or any(
+                not origin.startswith("https://") for origin in self.CORS_ALLOWED_ORIGINS
+            ):
+                raise ValueError("Production CORS origins must be explicit HTTPS origins")
+            if not self.ALLOWED_HOSTS or any(
+                host in {"*", "localhost", "127.0.0.1"} for host in self.ALLOWED_HOSTS
+            ):
+                raise ValueError("Production ALLOWED_HOSTS must contain only explicit public hosts")
             # Realtime horizontal scaling check
             if self.REALTIME_BROKER == "inmemory" and self.WEB_CONCURRENCY > 1:
                 raise ValueError(
@@ -250,6 +257,12 @@ class Settings(BaseSettings):
                     "METRICS_AUTH_TOKEN must be strong (>=32 chars) when metrics are "
                     "enabled in production"
                 )
+            if "localhost" in self.REDIS_URL or "127.0.0.1" in self.REDIS_URL:
+                raise ValueError("Production REDIS_URL must not use localhost")
+            if self.REALTIME_BROKER != "redis":
+                raise ValueError("REALTIME_BROKER must be 'redis' in production")
+            if self.RATE_LIMIT_FAIL_MODE == "open":
+                raise ValueError("RATE_LIMIT_FAIL_MODE must not be 'open' in production")
         return self
 
     @model_validator(mode="after")

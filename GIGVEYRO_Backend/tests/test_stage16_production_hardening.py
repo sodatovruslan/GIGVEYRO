@@ -13,7 +13,12 @@ async def test_security_headers_and_request_id():
         assert response.status_code == 200
         assert response.headers.get("X-Content-Type-Options") == "nosniff"
         assert response.headers.get("X-Frame-Options") == "DENY"
+        assert response.headers.get("Permissions-Policy")
+        assert "default-src 'none'" in response.headers.get("Content-Security-Policy", "")
         assert "X-Request-ID" in response.headers
+
+        rejected = await client.get("/health", headers={"X-Request-ID": "bad/request"})
+        assert rejected.headers["X-Request-ID"] != "bad/request"
 
 
 @pytest.mark.asyncio

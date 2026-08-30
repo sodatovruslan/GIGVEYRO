@@ -65,18 +65,16 @@ async def health_ready(response: Response, db: AsyncSession = Depends(get_db)):
     try:
         await db.execute(text("SELECT 1"))
         checks["database"] = {"status": "ok"}
-    except SQLAlchemyError as exc:
-        checks["database"] = {"status": "error", "detail": str(exc)}
+    except SQLAlchemyError:
+        checks["database"] = {"status": "error", "detail": "database check failed"}
         is_ready = False
 
     # Redis check
     redis_status = await redis_health_check()
-    checks["redis"] = redis_status
-    if redis_status.get("status") not in ("ok", "not_initialised"):
-        # Redis error is a warning — workers won't work but web requests still can
-        # Uncomment to make Redis a hard dependency:
-        # is_ready = False
-        pass
+    checks["redis"] = {key: value for key, value in redis_status.items() if key != "detail"}
+    if redis_status.get("status") != "ok" and settings.APP_ENV in {"staging", "production"}:
+        # Redis is critical for cross-process realtime, workers and distributed limits.
+        is_ready = False
 
     if not is_ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE

@@ -23,7 +23,7 @@ import json
 import logging
 import sys
 import traceback
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from datetime import UTC, datetime
 from typing import Any
 
@@ -31,9 +31,14 @@ from typing import Any
 _request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
 
-def set_request_id(request_id: str) -> None:
+def set_request_id(request_id: str) -> Token[str]:
     """Set the request ID for the current async context."""
-    _request_id_var.set(request_id)
+    return _request_id_var.set(request_id)
+
+
+def reset_request_id(token: Token[str]) -> None:
+    """Restore the previous request ID after the request scope exits."""
+    _request_id_var.reset(token)
 
 
 def get_request_id() -> str:

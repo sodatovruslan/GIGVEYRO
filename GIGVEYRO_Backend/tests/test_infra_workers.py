@@ -19,13 +19,35 @@ import pytest
 from app.core.config import Settings
 
 
+def _production_settings(**overrides) -> Settings:
+    values = {
+        "DATABASE_URL": "postgresql+asyncpg://user:pass@db/test",
+        "JWT_SECRET_KEY": "a-very-long-jwt-secret-key-minimum-32chars",
+        "APP_ENV": "production",
+        "DEBUG": False,
+        "CORS_ALLOWED_ORIGINS": ["https://example.com"],
+        "ALLOWED_HOSTS": ["example.com"],
+        "DEPOSIT_PROVIDER_TYPE": "trongrid",
+        "PAYOUT_ENABLED": False,
+        "PAYOUT_PROVIDER_MODE": "disabled",
+        "ALLOW_MOCK_PROVIDERS_IN_PRODUCTION": False,
+        "DOCS_ENABLED": False,
+        "METRICS_ENABLED": False,
+        "REDIS_URL": "redis://redis:6379/0",
+        "REALTIME_BROKER": "redis",
+        "RATE_LIMIT_FAIL_MODE": "closed",
+    }
+    values.update(overrides)
+    return Settings(**values)
+
+
 class TestProductionConfigValidation:
     """Production settings validation rules."""
 
     def test_payout_enabled_with_mock_provider_rejected_in_production(self):
         """Production must reject PAYOUT_ENABLED=True with mock payout provider."""
         with pytest.raises(ValueError, match="simulated payout mode"):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -45,7 +67,7 @@ class TestProductionConfigValidation:
 
     def test_payout_enabled_false_is_always_safe(self):
         """PAYOUT_ENABLED=False is always safe regardless of provider."""
-        s = Settings(
+        s = _production_settings(
             DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
             JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
             APP_ENV="production",
@@ -62,7 +84,7 @@ class TestProductionConfigValidation:
 
     def test_production_rejects_enabled_api_docs(self):
         with pytest.raises(ValueError, match="DOCS_ENABLED must be False in production"):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -76,7 +98,7 @@ class TestProductionConfigValidation:
 
     def test_production_rejects_unprotected_metrics(self):
         with pytest.raises(ValueError, match="METRICS_AUTH_TOKEN must be strong"):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -92,7 +114,7 @@ class TestProductionConfigValidation:
     def test_debug_true_rejected_in_production(self):
         """DEBUG=True is rejected in production."""
         with pytest.raises(ValueError, match="DEBUG must be False"):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -102,7 +124,7 @@ class TestProductionConfigValidation:
     def test_weak_jwt_key_rejected_in_production(self):
         """Short/default JWT key is rejected in production."""
         with pytest.raises(ValueError, match="JWT_SECRET_KEY must be strong"):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="CHANGE_ME",
                 APP_ENV="production",
@@ -112,7 +134,7 @@ class TestProductionConfigValidation:
     def test_wildcard_cors_rejected_in_production(self):
         """Wildcard CORS origin is rejected in production."""
         with pytest.raises(ValueError, match="Wildcard CORS origins"):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -125,7 +147,7 @@ class TestProductionConfigValidation:
         with pytest.raises(
             ValueError, match="DEPOSIT_PROVIDER_TYPE=mock is forbidden in production"
         ):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -139,7 +161,7 @@ class TestProductionConfigValidation:
         with pytest.raises(
             ValueError, match="REALTIME_BROKER must be set to 'redis' in production"
         ):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -151,7 +173,7 @@ class TestProductionConfigValidation:
 
     def test_production_rejects_live_mode_even_with_credentials(self):
         with pytest.raises(ValueError, match="no approved live provider"):
-            Settings(
+            _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
                 APP_ENV="production",
@@ -162,6 +184,27 @@ class TestProductionConfigValidation:
                 DOCS_ENABLED=False,
                 METRICS_ENABLED=False,
             )
+
+    def test_environment_modes_and_debug_contract(self):
+        with pytest.raises(ValueError, match="APP_ENV must be one of"):
+            Settings(APP_ENV="release")
+        with pytest.raises(ValueError, match="DEBUG must be False in staging"):
+            Settings(APP_ENV="staging", DEBUG=True)
+        assert Settings(APP_ENV="development", DEBUG=True).DEBUG is True
+
+    @pytest.mark.parametrize(
+        ("overrides", "message"),
+        [
+            ({"CORS_ALLOWED_ORIGINS": ["http://example.com"]}, "explicit HTTPS"),
+            ({"ALLOWED_HOSTS": ["localhost"]}, "explicit public hosts"),
+            ({"REDIS_URL": "redis://localhost:6379/0"}, "must not use localhost"),
+            ({"REALTIME_BROKER": "inmemory"}, "must be 'redis'"),
+            ({"RATE_LIMIT_FAIL_MODE": "open"}, "must not be 'open'"),
+        ],
+    )
+    def test_production_dependency_boundaries_fail_closed(self, overrides, message):
+        with pytest.raises(ValueError, match=message):
+            _production_settings(**overrides)
 
 
 class TestPayoutOrchestratorSafety:
