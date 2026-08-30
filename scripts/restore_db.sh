@@ -29,6 +29,7 @@ TARGET_DB="${2:-gigveyro_restore_test}"
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 POSTGRES_USER="${POSTGRES_USER:-gigveyro_user}"
+RESTORE_CONFIRM_TARGET="${RESTORE_CONFIRM_TARGET:-}"
 
 if [ -z "${BACKUP_FILE}" ]; then
     echo "ERROR: No backup file specified."
@@ -51,12 +52,17 @@ if [[ ! "${POSTGRES_USER}" =~ ^[A-Za-z0-9_]+$ ]]; then
     exit 1
 fi
 
+if [ "${RESTORE_CONFIRM_TARGET}" != "${TARGET_DB}" ]; then
+    echo "ERROR: Restore confirmation is missing or does not match the target."
+    echo "Set RESTORE_CONFIRM_TARGET=${TARGET_DB} after verifying the target is disposable."
+    exit 1
+fi
+
 echo "[restore] Restoring from: ${BACKUP_FILE}"
 echo "[restore] Target database: ${TARGET_DB} @ ${POSTGRES_HOST}:${POSTGRES_PORT}"
 echo ""
 echo "WARNING: This will DROP and recreate the target database '${TARGET_DB}'."
-echo "Press Ctrl+C within 5 seconds to cancel..."
-sleep 5
+echo "Explicit target confirmation accepted."
 
 # Drop and recreate target database (safe for test restores)
 psql \

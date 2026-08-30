@@ -60,6 +60,7 @@ EXPOSE 8000
 # SIGTERM is forwarded correctly by uvicorn for graceful shutdown.
 # -------------------------------------------------------
 ENV WEB_CONCURRENCY=1
+ENV FORWARDED_ALLOW_IPS=127.0.0.1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
@@ -71,5 +72,7 @@ CMD ["sh", "-c", \
      --host 0.0.0.0 \
      --port 8000 \
      --workers ${WEB_CONCURRENCY} \
+     --proxy-headers \
+     --forwarded-allow-ips ${FORWARDED_ALLOW_IPS} \
      --log-level ${LOG_LEVEL:-info} \
      --no-access-log"]

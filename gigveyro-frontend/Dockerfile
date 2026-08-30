@@ -53,6 +53,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
     CMD wget -qO- http://localhost:3000/ 2>/dev/null || exit 1
 
-# Runtime env vars (NEXT_PUBLIC_* and server-side) are injected via Docker env,
-# NOT baked into the image. See docs/deployment.md for env strategy.
+# Server-side variables such as BACKEND_API_URL are injected at runtime.
+# NEXT_PUBLIC_* values are build-time constants; production realtime defaults
+# to the current same-origin wss:// endpoint and needs no public API variable.
 CMD ["node", "server.js"]

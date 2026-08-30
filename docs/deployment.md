@@ -1,188 +1,37 @@
-# GIGVEYRO Production Deployment Guide
+# GIGVEYRO production deployment
 
-## Prerequisites
+This document covers configuration and release order. Container and Nginx runtime validation is still mandatory before staging or production deployment.
 
-- Docker 24+ and Docker Compose v2
-- Git
-- Access to server with 2GB+ RAM, 20GB+ disk
-- PostgreSQL credentials (or managed PostgreSQL)
-- Redis (or managed Redis)
+## Configuration
 
----
+Copy `GIGVEYRO_Backend/.env.production.example` to an untracked secret store or deployment environment. Never commit the resulting file. Process environment variables override dotenv values; verify the effective environment in the service manager.
 
-## First Deployment
+Required production boundaries:
 
-### 1. Clone and Configure
+- `APP_ENV=production`, `DEBUG=false`, `DOCS_ENABLED=false`;
+- dedicated PostgreSQL and Redis URLs, neither pointing at localhost;
+- unique, rotated JWT, TOTP encryption, metrics, and provider secrets;
+- explicit HTTPS CORS origins and public allowed hosts;
+- secure HttpOnly SameSite cookies through the same-origin Next.js BFF;
+- `REALTIME_BROKER=redis` and `RATE_LIMIT_FAIL_MODE=closed`;
+- `PAYOUT_ENABLED=false`, `PAYOUT_PROVIDER_MODE=disabled`, `PAYOUT_SIMULATION_ENABLED=false`, and `BYBIT_WRITE_ENABLED=false`.
 
-```bash
-git clone <your-repo> gigveyro
-cd gigveyro
-```
+The local development contract is `APP_ENV=development` and `DEBUG=true`. A value such as `DEBUG=release` is invalid because `DEBUG` is a boolean.
 
-### 2. Create Environment File
+## Release order
 
-```bash
-cp GIGVEYRO_Backend/.env.example GIGVEYRO_Backend/.env
-```
+1. Freeze deploys and record the current Git SHA and Alembic revision.
+2. Run all backend and frontend gates in `release-checklist.md`.
+3. Take a custom-format PostgreSQL backup and restore it into an isolated database.
+4. Verify backup integrity and migration `0019 -> 0020 -> 0021 -> 0022 -> 0023 -> 0024 -> 0025` on disposable PostgreSQL.
+5. Build immutable images. Run the one-shot `migrate` service, then backend, worker, frontend, and Nginx.
+6. Complete `docker-runtime-checklist.md`; do not deploy while that checklist is incomplete.
+7. Validate health, authenticated routes, BFF cookies, WebSocket Upgrade, ARQ heartbeat, metrics access, and log redaction.
 
-Edit `.env` with your values. **Minimum required for production**:
+The repository Compose file publishes only Nginx. `/api/*` goes through the Next.js BFF; `/api/v1/ws` is the direct WebSocket path to FastAPI. Use `nginx/tls.conf.example` as a TLS pattern and enable HSTS only after HTTPS is verified.
 
-```env
-APP_ENV=production
-DEBUG=false
-DATABASE_URL=postgresql+asyncpg://user:STRONG_PASS@your-db-host:5432/gigveyro
-JWT_SECRET_KEY=<64-char random secret>   # python -c "import secrets; print(secrets.token_hex(32))"
-REDIS_URL=redis://your-redis-host:6379/0
-CORS_ALLOWED_ORIGINS=["https://yourdomain.com"]
-ALLOWED_HOSTS=["yourdomain.com"]
-PAYOUT_ENABLED=false                      # KEEP FALSE until provider is verified
-DOCS_ENABLED=false                        # Disable Swagger in production
-```
+## Secrets and networking
 
-### 3. Take Pre-Deploy Backup (existing data)
+Use a secret manager or orchestrator secrets, not image build arguments. Restrict PostgreSQL, Redis, metrics, and backend ports to the private network. Configure the trusted proxy CIDR/IP explicitly. Production egress must use a documented static IP before requesting any exchange write allowlisting.
 
-```bash
-./scripts/backup_db.sh
-```
-
-### 4. Run Migrations
-
-```bash
-cd GIGVEYRO_Backend
-alembic upgrade head
-cd ..
-```
-
-### 5. Build and Start
-
-```bash
-docker compose build
-docker compose up -d
-```
-
-### 6. Verify
-
-```bash
-# Health check
-curl http://localhost:8000/health/ready
-
-# Check all services
-docker compose ps
-
-# Check logs
-docker compose logs --tail=50
-```
-
----
-
-## Subsequent Deployments
-
-```bash
-# 1. Backup database
-./scripts/backup_db.sh
-
-# 2. Pull latest code
-git pull
-
-# 3. Run migrations (before starting new app)
-cd GIGVEYRO_Backend && alembic upgrade head && cd ..
-
-# 4. Build new images
-docker compose build backend worker
-
-# 5. Rolling restart (zero-downtime if load balanced)
-docker compose up -d --no-deps backend worker
-
-# 6. Verify
-curl http://localhost:8000/health/ready
-```
-
----
-
-## Environment Variable Strategy
-
-### Backend Runtime Env
-
-All config via environment variables or `.env` file. **No secrets in image**.
-
-```
-                    ┌─────────────────┐
-docker-compose.yml  │  env_file: .env │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  Backend App    │
-                    │  pydantic-settings reads env
-                    └─────────────────┘
-```
-
-### Frontend Runtime Env
-
-```
-NEXT_PUBLIC_API_URL    — Browser-visible backend URL (injected at runtime)
-BACKEND_URL            — Server-side only (frontend → backend via internal network)
-```
-
-**Note**: `NEXT_PUBLIC_*` variables are embedded at **build time** in Next.js. 
-For truly runtime env, use a server-side API route that reads `process.env`.
-
----
-
-## WebSocket Scaling Note
-
-**Current**: `uvicorn --workers 1` (single process)
-
-The `InMemoryRealtimeBroker` is process-local. Running multiple uvicorn workers will split WebSocket connections across processes, breaking real-time event delivery.
-
-**Future scaling path**:
-1. Codex implements Redis-backed `RedisBroker`
-2. Switch to `RedisBroker` in `app/realtime/runtime.py`
-3. Increase `WEB_CONCURRENCY` env var
-4. Or: use multiple backend replicas behind Nginx
-
----
-
-## Production Checklist
-
-- [ ] `APP_ENV=production`
-- [ ] `DEBUG=false`
-- [ ] `JWT_SECRET_KEY` ≥ 32 chars, random, not `CHANGE_ME`
-- [ ] `DATABASE_URL` points to production DB (not localhost)
-- [ ] `REDIS_URL` configured
-- [ ] `CORS_ALLOWED_ORIGINS` — no wildcards
-- [ ] `ALLOWED_HOSTS` — exact domain names
-- [ ] `PAYOUT_ENABLED=false` (until external gateway verified)
-- [ ] `DOCS_ENABLED=false` (no Swagger in production)
-- [ ] Database backup taken before deployment
-- [ ] `alembic upgrade head` run successfully
-- [ ] `/health/ready` returns 200
-- [ ] Nginx configured with WebSocket upgrade headers
-- [ ] TLS certificates configured on Nginx
-- [ ] Sentry DSN configured (optional)
-
----
-
-## Backup Schedule
-
-Set up a daily cron job:
-
-```cron
-0 2 * * * /path/to/gigveyro/scripts/backup_db.sh /mnt/backups 2>&1 | logger -t gigveyro-backup
-```
-
-Default retention: 30 days (`BACKUP_RETAIN_DAYS=30`).
-
----
-
-## Nginx Configuration
-
-See `nginx/nginx.conf` for the full template.
-
-**Critical for WebSocket** (Codex realtime):
-```nginx
-location /ws/ {
-    proxy_set_header Upgrade    $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_read_timeout  3600s;
-}
-```
+See also: `backup-restore.md`, `rollback.md`, and `bybit-write-prerequisites.md`.
