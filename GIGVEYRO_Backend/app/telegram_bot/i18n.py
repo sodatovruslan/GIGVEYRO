@@ -133,8 +133,8 @@ def normalize_language(value: str | None) -> str:
     return language if language in SUPPORTED_LANGUAGES else "ru"
 
 
-def text(language: str, key: str, **values: object) -> str:
-    return _MESSAGES[normalize_language(language)][key].format(**values)
+def text(locale: str, key: str, **values: object) -> str:
+    return _MESSAGES[normalize_language(locale)][key].format(**values)
 
 
 def notification_label(language: str, notification_type: NotificationType) -> str:

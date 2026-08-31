@@ -150,6 +150,21 @@ async def test_commands_are_read_only_role_scoped_and_require_active_account(
     assert "0.00 USDT" in await commands.handle(
         telegram_user_id=88, chat_id=99, text_value="/balance"
     )
+    for language, expected in (
+        ("ru", "Язык: RU\nДоставка: включена"),
+        ("tg", "Забон: TG\nИрсол: фаъол"),
+        ("en", "Language: EN\nDelivery: enabled"),
+    ):
+        await commands.handle(
+            telegram_user_id=88,
+            chat_id=99,
+            text_value=f"/language {language}",
+        )
+        assert expected == await commands.handle(
+            telegram_user_id=88,
+            chat_id=99,
+            text_value="/settings",
+        )
     assert "unknown" in (
         await commands.handle(
             telegram_user_id=88,
@@ -340,6 +355,12 @@ class _FailingBot:
         (
             TelegramBadRequest(SendMessage(chat_id=1, text="x"), "chat not found"),
             "chat_not_found",
+            False,
+            None,
+        ),
+        (
+            TelegramBadRequest(SendMessage(chat_id=1, text="x"), "BUTTON_URL_INVALID"),
+            "button_url_invalid",
             False,
             None,
         ),

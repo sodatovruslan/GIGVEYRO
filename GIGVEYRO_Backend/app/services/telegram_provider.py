@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -21,6 +23,8 @@ from aiogram.utils.token import TokenValidationError
 
 from app.core.config import settings
 from app.infra.metrics import record_telegram_delivery
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramMessage(NamedTuple):
@@ -106,7 +110,33 @@ class AiogramTelegramProvider(TelegramProvider):
             record_telegram_delivery("blocked", monotonic() - started)
             raise TelegramDeliveryError("blocked", retryable=False) from exc
         except TelegramBadRequest as exc:
-            category = "chat_not_found" if "chat not found" in str(exc).lower() else "bad_request"
+            message = str(exc).lower()
+            category = next(
+                (
+                    safe_category
+                    for marker, safe_category in (
+                        ("chat not found", "chat_not_found"),
+                        ("button_url_invalid", "button_url_invalid"),
+                        ("button_type_invalid", "button_type_invalid"),
+                        ("message text is empty", "message_empty"),
+                        ("message is too long", "message_too_long"),
+                        ("not enough rights", "insufficient_rights"),
+                        ("can't parse entities", "invalid_entities"),
+                        ("message thread not found", "thread_not_found"),
+                    )
+                    if marker in message
+                ),
+                "bad_request",
+            )
+            safe_reason = exc.message.replace(
+                settings.TELEGRAM_BOT_TOKEN.get_secret_value(), "<redacted>"
+            )
+            safe_reason = re.sub(r"https?://\S+", "<url>", safe_reason)
+            safe_reason = re.sub(r"\d+", "<number>", safe_reason)[:180]
+            logger.warning(
+                "telegram.delivery.bad_request reason=%s",
+                safe_reason,
+            )
             self.last_error_category = category
             record_telegram_delivery("failed", monotonic() - started)
             raise TelegramDeliveryError(category, retryable=False) from exc

@@ -2,7 +2,9 @@ import hashlib
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
+from ipaddress import ip_address
 from typing import Any
+from urllib.parse import urlsplit
 
 from app.core.config import settings
 from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
@@ -227,8 +229,17 @@ class NotificationService:
     @staticmethod
     def _web_link(
         type_: NotificationType, role: str, payload: dict[str, Any] | None
-    ) -> str:
+    ) -> str | None:
         base = settings.TELEGRAM_WEB_APP_URL.rstrip("/")
+        parsed = urlsplit(base)
+        hostname = parsed.hostname
+        if parsed.scheme != "https" or not hostname or hostname.lower() == "localhost":
+            return None
+        try:
+            if ip_address(hostname).is_loopback:
+                return None
+        except ValueError:
+            pass
         section = {
             NotificationType.APPEAL_OPENED: "appeals",
             NotificationType.APPEAL_RESOLVED: "appeals",

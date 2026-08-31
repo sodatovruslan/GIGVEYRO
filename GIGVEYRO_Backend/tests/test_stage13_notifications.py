@@ -72,6 +72,19 @@ async def test_notification_preferences_and_deduplication(
     assert provider.sent_messages[0].button_text == "Open in GIGVEYRO"
 
 
+def test_telegram_web_link_omits_localhost_and_preserves_public_https(monkeypatch):
+    monkeypatch.setattr(settings, "TELEGRAM_WEB_APP_URL", "http://localhost:3000")
+    assert (
+        NotificationService._web_link(NotificationType.SECURITY_EVENT, "user", None)
+        is None
+    )
+
+    monkeypatch.setattr(settings, "TELEGRAM_WEB_APP_URL", "https://app.gigveyro.example")
+    assert NotificationService._web_link(
+        NotificationType.SECURITY_EVENT, "user", None
+    ) == "https://app.gigveyro.example/user/notifications"
+
+
 @pytest.mark.asyncio
 async def test_telegram_token_expiry_single_use_and_replacement(db_session, make_account):
     account = await make_account()
