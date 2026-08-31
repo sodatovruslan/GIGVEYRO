@@ -362,10 +362,19 @@ export interface NotificationPreferences {
   withdrawal_notifications: boolean;
 }
 
-export interface TelegramLinkCode {
-  verification_code: string;
+export interface TelegramLinkToken {
+  deep_link: string;
   expires_at: string;
   bot_username: string;
+}
+
+export interface TelegramConnection {
+  connected: boolean;
+  masked_username: string | null;
+  linked_at: string | null;
+  language: "ru" | "en" | "tg";
+  delivery_enabled: boolean;
+  unhealthy_reason: string | null;
 }
 
 export interface IntegrationDiagnostics {

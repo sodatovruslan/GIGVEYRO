@@ -452,11 +452,20 @@
     "withdrawals": "Выводы",
     "withdrawalsText": "Статусы заявок на вывод",
     "telegramLink": "ПРИВЯЗКА TELEGRAM",
-    "telegramHelp": "Получите одноразовый код и отправьте его боту.",
-    "getCode": "Получить код",
+    "telegramHelp": "Откройте защищённую одноразовую ссылку и подтвердите подключение в боте.",
+    "connectTelegram": "Подключить Telegram",
+    "openBot": "Открыть бота",
+    "connected": "Telegram подключён",
+    "privateAccount": "Скрытый профиль",
+    "botLanguage": "Язык сообщений бота",
+    "deliveryOn": "Доставка включена",
+    "deliveryOff": "Доставка выключена",
+    "deliveryUnavailable": "Доставка приостановлена. Проверьте доступность бота.",
+    "disconnect": "Отключить Telegram",
+    "disconnectConfirm": "Отключить Telegram от аккаунта? История уведомлений сохранится.",
     "validTo": "до {time}",
     "failed": "Не удалось выполнить действие.",
-    "codeFailed": "Не удалось получить код."
+    "codeFailed": "Не удалось создать ссылку."
   },
   "analytics": {
     "eyebrow": "ЦЕНТР УПРАВЛЕНИЯ OWNER",
@@ -865,7 +874,9 @@
       "DEPOSIT_CONFIRMED": "Депозит подтверждён",
       "WITHDRAWAL_STATUS_CHANGED": "Статус вывода изменён",
       "SECURITY_EVENT": "Событие безопасности",
-      "FIAT_BALANCE_UPDATED": "Фиатный баланс изменён"
+      "FIAT_BALANCE_UPDATED": "Фиатный баланс изменён",
+      "PAYOUT_ACTION_REQUIRED": "Выплата требует внимания",
+      "TREASURY_RISK_CHANGED": "Риск казначейства изменён"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",

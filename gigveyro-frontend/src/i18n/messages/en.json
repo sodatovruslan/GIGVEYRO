@@ -452,11 +452,20 @@
     "withdrawals": "Withdrawals",
     "withdrawalsText": "Withdrawal request statuses",
     "telegramLink": "TELEGRAM LINK",
-    "telegramHelp": "Generate a one-time code and send it to the bot.",
-    "getCode": "Get code",
+    "telegramHelp": "Open the secure one-time link and confirm the connection in the bot.",
+    "connectTelegram": "Connect Telegram",
+    "openBot": "Open bot",
+    "connected": "Telegram connected",
+    "privateAccount": "Private profile",
+    "botLanguage": "Bot message language",
+    "deliveryOn": "Delivery enabled",
+    "deliveryOff": "Delivery disabled",
+    "deliveryUnavailable": "Delivery is paused. Check that the bot is available.",
+    "disconnect": "Disconnect Telegram",
+    "disconnectConfirm": "Disconnect Telegram from this account? Notification history will remain.",
     "validTo": "until {time}",
     "failed": "Action failed.",
-    "codeFailed": "Failed to generate code."
+    "codeFailed": "Failed to generate the link."
   },
   "analytics": {
     "eyebrow": "OWNER CONTROL CENTER",
@@ -865,7 +874,9 @@
       "DEPOSIT_CONFIRMED": "Deposit confirmed",
       "WITHDRAWAL_STATUS_CHANGED": "Withdrawal status changed",
       "SECURITY_EVENT": "Security event",
-      "FIAT_BALANCE_UPDATED": "Fiat balance updated"
+      "FIAT_BALANCE_UPDATED": "Fiat balance updated",
+      "PAYOUT_ACTION_REQUIRED": "Payout requires attention",
+      "TREASURY_RISK_CHANGED": "Treasury risk changed"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",

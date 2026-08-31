@@ -452,11 +452,20 @@
     "withdrawals": "Бардоштҳо",
     "withdrawalsText": "Ҳолати дархостҳои бардошт",
     "telegramLink": "ПАЙВАСТИ TELEGRAM",
-    "telegramHelp": "Рамзи якдафъаина гиред ва ба бот фиристед.",
-    "getCode": "Гирифтани рамз",
+    "telegramHelp": "Пайванди бехатари якдафъаинаро кушоед ва пайвастшавиро дар бот тасдиқ кунед.",
+    "connectTelegram": "Пайваст кардани Telegram",
+    "openBot": "Кушодани бот",
+    "connected": "Telegram пайваст аст",
+    "privateAccount": "Профили пинҳон",
+    "botLanguage": "Забони паёмҳои бот",
+    "deliveryOn": "Ирсол фаъол аст",
+    "deliveryOff": "Ирсол ғайрифаъол аст",
+    "deliveryUnavailable": "Ирсол боздошта шуд. Дастрасии ботро санҷед.",
+    "disconnect": "Қатъ кардани Telegram",
+    "disconnectConfirm": "Telegram аз ҳисоб қатъ карда шавад? Таърихи огоҳиҳо нигоҳ дошта мешавад.",
     "validTo": "то {time}",
     "failed": "Амал иҷро нашуд.",
-    "codeFailed": "Рамз гирифта нашуд."
+    "codeFailed": "Пайванд сохта нашуд."
   },
   "analytics": {
     "eyebrow": "МАРКАЗИ ИДОРАКУНИИ СОҲИБ",
@@ -865,7 +874,9 @@
       "DEPOSIT_CONFIRMED": "Депозит тасдиқ шуд",
       "WITHDRAWAL_STATUS_CHANGED": "Вазъи гирифтани маблағ тағйир ёфт",
       "SECURITY_EVENT": "Рӯйдоди бехатарӣ",
-      "FIAT_BALANCE_UPDATED": "Тавозуни асъорӣ тағйир ёфт"
+      "FIAT_BALANCE_UPDATED": "Тавозуни асъорӣ тағйир ёфт",
+      "PAYOUT_ACTION_REQUIRED": "Пардохт таваҷҷуҳ мехоҳад",
+      "TREASURY_RISK_CHANGED": "Хавфи хазина тағйир ёфт"
     },
     "destination": {
       "usdt_trc20_address": "USDT TRC20",

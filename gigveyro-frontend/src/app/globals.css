@@ -148,6 +148,7 @@
   --primary-soft: var(--accent-soft);
   --primary-glow: var(--accent-glow);
   --text: var(--foreground);
+  --text-primary: var(--foreground);
   --text-secondary: var(--muted);
   --text-muted: var(--muted-subtle);
 }
