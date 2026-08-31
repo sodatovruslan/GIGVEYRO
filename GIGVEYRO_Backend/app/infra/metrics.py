@@ -171,12 +171,31 @@ if _PROMETHEUS_AVAILABLE:
         "Current live payout readiness blockers",
         labelnames=["reason"],
     )
+    TELEGRAM_DELIVERY = Counter(
+        "gigveyro_telegram_delivery_total",
+        "Telegram delivery outcomes",
+        labelnames=["status"],
+    )
+    TELEGRAM_DELIVERY_LATENCY = Histogram(
+        "gigveyro_telegram_delivery_latency_seconds",
+        "Telegram sendMessage latency",
+    )
+    TELEGRAM_CONNECTIONS = Counter(
+        "gigveyro_telegram_connections_total",
+        "Successful Telegram connection events",
+    )
+    TELEGRAM_COMMANDS = Counter(
+        "gigveyro_telegram_command_total",
+        "Telegram command outcomes",
+        labelnames=["command", "status"],
+    )
 else:
     # Stub objects so callers don't need to guard every usage
     class _NoopMetric:
         def inc(self, *a, **kw) -> None: ...
         def dec(self, *a, **kw) -> None: ...
         def set(self, *a, **kw) -> None: ...
+        def observe(self, *a, **kw) -> None: ...
         def labels(self, *a, **kw) -> _NoopMetric:
             return self
 
@@ -207,6 +226,10 @@ else:
     EXCHANGE_PRIVATE_RATE_LIMITS = _NoopMetric()  # type: ignore[assignment]
     PAYOUT_LIVE_READY = _NoopMetric()  # type: ignore[assignment]
     PAYOUT_LIVE_BLOCKERS = _NoopMetric()  # type: ignore[assignment]
+    TELEGRAM_DELIVERY = _NoopMetric()  # type: ignore[assignment]
+    TELEGRAM_DELIVERY_LATENCY = _NoopMetric()  # type: ignore[assignment]
+    TELEGRAM_CONNECTIONS = _NoopMetric()  # type: ignore[assignment]
+    TELEGRAM_COMMANDS = _NoopMetric()  # type: ignore[assignment]
 
 
 # ── FastAPI instrumentator setup ───────────────────────────────────────────
@@ -362,3 +385,17 @@ def set_outbox_metrics(pending: int, failed: int, oldest_age_seconds: float) -> 
     NOTIFICATION_OUTBOX_PENDING.set(pending)
     NOTIFICATION_OUTBOX_FAILED.set(failed)
     NOTIFICATION_OUTBOX_OLDEST_AGE.set(oldest_age_seconds)
+
+
+def record_telegram_delivery(status: str, latency_seconds: float) -> None:
+    TELEGRAM_DELIVERY.labels(status=status).inc()
+    TELEGRAM_DELIVERY_LATENCY.observe(latency_seconds)
+
+
+def record_telegram_connection(delta: int) -> None:
+    if delta > 0:
+        TELEGRAM_CONNECTIONS.inc(delta)
+
+
+def record_telegram_command(command: str, status: str) -> None:
+    TELEGRAM_COMMANDS.labels(command=command, status=status).inc()

@@ -25,7 +25,7 @@ from app.models.payout import (
 )
 from app.models.realtime import RealtimeOutbox
 from app.models.risk import RiskPolicy, TreasurySnapshotRecord
-from app.models.telegram import TelegramAccountLink
+from app.models.telegram import TelegramAccountLink, TelegramLinkToken
 from app.models.traffic import UserTrafficSettings
 from app.models.two_factor import (
     AccountTwoFactor,
@@ -72,6 +72,7 @@ __all__ = [
     "PayoutNetwork",
     "RealtimeOutbox",
     "TelegramAccountLink",
+    "TelegramLinkToken",
     "UserTrafficSettings",
     "UserWallet",
     "MerchantWithdrawal",

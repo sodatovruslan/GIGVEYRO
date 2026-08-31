@@ -18,6 +18,7 @@ from app.services.market_data.runtime import (
     get_market_data_aggregator,
     get_market_diagnostics,
 )
+from app.services.telegram_provider import telegram_diagnostics
 
 router = APIRouter(prefix="/api/v1/owner/integrations", tags=["Owner Integrations"])
 
@@ -56,6 +57,7 @@ async def get_integrations_diagnostics(
             },
             "bybit": await get_bybit_private_diagnostics(),
         },
+        "telegram": telegram_diagnostics(),
     }
 
 

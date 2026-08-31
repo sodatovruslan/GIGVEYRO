@@ -11,8 +11,8 @@ Guarantees:
   - Idempotent: already-processed entries are skipped by status filter.
   - No real money involved.
 
-Telegram provider: uses MockTelegramProvider in development.
-For production Telegram, configure TELEGRAM_BOT_TOKEN and use a real provider.
+Telegram is fail-closed while disabled. When explicitly enabled, the worker uses
+the async aiogram provider in every environment; tests inject a mock provider.
 """
 
 import logging
@@ -28,22 +28,11 @@ from app.models.notification import NotificationOutbox
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.services.notification import NotificationService
-from app.services.telegram_provider import MockTelegramProvider
+from app.services.telegram_provider import get_telegram_provider
 
 logger = logging.getLogger(__name__)
 
 JOB_NAME = "notification_outbox"
-
-
-def _get_telegram_provider() -> MockTelegramProvider:
-    """Return the configured Telegram provider.
-
-    Currently returns MockTelegramProvider.
-    Replace with a real provider when TELEGRAM_BOT_TOKEN is configured.
-    """
-    # TODO: When Claude #1 implements real Telegram provider,
-    # switch based on settings.TELEGRAM_PROVIDER_TYPE here.
-    return MockTelegramProvider()
 
 
 async def process_notification_outbox(ctx: dict) -> dict:
@@ -67,11 +56,14 @@ async def process_notification_outbox(ctx: dict) -> dict:
 
     batch_size = settings.OUTBOX_BATCH_SIZE
 
+    if not settings.TELEGRAM_BOT_ENABLED or not settings.TELEGRAM_DELIVERY_ENABLED:
+        return {"processed": 0, "pending_approx": 0, "status": "disabled"}
+
     try:
         async with AsyncSessionLocal() as session:
             notification_repo = NotificationRepository(session)
             telegram_repo = TelegramLinkRepository(session)
-            telegram_provider = _get_telegram_provider()
+            telegram_provider = get_telegram_provider()
 
             service = NotificationService(
                 notification_repo=notification_repo,
@@ -129,11 +121,11 @@ async def process_notification_outbox(ctx: dict) -> dict:
     except Exception as exc:
         record_worker_failure(JOB_NAME)
         logger.error(
-            "event=worker.job.failed job=%s job_id=%s attempt=%d error=%s",
+            "event=worker.job.failed job=%s job_id=%s attempt=%d error_category=%s",
             JOB_NAME,
             job_id,
             attempt,
-            str(exc),
+            type(exc).__name__,
             exc_info=True,
         )
         raise  # ARQ will handle retry

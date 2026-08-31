@@ -97,6 +97,7 @@ async def shutdown(ctx: dict) -> None:
     import logging
 
     from app.infra.redis_client import close_redis
+    from app.services.telegram_provider import close_telegram_provider
 
     logger = logging.getLogger("worker.shutdown")
 
@@ -108,6 +109,7 @@ async def shutdown(ctx: dict) -> None:
         except asyncio.CancelledError:
             pass
 
+    await close_telegram_provider()
     await close_redis()
     logger.info("ARQ worker shut down cleanly.")
 

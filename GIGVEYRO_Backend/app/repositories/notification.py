@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,7 +54,11 @@ class NotificationRepository:
         stmt = (
             select(Notification)
             .options(selectinload(Notification.deliveries))
-            .where(Notification.id == notification_id, Notification.account_id == account_id)
+            .where(
+                Notification.id == notification_id,
+                Notification.account_id == account_id,
+                Notification.in_app_visible.is_(True),
+            )
         )
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()
@@ -69,7 +74,10 @@ class NotificationRepository:
         stmt = (
             select(Notification)
             .options(selectinload(Notification.deliveries))
-            .where(Notification.account_id == account_id)
+            .where(
+                Notification.account_id == account_id,
+                Notification.in_app_visible.is_(True),
+            )
         )
         if unread_only:
             stmt = stmt.where(Notification.is_read.is_(False))
@@ -82,7 +90,9 @@ class NotificationRepository:
 
     async def get_unread_count(self, account_id: uuid.UUID) -> int:
         stmt = select(func.count(Notification.id)).where(
-            Notification.account_id == account_id, Notification.is_read.is_(False)
+            Notification.account_id == account_id,
+            Notification.in_app_visible.is_(True),
+            Notification.is_read.is_(False),
         )
         res = await self.session.execute(stmt)
         return res.scalar_one() or 0
@@ -93,6 +103,7 @@ class NotificationRepository:
             .where(
                 Notification.id == notification_id,
                 Notification.account_id == account_id,
+                Notification.in_app_visible.is_(True),
             )
             .values(is_read=True)
         )
@@ -102,7 +113,11 @@ class NotificationRepository:
     async def mark_all_as_read(self, account_id: uuid.UUID) -> int:
         stmt = (
             update(Notification)
-            .where(Notification.account_id == account_id, Notification.is_read.is_(False))
+            .where(
+                Notification.account_id == account_id,
+                Notification.in_app_visible.is_(True),
+                Notification.is_read.is_(False),
+            )
             .values(is_read=True)
         )
         res = await self.session.execute(stmt)
@@ -122,6 +137,10 @@ class NotificationRepository:
             .where(
                 NotificationOutbox.status == NotificationStatus.PENDING,
                 NotificationOutbox.attempts < NotificationOutbox.max_attempts,
+                (
+                    NotificationOutbox.next_attempt_at.is_(None)
+                    | (NotificationOutbox.next_attempt_at <= datetime.now(UTC))
+                ),
             )
             .order_by(NotificationOutbox.created_at.asc())
             .limit(limit)
@@ -134,6 +153,17 @@ class NotificationRepository:
         self.session.add(delivery)
         await self.session.flush()
         return delivery
+
+    async def get_telegram_delivery(
+        self, notification_id: uuid.UUID
+    ) -> NotificationDelivery | None:
+        result = await self.session.execute(
+            select(NotificationDelivery).where(
+                NotificationDelivery.notification_id == notification_id,
+                NotificationDelivery.channel == NotificationChannel.TELEGRAM,
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def list_deliveries_for_owner(
         self,

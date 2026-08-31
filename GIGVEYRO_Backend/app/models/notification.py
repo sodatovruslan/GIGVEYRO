@@ -68,6 +68,9 @@ class Notification(Base):
         String(64), nullable=True, unique=True, index=True
     )
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    in_app_visible: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -99,6 +102,10 @@ class NotificationDelivery(Base):
     )
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    telegram_connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("telegram_account_links.id"), nullable=True, index=True
+    )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -121,6 +128,9 @@ class NotificationOutbox(Base):
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False
     )
+    notification_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("notifications.id", ondelete="CASCADE"), nullable=True
+    )
     type: Mapped[NotificationType] = mapped_column(
         Enum(NotificationType, native_enum=False), nullable=False
     )
@@ -141,5 +151,6 @@ class NotificationOutbox(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("idx_outbox_pending_retry", "status", "attempts", "created_at"),)

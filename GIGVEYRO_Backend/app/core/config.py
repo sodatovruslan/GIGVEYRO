@@ -54,6 +54,21 @@ class Settings(BaseSettings):
     DEFAULT_RATE_LIMIT_REQUESTS: int = 100
     DEFAULT_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
+    # Telegram is an optional, read-only communication channel. It never authorizes finance.
+    TELEGRAM_BOT_ENABLED: bool = False
+    TELEGRAM_BOT_TOKEN: SecretStr = SecretStr("")
+    TELEGRAM_BOT_USERNAME: str = ""
+    TELEGRAM_DELIVERY_ENABLED: bool = False
+    TELEGRAM_BOT_MODE: str = "polling"  # polling (development) or webhook (production)
+    TELEGRAM_WEBHOOK_SECRET: SecretStr = SecretStr("")
+    TELEGRAM_WEBHOOK_BASE_URL: str = ""
+    TELEGRAM_WEB_APP_URL: str = "http://localhost:3000"
+    TELEGRAM_LINK_TOKEN_TTL_MINUTES: int = 10
+    TELEGRAM_API_TIMEOUT_SECONDS: float = 8.0
+    TELEGRAM_DELIVERY_MAX_ATTEMPTS: int = 5
+    TELEGRAM_COMMAND_RATE_LIMIT_REQUESTS: int = 20
+    TELEGRAM_COMMAND_RATE_LIMIT_WINDOW_SECONDS: int = 60
+
     # Provider Selector Settings
     DEPOSIT_PROVIDER_TYPE: str = "mock"  # "mock" or "trongrid"
     EXCHANGE_RATE_PROVIDER_TYPE: str = "fallback"  # "configured", "fallback", "business"
@@ -211,6 +226,30 @@ class Settings(BaseSettings):
             raise ValueError(f"APP_ENV must be one of: {', '.join(sorted(allowed))}")
         if self.APP_ENV in {"staging", "production"} and self.DEBUG:
             raise ValueError(f"DEBUG must be False in {self.APP_ENV}")
+        return self
+
+    @model_validator(mode="after")
+    def validate_telegram_settings(self) -> "Settings":
+        if self.TELEGRAM_BOT_MODE not in {"polling", "webhook"}:
+            raise ValueError("TELEGRAM_BOT_MODE must be 'polling' or 'webhook'")
+        if not 5 <= self.TELEGRAM_LINK_TOKEN_TTL_MINUTES <= 10:
+            raise ValueError("TELEGRAM_LINK_TOKEN_TTL_MINUTES must be between 5 and 10")
+        token = self.TELEGRAM_BOT_TOKEN.get_secret_value()
+        if self.TELEGRAM_DELIVERY_ENABLED and not self.TELEGRAM_BOT_ENABLED:
+            raise ValueError("TELEGRAM_DELIVERY_ENABLED requires TELEGRAM_BOT_ENABLED")
+        if self.TELEGRAM_BOT_ENABLED and (not token or not self.TELEGRAM_BOT_USERNAME):
+            raise ValueError("Enabled Telegram bot requires token and username")
+        if self.APP_ENV == "production" and self.TELEGRAM_BOT_ENABLED:
+            if self.TELEGRAM_BOT_MODE != "webhook":
+                raise ValueError("Production Telegram bot must use webhook mode")
+            secret = self.TELEGRAM_WEBHOOK_SECRET.get_secret_value()
+            if "CHANGE_ME" in secret or len(secret) < 32 or any(
+                char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+                for char in secret
+            ):
+                raise ValueError("Production Telegram webhook secret must be strong and valid")
+            if not self.TELEGRAM_WEBHOOK_BASE_URL.startswith("https://"):
+                raise ValueError("Production Telegram webhook base URL must use HTTPS")
         return self
 
     @model_validator(mode="after")

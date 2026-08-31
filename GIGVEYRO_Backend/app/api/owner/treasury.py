@@ -8,10 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_account, require_roles
 from app.db.session import get_db
 from app.enums.account import UserRole
+from app.enums.notification import NotificationType
+from app.enums.risk import RiskStatus
 from app.models.account import Account
 from app.models.risk import RiskPolicy
 from app.repositories.audit import AuditRepository
+from app.repositories.notification import NotificationRepository
 from app.repositories.risk import RiskRepository
+from app.repositories.telegram import TelegramLinkRepository
 from app.schemas.risk import (
     RiskPolicyInput,
     RiskPolicyOut,
@@ -21,6 +25,7 @@ from app.schemas.risk import (
 )
 from app.services.audit import AuditService
 from app.services.exchange_private.runtime import get_bybit_private_diagnostics
+from app.services.notification import NotificationService
 from app.services.risk import (
     RiskDecisionService,
     RiskPolicyError,
@@ -28,6 +33,7 @@ from app.services.risk import (
     TreasurySnapshot,
     TreasurySnapshotService,
 )
+from app.services.telegram_provider import MockTelegramProvider
 
 router = APIRouter(
     prefix="/api/v1/owner",
@@ -70,7 +76,11 @@ async def summary(repo: RiskRepository = Depends(_repo)):
 
 
 @router.post("/treasury/refresh", response_model=TreasurySummaryOut)
-async def refresh(repo: RiskRepository = Depends(_repo)):
+async def refresh(
+    account: Account = Depends(get_current_account),
+    repo: RiskRepository = Depends(_repo),
+):
+    previous = await repo.latest_snapshot()
     diagnostics = await get_bybit_private_diagnostics()
     balances = {
         item["asset"]: Decimal(
@@ -90,6 +100,25 @@ async def refresh(repo: RiskRepository = Depends(_repo)):
         usdt=balances.get("USDT", Decimal("0")),
         usdc=balances.get("USDC", Decimal("0")),
     )
+    previous_status = previous.risk_status if previous else None
+    alert_statuses = {RiskStatus.WARNING, RiskStatus.CRITICAL, RiskStatus.STALE}
+    if snapshot.risk_status in alert_statuses and snapshot.risk_status != previous_status:
+        notifications = NotificationService(
+            NotificationRepository(repo.session),
+            TelegramLinkRepository(repo.session),
+            MockTelegramProvider(),
+        )
+        await notifications.emit_notification(
+            account.id,
+            NotificationType.TREASURY_RISK_CHANGED,
+            "Статус риска казначейства изменён",
+            "Откройте раздел казначейства для безопасного просмотра деталей.",
+            {"risk_status": snapshot.risk_status.value},
+            (
+                f"treasury-risk:{previous.id if previous else 'initial'}:"
+                f"{snapshot.risk_status.value}"
+            ),
+        )
     return _summary(snapshot)
 
 

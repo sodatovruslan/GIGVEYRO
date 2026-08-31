@@ -95,6 +95,7 @@ async def health_diagnostics():
     from app.services.fiat_rate.runtime import get_fiat_diagnostics
     from app.services.market_data.runtime import get_market_diagnostics
     from app.services.provider_factory import get_provider_diagnostics
+    from app.services.telegram_provider import telegram_diagnostics
 
     redis_client = get_redis()
     worker_alive = False
@@ -124,4 +125,5 @@ async def health_diagnostics():
         "workers": {
             "worker_alive": worker_alive,
         },
+        "telegram": telegram_diagnostics(),
     }

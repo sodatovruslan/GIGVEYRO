@@ -60,10 +60,24 @@ class UnreadCountRead(BaseModel):
     unread_count: int
 
 
-class TelegramLinkCodeRead(BaseModel):
-    verification_code: str
+class TelegramLinkTokenRead(BaseModel):
+    deep_link: str
     expires_at: datetime
-    bot_username: str = "GigveyroBot"
+    bot_username: str
+
+
+class TelegramConnectionRead(BaseModel):
+    connected: bool
+    masked_username: str | None = None
+    linked_at: datetime | None = None
+    language: str = "ru"
+    delivery_enabled: bool = False
+    unhealthy_reason: str | None = None
+
+
+class TelegramConnectionUpdate(BaseModel):
+    language: str | None = Field(default=None, pattern="^(ru|en|tg)$")
+    delivery_enabled: bool | None = None
 
 
 class TelegramWebhookPayload(BaseModel):
