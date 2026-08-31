@@ -2,11 +2,13 @@ import uuid
 
 from sqlalchemy import delete, select
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.enums.account import UserRole
 from app.enums.notification import NotificationStatus, NotificationType
 from app.models.account import Account
+from app.models.audit import AuditLog
 from app.models.notification import NotificationOutbox
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
@@ -16,7 +18,13 @@ from app.services.telegram_provider import MockTelegramProvider
 from app.workers.jobs.notification_outbox import process_notification_outbox
 
 
-async def test_notification_outbox_job_commits_delivery_and_is_idempotent():
+async def test_notification_outbox_job_commits_delivery_and_is_idempotent(monkeypatch):
+    monkeypatch.setattr(settings, "TELEGRAM_BOT_ENABLED", True)
+    monkeypatch.setattr(settings, "TELEGRAM_DELIVERY_ENABLED", True)
+    provider = MockTelegramProvider()
+    monkeypatch.setattr(
+        "app.workers.jobs.notification_outbox.get_telegram_provider", lambda: provider
+    )
     account_id = uuid.uuid4()
     dedupe_key = f"notification-job-{uuid.uuid4().hex}"
     async with AsyncSessionLocal() as session:
@@ -35,10 +43,17 @@ async def test_notification_outbox_job_commits_delivery_and_is_idempotent():
         notification_repo = NotificationRepository(session)
         telegram_repo = TelegramLinkRepository(session)
         telegram_service = TelegramService(telegram_repo)
-        raw_code, link = await telegram_service.generate_link_code(account_id)
-        persisted_link = await telegram_repo.get_by_verification_code(raw_code)
-        assert persisted_link is not None and persisted_link.id == link.id
-        await telegram_repo.complete_link(persisted_link, telegram_user_id=12345, chat_id=67890)
+        raw_token, _ = await telegram_service.generate_link_token(
+            await session.get(Account, account_id)
+        )
+        await telegram_service.consume_link_token(
+            raw_token=raw_token,
+            telegram_user_id=12345,
+            chat_id=67890,
+            username=None,
+            first_name=None,
+            telegram_language="en",
+        )
 
         preference = await notification_repo.get_or_create_preference(account_id)
         await notification_repo.update_preference(preference, {"telegram_enabled": True})
@@ -77,5 +92,8 @@ async def test_notification_outbox_job_commits_delivery_and_is_idempotent():
             assert outbox.processed_at is not None
     finally:
         async with AsyncSessionLocal() as session:
+            await session.execute(
+                delete(AuditLog).where(AuditLog.actor_account_id == account_id)
+            )
             await session.execute(delete(Account).where(Account.id == account_id))
             await session.commit()

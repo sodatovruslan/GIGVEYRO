@@ -2,10 +2,13 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import func, select
 
 from app.core.security import create_access_token
 from app.enums.account import UserRole
+from app.enums.notification import NotificationType
 from app.enums.risk import RiskDecision, RiskReason, RiskStatus
+from app.models.notification import Notification
 from app.models.risk import RiskPolicy, TreasurySnapshotRecord
 from app.repositories.risk import RiskRepository
 from app.services.risk import RiskBlockedError, RiskDecisionService, RiskGuard, calculate_snapshot
@@ -174,6 +177,45 @@ async def test_owner_risk_api_rbac_policy_preview_and_profit_separation(
         f"/api/v1/owner/risk/policies/{created.json()['id']}/activate", headers=_headers(owner)
     )
     assert activated.status_code == 200 and activated.json()["version"] == 2
+
+
+async def test_treasury_refresh_notifies_owner_only_on_risk_transition(
+    client, db_session, make_account, make_wallet, monkeypatch
+):
+    owner = await make_account(role=UserRole.OWNER)
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user, available=Decimal("100"))
+
+    async def critical_diagnostics():
+        return {
+            "status": "connected",
+            "balances": [
+                {
+                    "asset": "USDT",
+                    "available_balance": "0",
+                    "wallet_balance": "0",
+                    "received_at": datetime.now(UTC).isoformat(),
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        "app.api.owner.treasury.get_bybit_private_diagnostics", critical_diagnostics
+    )
+    for _ in range(2):
+        response = await client.post(
+            "/api/v1/owner/treasury/refresh", headers=_headers(owner)
+        )
+        assert response.status_code == 200
+        assert response.json()["risk_status"] == "critical"
+
+    count = await db_session.scalar(
+        select(func.count(Notification.id)).where(
+            Notification.account_id == owner.id,
+            Notification.type == NotificationType.TREASURY_RISK_CHANGED,
+        )
+    )
+    assert count == 1
 
 
 async def test_enabled_guard_allows_healthy_and_blocks_limits_or_stale(

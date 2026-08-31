@@ -56,11 +56,12 @@ test("stale 401 responses cannot clear refreshed cookies", async () => {
   assert.equal((provider.match(/abortApiGeneration\(\)/g) || []).length, 4);
 });
 
-test("long Telegram codes use visible wrapping and remain selectable", async () => {
+test("Telegram deep links stay responsive and open safely", async () => {
   const component = await source("src/components/notifications/notifications-page.tsx");
-  assert.match(component, /overflowWrap: "anywhere"/);
-  assert.match(component, /wordBreak: "break-word"/);
-  assert.match(component, /userSelect: "all"/);
+  const styles = await source("src/components/notifications/notifications-page.module.css");
+  assert.match(styles, /\.deepLink small\{overflow-wrap:anywhere\}/);
+  assert.match(component, /target="_blank" rel="noopener noreferrer"/);
+  assert.doesNotMatch(component, /verification_code/);
 });
 
 test("merchant withdrawal maps structured and backend TRC20 validation to destination", () => {

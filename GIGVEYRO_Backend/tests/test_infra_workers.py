@@ -44,6 +44,23 @@ def _production_settings(**overrides) -> Settings:
 class TestProductionConfigValidation:
     """Production settings validation rules."""
 
+    def test_production_telegram_requires_webhook_and_real_secret(self):
+        common = {
+            "TELEGRAM_BOT_ENABLED": True,
+            "TELEGRAM_BOT_TOKEN": "test-placeholder",
+            "TELEGRAM_BOT_USERNAME": "test_bot",
+            "TELEGRAM_DELIVERY_ENABLED": True,
+        }
+        with pytest.raises(ValueError, match="must use webhook mode"):
+            _production_settings(**common, TELEGRAM_BOT_MODE="polling")
+        with pytest.raises(ValueError, match="must be strong and valid"):
+            _production_settings(
+                **common,
+                TELEGRAM_BOT_MODE="webhook",
+                TELEGRAM_WEBHOOK_SECRET="CHANGE_ME_AT_LEAST_32_RANDOM_CHARACTERS",
+                TELEGRAM_WEBHOOK_BASE_URL="https://example.com",
+            )
+
     def test_payout_enabled_with_mock_provider_rejected_in_production(self):
         """Production must reject PAYOUT_ENABLED=True with mock payout provider."""
         with pytest.raises(ValueError, match="simulated payout mode"):

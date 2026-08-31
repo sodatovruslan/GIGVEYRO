@@ -10,13 +10,15 @@ import asyncpg
 from sqlalchemy.engine import make_url
 
 
-async def test_payout_migration_roundtrip_on_disposable_database():
+async def test_telegram_migration_roundtrip_on_disposable_database():
     root = Path(__file__).resolve().parent.parent
     base = make_url(os.environ["DATABASE_URL"])
-    name = f"gigveyro_payout_migration_{uuid.uuid4().hex[:12]}"
+    name = f"gigveyro_telegram_migration_{uuid.uuid4().hex[:12]}"
     assert re.fullmatch(r"[A-Za-z0-9_]+", name)
     admin = await asyncpg.connect(
-        base.set(drivername="postgresql", database="postgres").render_as_string(hide_password=False)
+        base.set(drivername="postgresql", database="postgres").render_as_string(
+            hide_password=False
+        )
     )
     await admin.execute(f'CREATE DATABASE "{name}"')
     try:
@@ -28,9 +30,9 @@ async def test_payout_migration_roundtrip_on_disposable_database():
             "DATABASE_URL": url.render_as_string(hide_password=False),
         }
         for arguments in (
-            ("upgrade", "0024"),
+            ("upgrade", "0025"),
             ("upgrade", "head"),
-            ("downgrade", "0024"),
+            ("downgrade", "0025"),
             ("upgrade", "head"),
         ):
             await asyncio.to_thread(
@@ -47,29 +49,27 @@ async def test_payout_migration_roundtrip_on_disposable_database():
         )
         try:
             assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0026"
-            assert (
-                await connection.fetchval(
-                    "SELECT count(*) FROM payout_policies WHERE status='active'"
+            assert await connection.fetchval("SELECT to_regclass('telegram_link_tokens')")
+            columns = {
+                row["column_name"]
+                for row in await connection.fetch(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name='telegram_account_links'"
                 )
-                == 1
-            )
-            assert await connection.fetchval("SELECT payouts_enabled FROM payout_policies") is False
-            assert await connection.fetchval("SELECT count(*) FROM payout_intents") == 0
-            assert await connection.fetchval("SELECT count(*) FROM payout_destinations") == 0
-            assert (
-                await connection.fetchval(
-                    "SELECT count(*) FROM information_schema.columns "
-                    "WHERE table_name='payout_intents' AND column_name='provider_name'"
+            }
+            assert {"language", "delivery_enabled", "linked_at"} <= columns
+            assert "verification_code_hash" not in columns
+            indexes = {
+                row["indexname"]
+                for row in await connection.fetch(
+                    "SELECT indexname FROM pg_indexes "
+                    "WHERE tablename='telegram_account_links'"
                 )
-                == 1
-            )
-            assert (
-                await connection.fetchval(
-                    "SELECT count(*) FROM payout_networks "
-                    "WHERE asset='USDT' AND network='TRC20' AND enabled=true"
-                )
-                == 1
-            )
+            }
+            assert {
+                "uq_telegram_link_active_user",
+                "uq_telegram_link_active_chat",
+            } <= indexes
         finally:
             await connection.close()
     finally:

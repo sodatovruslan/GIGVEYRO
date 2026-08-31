@@ -3,187 +3,262 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app.enums.account import UserRole
+from app.core.config import settings
 from app.enums.notification import NotificationStatus, NotificationType
 from app.models.notification import Notification, NotificationOutbox
+from app.models.telegram import TelegramLinkToken
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.services.notification import NotificationService
-from app.services.telegram import TelegramService
-from app.services.telegram_provider import MockTelegramProvider
+from app.services.telegram import TelegramLinkError, TelegramService
+from app.services.telegram_provider import MockTelegramProvider, TelegramDeliveryError
+
+
+async def _connect(service: TelegramService, account, *, user_id=12345, chat_id=67890):
+    raw_token, _ = await service.generate_link_token(account)
+    result = await service.consume_link_token(
+        raw_token=raw_token,
+        telegram_user_id=user_id,
+        chat_id=chat_id,
+        username="telegram-user",
+        first_name="Test",
+        telegram_language="en",
+    )
+    return raw_token, result.connection
 
 
 @pytest.mark.asyncio
-async def test_notification_preferences_and_deduplication(db_session, make_account):
-    acc = await make_account()
-    notif_repo = NotificationRepository(db_session)
-    tg_repo = TelegramLinkRepository(db_session)
-    tg_provider = MockTelegramProvider()
+async def test_notification_preferences_and_deduplication(
+    db_session, make_account, monkeypatch
+):
+    monkeypatch.setattr(settings, "TELEGRAM_DELIVERY_ENABLED", True)
+    account = await make_account()
+    notification_repo = NotificationRepository(db_session)
+    telegram_repo = TelegramLinkRepository(db_session)
+    provider = MockTelegramProvider()
+    service = NotificationService(notification_repo, telegram_repo, provider)
+    telegram = TelegramService(telegram_repo)
 
-    service = NotificationService(notif_repo, tg_repo, tg_provider)
-    tg_service = TelegramService(tg_repo)
+    raw_token, _ = await _connect(telegram, account)
+    persisted = (
+        await db_session.execute(
+            select(TelegramLinkToken).where(TelegramLinkToken.used_at.is_not(None))
+        )
+    ).scalar_one()
+    assert persisted.token_hash != raw_token
+    assert len(persisted.token_hash) == 64
 
-    # Verification code hashing check
-    raw_code, link = await tg_service.generate_link_code(acc.id)
-    assert link.verification_code_hash is not None
-    assert link.verification_code_hash != raw_code
-
-    retrieved_link = await tg_repo.get_by_verification_code(raw_code)
-    assert retrieved_link is not None
-    assert retrieved_link.account_id == acc.id
-
-    await tg_repo.complete_link(retrieved_link, telegram_user_id=12345, chat_id=67890)
-
-    pref = await notif_repo.get_or_create_preference(acc.id)
-    await notif_repo.update_preference(pref, {"telegram_enabled": True})
-
-    # Deduplication test
-    notif1 = await service.emit_notification(
-        account_id=acc.id,
-        type_=NotificationType.DEAL_CREATED,
-        title="Test Deal",
-        message="Deal created msg",
-        dedupe_key="unique_deal_1",
+    preference = await notification_repo.get_or_create_preference(account.id)
+    await notification_repo.update_preference(preference, {"telegram_enabled": True})
+    first = await service.emit_notification(
+        account.id,
+        NotificationType.DEAL_CREATED,
+        "Test Deal",
+        "Deal created",
+        dedupe_key="unique-deal",
     )
-    notif2 = await service.emit_notification(
-        account_id=acc.id,
-        type_=NotificationType.DEAL_CREATED,
-        title="Test Deal Duplicate",
-        message="Deal created msg duplicate",
-        dedupe_key="unique_deal_1",
+    duplicate = await service.emit_notification(
+        account.id,
+        NotificationType.DEAL_CREATED,
+        "Duplicate",
+        "Duplicate message",
+        dedupe_key="unique-deal",
     )
 
-    assert notif1.id == notif2.id
-
-    processed = await service.process_outbox_batch()
-    assert processed == 1
-    assert len(tg_provider.sent_messages) == 1
-    assert tg_provider.sent_messages[0].chat_id == 67890
+    assert first is not None and duplicate is not None and first.id == duplicate.id
+    assert await service.process_outbox_batch() == 1
+    assert len(provider.sent_messages) == 1
+    assert provider.sent_messages[0].chat_id == 67890
+    assert provider.sent_messages[0].button_text == "Open in GIGVEYRO"
 
 
 @pytest.mark.asyncio
-async def test_telegram_security_code_ttl_and_single_use(db_session, make_account):
-    acc = await make_account()
-    tg_repo = TelegramLinkRepository(db_session)
-    tg_service = TelegramService(tg_repo)
+async def test_telegram_token_expiry_single_use_and_replacement(db_session, make_account):
+    account = await make_account()
+    service = TelegramService(TelegramLinkRepository(db_session))
+    with pytest.raises(TelegramLinkError):
+        await service.consume_link_token(
+            raw_token="not-a-real-token",
+            telegram_user_id=1,
+            chat_id=1,
+            username=None,
+            first_name=None,
+            telegram_language="ru",
+        )
+    first_raw, _ = await service.generate_link_token(account)
+    second_raw, _ = await service.generate_link_token(account)
 
-    # 1. Verification Code TTL
-    raw_code, link = await tg_service.generate_link_code(acc.id)
-    link.verification_expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    with pytest.raises(TelegramLinkError):
+        await service.consume_link_token(
+            raw_token=first_raw,
+            telegram_user_id=1,
+            chat_id=1,
+            username=None,
+            first_name=None,
+            telegram_language="ru",
+        )
+
+    result = await service.consume_link_token(
+        raw_token=second_raw,
+        telegram_user_id=2,
+        chat_id=2,
+        username=None,
+        first_name=None,
+        telegram_language="tg",
+    )
+    assert result.language == "tg"
+    with pytest.raises(TelegramLinkError):
+        await service.consume_link_token(
+            raw_token=second_raw,
+            telegram_user_id=2,
+            chat_id=2,
+            username=None,
+            first_name=None,
+            telegram_language="tg",
+        )
+
+    expired_raw, _ = await service.generate_link_token(account)
+    expired = await TelegramLinkRepository(db_session).get_token_for_update(expired_raw)
+    assert expired is not None
+    expired.expires_at = datetime.now(UTC) - timedelta(seconds=1)
     await db_session.flush()
+    with pytest.raises(TelegramLinkError):
+        await service.consume_link_token(
+            raw_token=expired_raw,
+            telegram_user_id=3,
+            chat_id=3,
+            username=None,
+            first_name=None,
+            telegram_language="en",
+        )
 
-    res = await tg_service.process_telegram_command(111, 222, f"/start {raw_code}")
-    assert "expired" in res.lower()
 
-    # 2. Single-use Code Verification
-    raw_code_2, link_2 = await tg_service.generate_link_code(acc.id)
-    res_success = await tg_service.process_telegram_command(333, 444, f"/start {raw_code_2}")
-    assert "successfully" in res_success.lower()
-
-    # Reuse code -> Should Fail
-    res_reuse = await tg_service.process_telegram_command(333, 444, f"/start {raw_code_2}")
-    assert "invalid or expired" in res_reuse.lower()
+@pytest.mark.asyncio
+async def test_blocked_account_cannot_consume_link_token(db_session, make_account):
+    account = await make_account()
+    service = TelegramService(TelegramLinkRepository(db_session))
+    raw_token, _ = await service.generate_link_token(account)
+    account.is_active = False
+    await db_session.flush()
+    with pytest.raises(TelegramLinkError):
+        await service.consume_link_token(
+            raw_token=raw_token,
+            telegram_user_id=44,
+            chat_id=44,
+            username=None,
+            first_name=None,
+            telegram_language="ru",
+        )
 
 
 @pytest.mark.asyncio
 async def test_notification_outbox_atomicity_and_rollback(db_session, make_account):
-    acc = await make_account()
-    notif_repo = NotificationRepository(db_session)
-    tg_repo = TelegramLinkRepository(db_session)
-    tg_provider = MockTelegramProvider()
-    service = NotificationService(notif_repo, tg_repo, tg_provider)
-
+    account = await make_account()
+    service = NotificationService(
+        NotificationRepository(db_session),
+        TelegramLinkRepository(db_session),
+        MockTelegramProvider(),
+    )
     try:
         async with db_session.begin_nested():
             await service.emit_notification(
-                account_id=acc.id,
-                type_=NotificationType.DEAL_COMPLETED,
-                title="Completed Deal",
-                message="Your deal completed",
-                dedupe_key="deal_completed_1",
+                account.id,
+                NotificationType.DEAL_COMPLETED,
+                "Completed",
+                "Completed",
+                dedupe_key="rollback",
             )
-            raise RuntimeError("Simulated DB Failure")
+            raise RuntimeError("rollback")
     except RuntimeError:
         pass
-
-    stmt = select(Notification).where(Notification.account_id == acc.id)
-    res = await db_session.execute(stmt)
-    assert res.scalar_one_or_none() is None
+    result = await db_session.execute(
+        select(Notification).where(Notification.account_id == account.id)
+    )
+    assert result.scalar_one_or_none() is None
 
 
 @pytest.mark.asyncio
-async def test_mock_telegram_provider_retry_and_owner_monitoring(db_session, make_account):
-    acc = await make_account()
-    await make_account(role=UserRole.OWNER)
-    notif_repo = NotificationRepository(db_session)
-    tg_repo = TelegramLinkRepository(db_session)
-
-    failing_provider = MockTelegramProvider(should_fail=True)
-    service = NotificationService(notif_repo, tg_repo, failing_provider)
-    tg_service = TelegramService(tg_repo)
-
-    raw_code, link = await tg_service.generate_link_code(acc.id)
-    retrieved_link = await tg_repo.get_by_verification_code(raw_code)
-    await tg_repo.complete_link(retrieved_link, telegram_user_id=999, chat_id=888)
-
-    pref = await notif_repo.get_or_create_preference(acc.id)
-    await notif_repo.update_preference(pref, {"telegram_enabled": True, "in_app_enabled": False})
-
-    await service.emit_notification(
-        account_id=acc.id,
-        type_=NotificationType.DEPOSIT_CONFIRMED,
-        title="Deposit Confirmed",
-        message="100 USDT credited",
-        dedupe_key="dep_1",
+async def test_mock_provider_retry_and_hidden_notification(
+    db_session, make_account, monkeypatch
+):
+    monkeypatch.setattr(settings, "TELEGRAM_DELIVERY_ENABLED", True)
+    account = await make_account()
+    notification_repo = NotificationRepository(db_session)
+    telegram_repo = TelegramLinkRepository(db_session)
+    provider = MockTelegramProvider(should_fail=True)
+    service = NotificationService(notification_repo, telegram_repo, provider)
+    await _connect(TelegramService(telegram_repo), account, user_id=999, chat_id=888)
+    preference = await notification_repo.get_or_create_preference(account.id)
+    await notification_repo.update_preference(
+        preference, {"telegram_enabled": True, "in_app_enabled": False}
     )
-
-    # First attempt fails
-    processed_1 = await service.process_outbox_batch()
-    assert processed_1 == 0
-
-    outbox_stmt = select(NotificationOutbox).where(NotificationOutbox.account_id == acc.id)
-    outbox = (await db_session.execute(outbox_stmt)).scalar_one()
-    assert outbox.attempts == 1
+    notification = await service.emit_notification(
+        account.id,
+        NotificationType.DEPOSIT_CONFIRMED,
+        "Deposit",
+        "Sensitive amount is not forwarded",
+        dedupe_key="deposit",
+    )
+    assert notification is not None and not notification.in_app_visible
+    assert await notification_repo.get_unread_count(account.id) == 0
+    assert await service.process_outbox_batch() == 0
+    outbox = (
+        await db_session.execute(
+            select(NotificationOutbox).where(NotificationOutbox.account_id == account.id)
+        )
+    ).scalar_one()
     assert outbox.status == NotificationStatus.PENDING
+    assert outbox.last_error == "temporary_unavailable"
+    provider.should_fail = False
+    outbox.next_attempt_at = datetime.now(UTC) - timedelta(seconds=1)
+    await db_session.flush()
+    assert await service.process_outbox_batch() == 1
+    assert "Sensitive amount" not in provider.sent_messages[0].text
 
-    # Fix provider and retry
-    failing_provider.should_fail = False
-    processed_2 = await service.process_outbox_batch()
-    assert processed_2 == 1
 
-    await db_session.refresh(outbox)
-    assert outbox.status == NotificationStatus.SENT
+@pytest.mark.asyncio
+async def test_blocked_bot_disables_delivery(db_session, make_account, monkeypatch):
+    monkeypatch.setattr(settings, "TELEGRAM_DELIVERY_ENABLED", True)
+    account = await make_account()
+    notification_repo = NotificationRepository(db_session)
+    telegram_repo = TelegramLinkRepository(db_session)
+    _, connection = await _connect(TelegramService(telegram_repo), account)
+    preference = await notification_repo.get_or_create_preference(account.id)
+    await notification_repo.update_preference(preference, {"telegram_enabled": True})
+    service = NotificationService(
+        notification_repo,
+        telegram_repo,
+        MockTelegramProvider(error=TelegramDeliveryError("blocked", retryable=False)),
+    )
+    await service.emit_notification(
+        account.id,
+        NotificationType.SECURITY_EVENT,
+        "Security",
+        "Open the web application",
+        dedupe_key="blocked-bot",
+    )
+    assert await service.process_outbox_batch() == 0
+    assert connection.delivery_enabled is False
+    assert connection.last_error_category == "blocked"
 
 
 @pytest.mark.asyncio
 async def test_all_domain_notification_events(db_session, make_account):
-    acc = await make_account()
-    notif_repo = NotificationRepository(db_session)
-    tg_repo = TelegramLinkRepository(db_session)
-    tg_provider = MockTelegramProvider()
-    service = NotificationService(notif_repo, tg_repo, tg_provider)
-
+    account = await make_account()
+    repo = NotificationRepository(db_session)
+    service = NotificationService(repo, TelegramLinkRepository(db_session), MockTelegramProvider())
     events = [
-        (NotificationType.DEAL_ACCEPTED, "deal_acc_1"),
-        (NotificationType.DEAL_PAID, "deal_paid_1"),
-        (NotificationType.DEAL_COMPLETED, "deal_comp_1"),
-        (NotificationType.DEAL_CANCELLED, "deal_canc_1"),
-        (NotificationType.APPEAL_OPENED, "appeal_op_1"),
-        (NotificationType.APPEAL_RESOLVED, "appeal_res_1"),
-        (NotificationType.DEPOSIT_CONFIRMED, "dep_conf_1"),
-        (NotificationType.WITHDRAWAL_STATUS_CHANGED, "with_stat_1"),
+        NotificationType.DEAL_ACCEPTED,
+        NotificationType.DEAL_PAID,
+        NotificationType.DEAL_COMPLETED,
+        NotificationType.DEAL_CANCELLED,
+        NotificationType.APPEAL_OPENED,
+        NotificationType.APPEAL_RESOLVED,
+        NotificationType.DEPOSIT_CONFIRMED,
+        NotificationType.WITHDRAWAL_STATUS_CHANGED,
     ]
-
-    for type_, key in events:
-        notif = await service.emit_notification(
-            account_id=acc.id,
-            type_=type_,
-            title=f"Title {type_}",
-            message=f"Message {type_}",
-            dedupe_key=key,
+    for event in events:
+        assert await service.emit_notification(
+            account.id, event, "Title", "Message", dedupe_key=event.value
         )
-        assert notif is not None
-        assert notif.type == type_
-
-    count = await notif_repo.get_unread_count(acc.id)
-    assert count == len(events)
+    assert await repo.get_unread_count(account.id) == len(events)

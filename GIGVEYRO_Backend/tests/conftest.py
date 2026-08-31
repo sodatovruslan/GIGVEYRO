@@ -36,6 +36,9 @@ _ADMIN_DATABASE_URL = _base_url.set(drivername="postgresql", database="postgres"
 os.environ["APP_ENV"] = "test"
 os.environ["DEBUG"] = "false"
 os.environ["DATABASE_URL"] = _TEST_DATABASE_URL.render_as_string(hide_password=False)
+# Standard tests must never inherit a developer's live Telegram configuration.
+os.environ["TELEGRAM_BOT_ENABLED"] = "false"
+os.environ["TELEGRAM_DELIVERY_ENABLED"] = "false"
 
 from app.core.config import settings as app_settings
 from app.core.middleware import in_memory_rate_limiter
