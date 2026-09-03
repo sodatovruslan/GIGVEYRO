@@ -177,6 +177,15 @@ test("query invalidation supports exact and scoped prefix keys", () => {
   assert.deepEqual({ deals, analytics, accounts }, { deals: 1, analytics: 1, accounts: 0 });
 });
 
+test("deposit reconciliation realtime refetches owner and user REST state", () => {
+  assert.deepEqual(queryKeysForRealtimeEvent("deposit.updated", "owner"), [
+    "deposits:*", "unmatched-transfers:*", "owner-summary", "owner-activity",
+  ]);
+  assert.deepEqual(queryKeysForRealtimeEvent("deposit.updated", "user"), [
+    "deposits:*", "user-wallet", "wallet-page", "ledger-page",
+  ]);
+});
+
 test("realtime handlers revalidate REST and never mutate financial values", async () => {
   const provider = await readFile(
     new URL("../src/features/realtime/realtime-provider.tsx", import.meta.url),

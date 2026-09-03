@@ -145,12 +145,19 @@ async def test_owner_deposits_require_authentication(client):
     assert response.status_code == 401
 
 
-async def test_owner_has_no_manual_credit_endpoint():
+async def test_owner_has_no_force_credit_endpoint():
     from app.main import app as fastapi_app
 
     schema = fastapi_app.openapi()
+    allowed_posts = {
+        "/owner/deposits/unmatched/{transfer_id}/link",
+        "/owner/deposits/unmatched/{transfer_id}/reprocess",
+        "/owner/deposits/unmatched/{transfer_id}/ignore",
+    }
     for path, methods in schema["paths"].items():
         if path.startswith("/owner/deposits"):
-            assert "post" not in methods
+            if "post" in methods:
+                assert path in allowed_posts
             assert "patch" not in methods
             assert "put" not in methods
+            assert "credit" not in path

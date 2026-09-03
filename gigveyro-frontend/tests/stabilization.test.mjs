@@ -8,6 +8,7 @@ import { AuthOperationGate } from "../src/features/auth/auth-operation-gate.ts";
 import { loginErrorKey } from "../src/features/auth/login-error.ts";
 import { auditMessagePath } from "../src/features/audit/i18n.ts";
 import { notificationLink } from "../src/features/notifications/links.ts";
+import { apiErrorFromPayload } from "../src/lib/api/error.ts";
 import { isWithdrawalStateConflict, mapWithdrawalFieldErrors } from "../src/features/withdrawals/validation.ts";
 
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
@@ -241,14 +242,43 @@ test("business list views paginate instead of hardcoding limit=100", async () =>
   }
 });
 
-test("owner deposit unmatched-transfer visibility is real, read-only, and not a manual-credit shortcut", async () => {
+test("owner unmatched-transfer workflow uses guarded reconciliation endpoints without force credit", async () => {
   const api = await source("src/lib/api/deposits.ts");
   const panel = await source("src/components/deposits/unmatched-transfers-panel.tsx");
   assert.match(api, /\/owner\/deposits\/unmatched/);
-  assert.doesNotMatch(panel, /method:\s*"POST"/);
-  assert.doesNotMatch(panel, /method:\s*"PATCH"/);
-  assert.doesNotMatch(panel, /credit/i);
+  assert.match(api, /unmatched\/\$\{id\}\/link/);
+  assert.match(api, /unmatched\/\$\{id\}\/reprocess/);
+  assert.match(api, /unmatched\/\$\{id\}\/ignore/);
+  assert.match(panel, /confirmation/);
+  assert.match(panel, /amount_matches/);
+  assert.doesNotMatch(api, /force[-_]credit/i);
   assert.match(panel, /Pager/);
+});
+
+test("owner reconciliation UI has complete RU EN and TG safety labels", async () => {
+  const required = [
+    "correlationStatus", "reconciliationStatus", "candidateTitle", "linkAction",
+    "reprocessAction", "ignoreAction", "ignoreReason", "observedAmount",
+    "expectedAmount", "amountDifference", "ignoreWarning", "processing",
+  ];
+  for (const locale of ["ru", "en", "tg"]) {
+    const messages = JSON.parse(await source(`src/i18n/messages/${locale}.json`));
+    for (const key of required) assert.equal(typeof messages.deposits[key], "string");
+    for (const status of ["PENDING", "REPROCESSED", "IGNORED", "CREDITED"]) {
+      assert.equal(typeof messages.deposits.reconciliation[status], "string");
+    }
+    for (const action of ["link", "reprocess", "ignore"]) {
+      assert.equal(typeof messages.deposits.confirmation[action].title, "string");
+      assert.equal(typeof messages.deposits.actionSuccess[action], "string");
+    }
+  }
+});
+
+test("reconciliation API errors preserve backend machine-readable reason codes", () => {
+  const stale = apiErrorFromPayload(409, { detail: { code: "STALE_STATE" } });
+  const mismatch = apiErrorFromPayload(422, { detail: { code: "AMOUNT_MISMATCH" } });
+  assert.equal(stale.code, "STALE_STATE");
+  assert.equal(mismatch.code, "AMOUNT_MISMATCH");
 });
 
 test("login page clears two-factor challenge state on a fresh credentials submit", async () => {
