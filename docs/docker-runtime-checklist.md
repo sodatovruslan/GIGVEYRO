@@ -6,7 +6,7 @@ This checklist cannot be signed off without Docker. Use a separate Compose proje
 - [ ] Compose config resolves with a dedicated production-like env and no secrets printed.
 - [ ] Build all images and inspect non-root users and healthchecks.
 - [ ] PostgreSQL and Redis become healthy; Redis persistence and `noeviction` are effective.
-- [ ] One-shot migrations reach `0025`; backend and worker start afterward.
+- [ ] One-shot migrations reach `0027`; backend and worker start afterward.
 - [ ] `/health/live` and `/health/ready` return 200 through Nginx.
 - [ ] Frontend, login, and same-origin `/api/*` BFF routing work.
 - [ ] Nginx config validation passes; only Nginx is published.

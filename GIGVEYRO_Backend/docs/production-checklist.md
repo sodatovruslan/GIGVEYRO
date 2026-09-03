@@ -8,4 +8,7 @@
 - [ ] `ALLOWED_HOSTS` configured with exact domain names.
 - [ ] `PAYOUT_ENABLED` remains `false` until external gateway security verification is completed.
 - [ ] Database backup executed before running `alembic upgrade head`.
-- [ ] Shared rate-limiter (e.g. Redis) planned if scaling to multi-instance/multi-worker process deployments.
+- [ ] `REDIS_URL` points to the dedicated production Redis service.
+- [ ] Redis-backed distributed rate limiting is enabled with `RATE_LIMIT_FAIL_MODE=closed`.
+- [ ] `REALTIME_BROKER=redis`; authenticated cross-process WebSocket delivery is validated.
+- [ ] ARQ worker heartbeat and notification/deposit scanner jobs are monitored.

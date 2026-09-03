@@ -150,7 +150,7 @@ This is intentional:
 - Real-time events triggered by worker jobs should be written to the `realtime_outbox` table
 - The web process polls this table and dispatches via WebSocket
 
-**Horizontal scaling**: When switching to `RedisBroker`, multiple web processes can share WebSocket state. This requires Codex's Redis broker implementation.
+**Horizontal scaling**: production uses the implemented `RedisRealtimeBroker`, allowing multiple web processes to share realtime events. `InMemoryRealtimeBroker` remains development/test-only.
 
 ---
 

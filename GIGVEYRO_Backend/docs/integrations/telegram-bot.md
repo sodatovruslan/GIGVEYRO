@@ -95,3 +95,12 @@ link/unlink, one safe notification, diagnostics and worker retries. Roll back wi
 the consumer. Never expose the webhook secret in an Nginx access log.
 
 Webhook HTTPS/Nginx runtime has intentionally not been validated until Docker is available.
+
+## Validation status
+
+Local polling was validated end to end with a disposable PostgreSQL database at migration `0026`:
+link, unlink, relink, RU/EN/TG commands, role-scoped read-only commands, notification outbox
+delivery, retry behavior and clean polling shutdown all passed. No financial action was executed.
+
+Production HTTPS webhook and Nginx runtime remain **not tested** because Docker is not installed.
+Do not treat the local polling result as production webhook approval.

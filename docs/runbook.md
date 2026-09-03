@@ -35,13 +35,13 @@
 
 ### 🔴 Redis Down
 
-**Symptoms**: Worker jobs fail to enqueue, rate limiter falls back to allow-all, `/health/ready` shows redis error.
+**Symptoms**: Worker jobs stop, realtime delivery is interrupted, protected requests fail closed in production, and `/health/ready` returns 503.
 
 **Impact Assessment**:
-- Web requests: **continue to work** (Redis error is non-fatal for API)
-- Rate limiting: **fails open** (allows all requests)
+- Web requests: health/liveness may respond, but production readiness is **unavailable**
+- Rate limiting: production `RATE_LIMIT_FAIL_MODE=closed` rejects protected traffic safely
 - Background workers: **cannot process** new jobs
-- WebSocket broker: **continues working** (InMemoryBroker, not Redis-dependent)
+- WebSocket broker: production `RedisRealtimeBroker` cannot deliver cross-process events
 
 **Steps**:
 1. Check Redis container: `docker compose ps redis`
@@ -49,6 +49,7 @@
 3. Check memory: `docker stats redis`
 4. Attempt restart: `docker compose restart redis`
 5. Verify ARQ reconnects: `docker compose logs worker --tail=20`
+6. Verify `/health/ready`, worker heartbeat, authenticated WebSocket delivery, and rate limiting recover before closing the incident.
 
 ---
 
@@ -83,12 +84,8 @@
    docker compose exec redis redis-cli keys "arq:*"
    ```
 4. Restart worker: `docker compose restart worker`
-5. If outbox has FAILED entries, they are dead-lettered and will not retry automatically
-6. To manually retry dead-letter entries, update their status to PENDING in DB:
-   ```sql
-   UPDATE notification_outbox SET status = 'pending', attempts = 0
-   WHERE status = 'failed' AND created_at > NOW() - INTERVAL '24 hours';
-   ```
+5. OWNER inspects failed Telegram deliveries in Notifications and uses the authoritative retry action.
+6. Do not edit notification/outbox rows manually; preserve attempts and audit history.
 
 ---
 

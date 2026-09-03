@@ -23,7 +23,7 @@ The local development contract is `APP_ENV=development` and `DEBUG=true`. A valu
 1. Freeze deploys and record the current Git SHA and Alembic revision.
 2. Run all backend and frontend gates in `release-checklist.md`.
 3. Take a custom-format PostgreSQL backup and restore it into an isolated database.
-4. Verify backup integrity and migration `0019 -> 0020 -> 0021 -> 0022 -> 0023 -> 0024 -> 0025` on disposable PostgreSQL.
+4. Verify backup integrity and migration `0019 -> 0020 -> 0021 -> 0022 -> 0023 -> 0024 -> 0025 -> 0026 -> 0027` on disposable PostgreSQL.
 5. Build immutable images. Run the one-shot `migrate` service, then backend, worker, frontend, and Nginx.
 6. Complete `docker-runtime-checklist.md`; do not deploy while that checklist is incomplete.
 7. Validate health, authenticated routes, BFF cookies, WebSocket Upgrade, ARQ heartbeat, metrics access, and log redaction.
