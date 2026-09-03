@@ -2,6 +2,7 @@ import uuid
 
 from app.core.security import create_access_token
 from app.enums.account import UserRole
+from app.main import app
 from app.repositories.account import AccountRepository
 
 
@@ -11,6 +12,28 @@ def _auth_headers(account) -> dict:
 
 
 # ---- RBAC ----------------------------------------------------------------
+
+
+def test_public_registration_routes_are_not_exposed():
+    route_paths = {route.path for route in app.routes}
+
+    assert "/register" not in route_paths
+    assert "/public/register" not in route_paths
+    assert "/auth/register" not in route_paths
+    assert "Public registration is disabled by design" in app.description
+
+
+async def test_public_registration_requests_return_not_found(client):
+    payload = {
+        "username": f"public_{uuid.uuid4().hex[:8]}",
+        "password": "PublicRegistration123",
+        "role": "user",
+        "full_name": "Public Registration",
+    }
+
+    for path in ("/register", "/public/register", "/auth/register"):
+        response = await client.post(path, json=payload)
+        assert response.status_code == 404
 
 
 async def test_owner_endpoints_require_authentication(client):
@@ -30,6 +53,23 @@ async def test_create_account_rejects_user_role(client, make_account):
             "full_name": "New Person",
         },
         headers=_auth_headers(user),
+    )
+
+    assert response.status_code == 403
+
+
+async def test_create_account_rejects_merchant_role(client, make_account):
+    merchant = await make_account(role=UserRole.MERCHANT)
+
+    response = await client.post(
+        "/owner/accounts",
+        json={
+            "username": f"new_{uuid.uuid4().hex[:8]}",
+            "password": "NewAccountPass123",
+            "role": "merchant",
+            "full_name": "New Merchant",
+        },
+        headers=_auth_headers(merchant),
     )
 
     assert response.status_code == 403
