@@ -23,7 +23,11 @@
 .profile button:hover { color: var(--primary); background: var(--primary-soft); }
 .workspace { min-height: 100vh; padding-left: var(--sidebar-width); }
 .header { position: sticky; top: 0; z-index: 20; height: var(--header-height); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border); background: var(--header-bg); color: var(--text-muted); font-size: 11px; backdrop-filter: blur(18px); }
-.liveDot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 10px var(--success); }
+.systemHealth { display: flex; align-items: center; }
+.systemHealth i { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--text-muted); }
+.systemHealth[data-health="healthy"] i { background: var(--success); box-shadow: 0 0 10px var(--success); }
+.systemHealth[data-health="degraded"] i,.systemHealth[data-health="checking"] i { background: var(--warning); box-shadow: 0 0 10px var(--warning); }
+.systemHealth[data-health="unavailable"] i { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
 .headerUser { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); }
 .headerActions { display: flex; align-items: center; gap: 12px; }
 .headerUser div { width: 32px; height: 32px; }

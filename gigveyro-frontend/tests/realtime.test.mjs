@@ -142,6 +142,28 @@ test("fiat events refetch exact owner/user resources without merchant leakage", 
   assert.deepEqual({ balances, ledger, usdt }, { balances: 1, ledger: 1, usdt: 0 });
 });
 
+test("payout and withdrawal events invalidate only role-owned REST resources", () => {
+  assert.deepEqual(queryKeysForRealtimeEvent("payout.updated", "user"), []);
+  assert.deepEqual(queryKeysForRealtimeEvent("withdrawal.updated", "user"), []);
+
+  const ownerPayout = queryKeysForRealtimeEvent("payout.updated", "owner");
+  assert.ok(ownerPayout.includes("owner-payouts:*"));
+  assert.ok(ownerPayout.includes("owner-payout:*"));
+  assert.ok(ownerPayout.includes("owner-summary"));
+  assert.ok(!ownerPayout.includes("owner-withdrawals:*"));
+
+  const ownerWithdrawal = queryKeysForRealtimeEvent("withdrawal.updated", "owner");
+  assert.ok(ownerWithdrawal.includes("owner-withdrawals:*"));
+  assert.ok(ownerWithdrawal.includes("owner-withdrawal:*"));
+  assert.ok(ownerWithdrawal.includes("owner-payouts:*"));
+
+  const merchant = queryKeysForRealtimeEvent("withdrawal.updated", "merchant");
+  assert.ok(merchant.includes("merchant-withdrawals:*"));
+  assert.ok(merchant.includes("merchant-withdrawal:*"));
+  assert.ok(merchant.includes("merchant-wallet"));
+  assert.ok(!merchant.includes("owner-payouts:*"));
+});
+
 test("query invalidation supports exact and scoped prefix keys", () => {
   const bus = new QueryInvalidationBus();
   let deals = 0;

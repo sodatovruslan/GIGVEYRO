@@ -115,7 +115,10 @@
     "merchant": "Тоҷир"
   },
   "header": {
-    "healthy": "Система муътадил кор мекунад"
+    "checking": "Система санҷида мешавад…",
+    "healthy": "Система муътадил кор мекунад",
+    "degraded": "Система бо маҳдудият кор мекунад",
+    "unavailable": "Система муваққатан дастнорас аст"
   },
   "dashboard": {
     "ownerEyebrow": "МАРКАЗИ ИДОРАКУНИИ СОҲИБ",
@@ -349,6 +352,10 @@
     "depositId": "ID-и депозит",
     "depositAddress": "Суроғаи депозит",
     "expiresAt": "Мӯҳлат",
+    "expiredNotice": "Муҳлати ин суроғаи депозит гузаштааст. Ба он маблағ нафиристед.",
+    "copyAddress": "Нусхабардории суроға",
+    "copied": "Суроға нусхабардорӣ шуд",
+    "copyFailed": "Суроға нусхабардорӣ нашуд.",
     "unmatchedTitle": "Интиқолҳои номувофиқ",
     "unmatchedSubtitle": "Интиқолҳои занҷира, ки сканер натавонист бехатар бо депозит мувофиқат кунад",
     "unmatchedEmpty": "Интиқоли номувофиқ нест",
@@ -465,7 +472,21 @@
     "disconnectConfirm": "Telegram аз ҳисоб қатъ карда шавад? Таърихи огоҳиҳо нигоҳ дошта мешавад.",
     "validTo": "то {time}",
     "failed": "Амал иҷро нашуд.",
-    "codeFailed": "Пайванд сохта нашуд."
+    "codeFailed": "Пайванд сохта нашуд.",
+    "deliveriesTitle": "Расонидани Telegram",
+    "deliveriesSubtitle": "Назорати навбат ва такрори расонидани номуваффақ",
+    "deliveriesEmpty": "Сабти расонидан нест",
+    "deliveryChannel": "Канал",
+    "deliveryReference": "Огоҳӣ",
+    "deliveryAttempts": "Кӯшишҳо",
+    "deliveryCreated": "Эҷод шуд",
+    "deliverySent": "Расонида шуд",
+    "deliveryError": "Сабаб",
+    "retry": "Такрор кардан",
+    "retrying": "Такрор мешавад…",
+    "retryQueued": "Расонидан ба навбат баргардонида шуд.",
+    "deliveryStatuses": {"all":"Ҳама","PENDING":"Дар интизорӣ","SENT":"Расонида шуд","FAILED":"Хато"},
+    "deliveryFailures": {"blocked":"Қабулкунанда ботро баст","chat_not_found":"Чат дастнорас аст","invalid_token":"Хатои танзими бот","invalid_config":"Хатои танзими расонидан","temporary_unavailable":"Telegram муваққатан дастнорас аст","unavailable":"Telegram дастнорас аст","rate_limited":"Маҳдудияти Telegram API","unknown":"Расонидан номуваффақ шуд"}
   },
   "analytics": {
     "eyebrow": "МАРКАЗИ ИДОРАКУНИИ СОҲИБ",

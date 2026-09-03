@@ -352,6 +352,20 @@ export interface NotificationItem {
   created_at: string;
 }
 
+export type NotificationDeliveryStatus = "PENDING" | "SENT" | "FAILED";
+
+export interface NotificationDelivery {
+  id: string;
+  notification_id: string;
+  channel: "TELEGRAM" | "IN_APP";
+  status: NotificationDeliveryStatus;
+  attempts: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface NotificationPreferences {
   account_id: string;
   in_app_enabled: boolean;

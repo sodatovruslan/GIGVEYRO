@@ -19,6 +19,7 @@ import type {
 import { useApiQuery } from "@/lib/hooks/use-api-query";
 
 import styles from "./notifications-page.module.css";
+import { OwnerDeliveryOperations } from "./owner-delivery-operations";
 
 const PAGE_SIZE = 20;
 const toggles: Array<{
@@ -136,6 +137,7 @@ export function NotificationsPage() {
           </div>
         </aside>
       </div>
+      {account?.role === "owner" && <OwnerDeliveryOperations />}
     </section>
   );
 }

@@ -115,7 +115,10 @@
     "merchant": "Merchant"
   },
   "header": {
-    "healthy": "All systems operational"
+    "checking": "Checking system…",
+    "healthy": "All systems operational",
+    "degraded": "System is operating with limitations",
+    "unavailable": "System is temporarily unavailable"
   },
   "dashboard": {
     "ownerEyebrow": "OWNER CONTROL CENTER",
@@ -349,6 +352,10 @@
     "depositId": "Deposit ID",
     "depositAddress": "Deposit address",
     "expiresAt": "Expires at",
+    "expiredNotice": "This deposit address has expired. Do not send funds to it.",
+    "copyAddress": "Copy address",
+    "copied": "Address copied",
+    "copyFailed": "Could not copy the address.",
     "unmatchedTitle": "Unmatched transfers",
     "unmatchedSubtitle": "On-chain transfers the correlation scanner could not safely match to a deposit intent",
     "unmatchedEmpty": "No unmatched transfers",
@@ -465,7 +472,21 @@
     "disconnectConfirm": "Disconnect Telegram from this account? Notification history will remain.",
     "validTo": "until {time}",
     "failed": "Action failed.",
-    "codeFailed": "Failed to generate the link."
+    "codeFailed": "Failed to generate the link.",
+    "deliveriesTitle": "Telegram delivery",
+    "deliveriesSubtitle": "Monitor the queue and retry failed deliveries",
+    "deliveriesEmpty": "No delivery records",
+    "deliveryChannel": "Channel",
+    "deliveryReference": "Notification",
+    "deliveryAttempts": "Attempts",
+    "deliveryCreated": "Created",
+    "deliverySent": "Delivered",
+    "deliveryError": "Reason",
+    "retry": "Retry",
+    "retrying": "Retrying…",
+    "retryQueued": "Delivery returned to the queue.",
+    "deliveryStatuses": {"all":"All","PENDING":"Pending","SENT":"Delivered","FAILED":"Failed"},
+    "deliveryFailures": {"blocked":"The recipient blocked the bot","chat_not_found":"Chat is unavailable","invalid_token":"Bot configuration error","invalid_config":"Delivery configuration error","temporary_unavailable":"Telegram is temporarily unavailable","unavailable":"Telegram is unavailable","rate_limited":"Telegram API rate limit","unknown":"Delivery failed"}
   },
   "analytics": {
     "eyebrow": "OWNER CONTROL CENTER",

@@ -115,7 +115,10 @@
     "merchant": "Мерчант"
   },
   "header": {
-    "healthy": "Система работает штатно"
+    "checking": "Проверяем систему…",
+    "healthy": "Система работает штатно",
+    "degraded": "Система работает с ограничениями",
+    "unavailable": "Система временно недоступна"
   },
   "dashboard": {
     "ownerEyebrow": "ЦЕНТР УПРАВЛЕНИЯ OWNER",
@@ -349,6 +352,10 @@
     "depositId": "ID депозита",
     "depositAddress": "Адрес депозита",
     "expiresAt": "Истекает",
+    "expiredNotice": "Срок этого депозитного адреса истёк. Не отправляйте на него средства.",
+    "copyAddress": "Скопировать адрес",
+    "copied": "Адрес скопирован",
+    "copyFailed": "Не удалось скопировать адрес.",
     "unmatchedTitle": "Несопоставленные переводы",
     "unmatchedSubtitle": "Переводы в блокчейне, которые сканер не смог безопасно сопоставить с депозитом",
     "unmatchedEmpty": "Несопоставленных переводов нет",
@@ -465,7 +472,21 @@
     "disconnectConfirm": "Отключить Telegram от аккаунта? История уведомлений сохранится.",
     "validTo": "до {time}",
     "failed": "Не удалось выполнить действие.",
-    "codeFailed": "Не удалось создать ссылку."
+    "codeFailed": "Не удалось создать ссылку.",
+    "deliveriesTitle": "Доставка Telegram",
+    "deliveriesSubtitle": "Мониторинг очереди и повторная отправка неудачных доставок",
+    "deliveriesEmpty": "Записей доставки нет",
+    "deliveryChannel": "Канал",
+    "deliveryReference": "Уведомление",
+    "deliveryAttempts": "Попытки",
+    "deliveryCreated": "Создано",
+    "deliverySent": "Доставлено",
+    "deliveryError": "Причина",
+    "retry": "Повторить",
+    "retrying": "Повторяем…",
+    "retryQueued": "Доставка возвращена в очередь.",
+    "deliveryStatuses": {"all":"Все","PENDING":"Ожидает","SENT":"Доставлено","FAILED":"Ошибка"},
+    "deliveryFailures": {"blocked":"Бот заблокирован получателем","chat_not_found":"Чат недоступен","invalid_token":"Ошибка конфигурации бота","invalid_config":"Ошибка конфигурации доставки","temporary_unavailable":"Telegram временно недоступен","unavailable":"Telegram недоступен","rate_limited":"Лимит Telegram API","unknown":"Ошибка доставки"}
   },
   "analytics": {
     "eyebrow": "ЦЕНТР УПРАВЛЕНИЯ OWNER",

@@ -9,6 +9,7 @@ import { useLocalizedError } from "@/features/i18n/use-localized-error";
 import { ownerOperationsApi } from "@/lib/api/owner-operations";
 import type { PayoutIntent, PayoutPolicyInput, PayoutStatus } from "@/lib/api/types";
 import { useApiQuery } from "@/lib/hooks/use-api-query";
+import { queryInvalidation } from "@/lib/query/invalidation";
 import { Heading } from "../owner-components";
 import { LivePayoutReadinessPanel } from "./live-payout-readiness";
 import styles from "./payouts.module.css";
@@ -26,6 +27,13 @@ export default function OwnerPayoutsPage() {
   const [detail, setDetail] = useState<PayoutIntent | null>(null); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   const [manualRef, setManualRef] = useState(""); const [evidence, setEvidence] = useState("");
   useEffect(() => { if (policy.data) { const timer = window.setTimeout(() => setForm({ ...defaults, ...policy.data }), 0); return () => window.clearTimeout(timer); } }, [policy.data]);
+  useEffect(() => {
+    const id = detail?.id;
+    if (!id) return;
+    return queryInvalidation.subscribe(`owner-payout:${id}`, () => {
+      void ownerOperationsApi.payout(id).then(setDetail).catch((reason) => setError(localizeError(reason)));
+    });
+  }, [detail?.id, localizeError]);
   async function open(id: string) { setError(""); try { setDetail(await ownerOperationsApi.payout(id)); } catch (e) { setError(localizeError(e)); } }
   async function run(action: () => Promise<PayoutIntent>) { setBusy(true); setError(""); try { const item = await action(); setDetail(item); await query.refetch(); } catch (e) { setError(localizeError(e)); } finally { setBusy(false); } }
   async function createPolicy() { setBusy(true); setError(""); try { const value = await ownerOperationsApi.createPayoutPolicy(form); setDraft(value.id); } catch (e) { setError(localizeError(e)); } finally { setBusy(false); } }

@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { PageHeading } from "@/app/user/user-components";
@@ -13,6 +13,7 @@ import type { MerchantWithdrawal } from "@/lib/api/types";
 import { useApiQuery } from "@/lib/hooks/use-api-query";
 import { Pager } from "@/components/ui/pager";
 import { WithdrawalDetailGrid } from "@/components/withdrawals/withdrawal-detail";
+import { queryInvalidation } from "@/lib/query/invalidation";
 
 import styles from "../../user/user.module.css";
 
@@ -37,6 +38,14 @@ export default function MerchantWithdrawalsPage() {
   const [detail, setDetail] = useState<MerchantWithdrawal | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+
+  useEffect(() => {
+    const id = detail?.id;
+    if (!id) return;
+    return queryInvalidation.subscribe(`merchant-withdrawal:${id}`, () => {
+      void merchantApi.getWithdrawal(id).then(setDetail).catch((reason) => setDetailError(localizeError(reason)));
+    });
+  }, [detail?.id, localizeError]);
 
   async function openDetail(id: string) {
     setDetail(null); setDetailError(""); setDetailLoading(true);

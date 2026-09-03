@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { useAppFormat } from "@/features/i18n/use-app-format";
@@ -11,6 +11,7 @@ import { ownerOperationsApi } from "@/lib/api/owner-operations";
 import type { MerchantWithdrawal } from "@/lib/api/types";
 import { useApiQuery } from "@/lib/hooks/use-api-query";
 import { Pager } from "@/components/ui/pager";
+import { queryInvalidation } from "@/lib/query/invalidation";
 import { WithdrawalDetailGrid } from "@/components/withdrawals/withdrawal-detail";
 
 import { Heading } from "../owner-components";
@@ -37,6 +38,14 @@ export default function OwnerWithdrawalsPage() {
   const [detail, setDetail] = useState<MerchantWithdrawal | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+
+  useEffect(() => {
+    const id = detail?.id;
+    if (!id) return;
+    return queryInvalidation.subscribe(`owner-withdrawal:${id}`, () => {
+      void ownerOperationsApi.getWithdrawal(id).then(setDetail).catch((reason) => setDetailError(localizeError(reason)));
+    });
+  }, [detail?.id, localizeError]);
 
   async function openDetail(id: string) {
     setDetail(null); setDetailError(""); setDetailLoading(true);

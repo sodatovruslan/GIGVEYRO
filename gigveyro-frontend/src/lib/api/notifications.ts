@@ -1,6 +1,8 @@
 import { apiFetch } from "@/lib/api/client";
 import type {
   NotificationItem,
+  NotificationDelivery,
+  NotificationDeliveryStatus,
   NotificationPreferences,
   TelegramConnection,
   TelegramLinkToken,
@@ -18,4 +20,13 @@ export const notificationsApi = {
   updateTelegram: (input: Partial<Pick<TelegramConnection, "language" | "delivery_enabled">>) =>
     apiFetch<TelegramConnection>("/telegram/connection", { method: "PATCH", body: input }),
   disconnectTelegram: () => apiFetch<void>("/telegram/connection", { method: "DELETE" }),
+  ownerDeliveries: (status?: NotificationDeliveryStatus, limit = 20, offset = 0) => {
+    const params = new URLSearchParams({ channel: "TELEGRAM", limit: String(limit), offset: String(offset) });
+    if (status) params.set("status", status);
+    return apiFetch<NotificationDelivery[]>(`/notifications/owner/deliveries?${params}`);
+  },
+  retryOwnerDelivery: (id: string) => apiFetch<NotificationDelivery>(
+    `/notifications/owner/deliveries/${id}/retry`,
+    { method: "POST" },
+  ),
 };

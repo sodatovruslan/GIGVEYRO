@@ -9,6 +9,8 @@ export const realtimeEventNames = [
   "deal.disputed",
   "fiat.allocated",
   "fiat.converted",
+  "payout.updated",
+  "withdrawal.updated",
 ] as const;
 
 export type RealtimeEventName = (typeof realtimeEventNames)[number];
@@ -18,8 +20,27 @@ const userDeals = ["user-deals", "user-appeal-deals"];
 const userFunds = ["user-wallet", "wallet-page", "ledger-page"];
 const merchantDeals = ["merchant-deals", "merchant-appeal-deals"];
 const merchantFunds = ["merchant-dashboard-wallet", "merchant-wallet", "merchant-ledger"];
+const ownerPayouts = ["owner-payouts:*", "owner-payout:*"];
+const ownerWithdrawals = ["owner-withdrawals:*", "owner-withdrawal:*"];
+const merchantWithdrawals = ["merchant-withdrawals:*", "merchant-withdrawal:*"];
 
 export function queryKeysForRealtimeEvent(event: RealtimeEventName, role: UserRole) {
+  if (event === "payout.updated") {
+    if (role === "owner") return [...ownerPayouts, "owner-summary", "owner-activity"];
+    if (role === "merchant") {
+      return [...merchantWithdrawals, "merchant-dashboard-withdrawals", ...merchantFunds];
+    }
+    return [];
+  }
+  if (event === "withdrawal.updated") {
+    if (role === "owner") {
+      return [...ownerWithdrawals, ...ownerPayouts, "owner-summary", "owner-activity"];
+    }
+    if (role === "merchant") {
+      return [...merchantWithdrawals, "merchant-dashboard-withdrawals", ...merchantFunds];
+    }
+    return [];
+  }
   if (event === "fiat.allocated" || event === "fiat.converted") {
     return role === "owner"
       ? ["owner-fiat:*"]

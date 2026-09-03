@@ -10,6 +10,7 @@ import { notificationsApi } from "@/lib/api/notifications";
 import type { UserRole } from "@/lib/api/types";
 import { ThemeSwitcher } from "@/features/theme/theme-switcher";
 import { LanguageSwitcher } from "@/features/i18n/language-switcher";
+import { SystemHealthIndicator } from "@/features/health/system-health-indicator";
 
 import styles from "./dashboard-shell.module.css";
 
@@ -34,7 +35,7 @@ export function DashboardShell({ role, children }: { role: UserRole; children: R
   const { account, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const t = useTranslations("navigation"); const tRoles = useTranslations("roles"); const tHeader = useTranslations("header"); const common = useTranslations("common");
+  const t = useTranslations("navigation"); const tRoles = useTranslations("roles"); const common = useTranslations("common");
 
   useEffect(() => {
     let active = true;
@@ -78,7 +79,7 @@ export function DashboardShell({ role, children }: { role: UserRole; children: R
       <div className={styles.workspace}>
         <header className={styles.header}>
           <button className={styles.menuButton} onClick={() => setMenuOpen(true)} aria-label={t("openMenu")}>☰</button>
-          <div><span className={styles.liveDot} /> {tHeader("healthy")}</div>
+          <SystemHealthIndicator className={styles.systemHealth} />
           <div className={styles.headerActions}><LanguageSwitcher /><ThemeSwitcher /><div className={styles.headerUser}><span>{account?.username}</span><div>{account?.full_name?.slice(0, 1).toUpperCase()}</div></div></div>
         </header>
         <main className={styles.content}>{children}</main>
