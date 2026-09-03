@@ -321,6 +321,7 @@ export default function LoginPage() {
             {submitting ? t("submitting") : t("submit")}
           </button>
         </form>
+        <p className={styles.managedOnboarding}>{t("managedOnboarding")}</p>
         <p className={styles.security}>{t("security")}</p>
       </section>
       <aside className={styles.visual} aria-hidden="true">

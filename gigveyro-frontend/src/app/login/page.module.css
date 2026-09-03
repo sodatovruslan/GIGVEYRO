@@ -19,7 +19,9 @@
 .form button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
 .form button:disabled { opacity: .6; cursor: wait; }
 .error { padding: 11px 13px; border: 1px solid var(--danger-border); border-radius: var(--radius-sm); color: var(--danger-text); background: var(--danger-soft); font-size: 12px; }
+.managedOnboarding { margin-top: 24px; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--surface-subtle); font-size: 11px; text-align: center; }
 .security { margin-top: 26px; color: var(--text-muted); font-size: 10px; text-align: center; }
+.managedOnboarding + .security { margin-top: 12px; }
 .linkButton { color: var(--primary); font-size: 10px; font-weight: 600; text-decoration: underline; cursor: pointer; background: none; border: 0; padding: 0; }
 .setupHint { color: var(--text-secondary); font-size: 12px; }
 .qrWrap { display: grid; justify-items: center; padding: 16px; border-radius: var(--radius-sm); background: var(--surface-control); }
