@@ -136,9 +136,9 @@ class TwoFactorService:
         return record, codes
 
     async def regenerate_recovery_codes(
-        self, account: Account, password: str, totp_code: str
+        self, account: Account, password: str, code: str
     ) -> list[str]:
-        await self._require_password_and_totp(account, password, totp_code)
+        await self.require_password_and_code(account, password, code)
         return await self._issue_recovery_codes(account.id)
 
     async def _issue_recovery_codes(self, account_id: uuid.UUID) -> list[str]:
@@ -152,23 +152,9 @@ class TwoFactorService:
         await self._recovery.replace_for_account(account_id, records)
         return plaintext_codes
 
-    async def _require_password_and_totp(
-        self, account: Account, password: str, totp_code: str
+    async def require_password_and_code(
+        self, account: Account, password: str, code: str
     ) -> AccountTwoFactor:
-        if not verify_password(password, account.password_hash):
-            raise InvalidPasswordError()
-
-        two_factor = await self._two_factor.get_by_account_id(account.id)
-        if two_factor is None:
-            raise TwoFactorNotEnabledError()
-
-        secret = decrypt_totp_secret(two_factor.encrypted_secret)
-        if not pyotp.TOTP(secret).verify(totp_code, valid_window=1):
-            raise InvalidCodeError()
-
-        return two_factor
-
-    async def disable(self, account: Account, password: str, code: str) -> None:
         if not verify_password(password, account.password_hash):
             raise InvalidPasswordError()
 
@@ -182,6 +168,11 @@ class TwoFactorService:
                 raise InvalidCodeError()
         elif not await self._consume_recovery_code(account.id, code):
             raise InvalidCodeError()
+
+        return two_factor
+
+    async def disable(self, account: Account, password: str, code: str) -> None:
+        await self.require_password_and_code(account, password, code)
 
         await self._two_factor.delete_for_account(account.id)
         await self._recovery.delete_for_account(account.id)

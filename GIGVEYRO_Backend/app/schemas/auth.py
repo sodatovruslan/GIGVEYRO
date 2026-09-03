@@ -31,3 +31,9 @@ class TwoFactorSetupRequiredResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: PasswordStr
+    new_password: PasswordStr
+    code: str | None = Field(default=None, min_length=6, max_length=32)

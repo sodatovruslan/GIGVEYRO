@@ -50,7 +50,9 @@ class TwoFactorDisableRequest(BaseModel):
 
 class TwoFactorRegenerateRequest(BaseModel):
     password: CurrentPassword
-    totp_code: TotpCode
+    # Keep the established field name for API compatibility while accepting
+    # either a current TOTP or a one-time recovery code for strong re-auth.
+    totp_code: str = Field(min_length=6, max_length=32)
 
 
 class TwoFactorRegenerateResponse(BaseModel):
@@ -59,5 +61,6 @@ class TwoFactorRegenerateResponse(BaseModel):
 
 class TwoFactorStatusResponse(BaseModel):
     enabled: bool
+    required: bool = False
     enabled_at: datetime | None = None
     recovery_codes_remaining: int = 0

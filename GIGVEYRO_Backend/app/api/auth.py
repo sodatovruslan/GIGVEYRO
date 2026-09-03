@@ -8,7 +8,6 @@ from app.api.deps import (
     TwoFactorSetupActor,
     get_current_account,
     get_two_factor_setup_actor,
-    require_roles,
 )
 from app.core.config import settings
 from app.core.security import (
@@ -38,6 +37,7 @@ from app.repositories.two_factor import (
 from app.schemas.account import AccountRead
 from app.schemas.auth import (
     LoginRequest,
+    PasswordChangeRequest,
     RefreshTokenRequest,
     TokenResponse,
     TwoFactorRequiredResponse,
@@ -59,6 +59,7 @@ from app.services.audit import AuditService
 from app.services.auth import (
     AuthenticationError,
     AuthService,
+    InvalidCurrentPasswordError,
     SessionNotFoundError,
     TokenPair,
     TokenReuseError,
@@ -104,16 +105,12 @@ def _notification_service(db: AsyncSession = Depends(get_db)) -> NotificationSer
     )
 
 
-async def _notify_owner_security_event(
+async def _notify_security_event(
     notifications: NotificationService, account: Account, *, title: str, message: str
 ) -> None:
-    # Security notifications are currently scoped to OWNER only (the only
-    # role that can have 2FA / active-session self-management in this
-    # stage) - same emit_notification() call other domains already use for
-    # deposits/withdrawals/appeals, no changes to the notification system
-    # itself.
-    if account.role != UserRole.OWNER:
-        return
+    # The canonical in-app event and optional Telegram outbox entry are
+    # persisted in the caller transaction. External Telegram delivery is
+    # asynchronous and can never roll back the security mutation.
     await notifications.emit_notification(
         account.id, NotificationType.SECURITY_EVENT, title=title, message=message
     )
@@ -283,7 +280,7 @@ async def verify_two_factor(
         actor_role=account.role.value,
     )
     if used_recovery:
-        await _notify_owner_security_event(
+        await _notify_security_event(
             notifications,
             account,
             title="Recovery code used",
@@ -299,11 +296,17 @@ async def two_factor_status(
 ) -> TwoFactorStatusResponse:
     record = await two_factor_service.get_status(account.id)
     if record is None:
-        return TwoFactorStatusResponse(enabled=False)
+        return TwoFactorStatusResponse(
+            enabled=False,
+            required=account.role == UserRole.OWNER and settings.OWNER_2FA_REQUIRED,
+        )
 
     remaining = await two_factor_service.count_unused_recovery_codes(account.id)
     return TwoFactorStatusResponse(
-        enabled=True, enabled_at=record.enabled_at, recovery_codes_remaining=remaining
+        enabled=True,
+        required=account.role == UserRole.OWNER and settings.OWNER_2FA_REQUIRED,
+        enabled_at=record.enabled_at,
+        recovery_codes_remaining=remaining,
     )
 
 
@@ -315,6 +318,7 @@ async def start_two_factor_setup(
     audit: AuditService = Depends(_audit_service),
 ) -> TwoFactorSetupStartResponse:
     account = actor.account
+    await _enforce_two_factor_rate_limit(f"2fa_setup_start:{account.id}")
     try:
         pending = await two_factor_service.start_setup(
             account, payload.password, password_verified=actor.password_verified
@@ -354,6 +358,7 @@ async def confirm_two_factor_setup(
     notifications: NotificationService = Depends(_notification_service),
 ) -> TwoFactorSetupConfirmResponse:
     account = actor.account
+    await _enforce_two_factor_rate_limit(f"2fa_setup_confirm:{account.id}")
     try:
         record, recovery_codes = await two_factor_service.confirm_setup(
             account, payload.totp_code
@@ -393,7 +398,7 @@ async def confirm_two_factor_setup(
             actor_account_id=account.id,
             actor_role=account.role.value,
         )
-        await _notify_owner_security_event(
+        await _notify_security_event(
             notifications,
             account,
             title="Two-factor authentication enabled",
@@ -420,7 +425,7 @@ async def confirm_two_factor_setup(
         actor_role=account.role.value,
         audit_metadata={"other_sessions_revoked": revoked_count},
     )
-    await _notify_owner_security_event(
+    await _notify_security_event(
         notifications,
         account,
         title="Two-factor authentication enabled",
@@ -435,12 +440,18 @@ async def confirm_two_factor_setup(
 async def disable_two_factor(
     payload: TwoFactorDisableRequest,
     request: Request,
-    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    account: Account = Depends(get_current_account),
     service: AuthService = Depends(_service),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
     notifications: NotificationService = Depends(_notification_service),
 ) -> None:
+    if account.role == UserRole.OWNER and settings.OWNER_2FA_REQUIRED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="two-factor authentication is required for owner accounts",
+        )
+    await _enforce_two_factor_rate_limit(f"2fa_disable:{account.id}")
     try:
         await two_factor_service.disable(account, payload.password, payload.code)
     except InvalidPasswordError as exc:
@@ -469,7 +480,7 @@ async def disable_two_factor(
         actor_role=account.role.value,
         audit_metadata={"other_sessions_revoked": revoked_count},
     )
-    await _notify_owner_security_event(
+    await _notify_security_event(
         notifications,
         account,
         title="Two-factor authentication disabled",
@@ -480,10 +491,12 @@ async def disable_two_factor(
 @router.post("/2fa/recovery/regenerate", response_model=TwoFactorRegenerateResponse)
 async def regenerate_recovery_codes(
     payload: TwoFactorRegenerateRequest,
-    account: Annotated[Account, Depends(require_roles(UserRole.OWNER))],
+    account: Account = Depends(get_current_account),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
+    notifications: NotificationService = Depends(_notification_service),
 ) -> TwoFactorRegenerateResponse:
+    await _enforce_two_factor_rate_limit(f"2fa_recovery_regenerate:{account.id}")
     try:
         codes = await two_factor_service.regenerate_recovery_codes(
             account, payload.password, payload.totp_code
@@ -508,7 +521,60 @@ async def regenerate_recovery_codes(
         actor_account_id=account.id,
         actor_role=account.role.value,
     )
+    await _notify_security_event(
+        notifications,
+        account,
+        title="Recovery codes regenerated",
+        message="New recovery codes were generated. Previous codes no longer work.",
+    )
     return TwoFactorRegenerateResponse(recovery_codes=codes)
+
+
+@router.post("/password/change", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    payload: PasswordChangeRequest,
+    request: Request,
+    account: Account = Depends(get_current_account),
+    service: AuthService = Depends(_service),
+    two_factor_service: TwoFactorService = Depends(_two_factor_service),
+    audit: AuditService = Depends(_audit_service),
+    notifications: NotificationService = Depends(_notification_service),
+) -> None:
+    await _enforce_two_factor_rate_limit(f"password_change:{account.id}")
+    two_factor = await two_factor_service.get_status(account.id)
+    try:
+        if two_factor is not None:
+            if payload.code is None:
+                raise InvalidCodeError()
+            await two_factor_service.require_password_and_code(
+                account, payload.current_password, payload.code
+            )
+        await service.change_password(account, payload.current_password, payload.new_password)
+    except (InvalidPasswordError, InvalidCurrentPasswordError, InvalidCodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid current credentials",
+        ) from exc
+
+    current_session_id = _bearer_session_id(request)
+    revoked_count = await service.logout_all(
+        account.id,
+        except_session_id=uuid.UUID(current_session_id) if current_session_id else None,
+    )
+    await audit.log_action(
+        action="auth.password_changed",
+        entity_type="account",
+        entity_id=str(account.id),
+        actor_account_id=account.id,
+        actor_role=account.role.value,
+        audit_metadata={"other_sessions_revoked": revoked_count},
+    )
+    await _notify_security_event(
+        notifications,
+        account,
+        title="Password changed",
+        message="Your account password was changed. Other active sessions were signed out.",
+    )
 
 
 @router.get("/me", response_model=AccountRead)
@@ -572,12 +638,17 @@ async def logout(
 
 @router.post("/logout-all", response_model=LogoutAllResponse)
 async def logout_all(
+    request: Request,
     account: Account = Depends(get_current_account),
     service: AuthService = Depends(_service),
     audit: AuditService = Depends(_audit_service),
     notifications: NotificationService = Depends(_notification_service),
 ) -> LogoutAllResponse:
-    revoked_count = await service.logout_all(account.id)
+    current_session_id = _bearer_session_id(request)
+    revoked_count = await service.logout_all(
+        account.id,
+        except_session_id=uuid.UUID(current_session_id) if current_session_id else None,
+    )
     await audit.log_action(
         action="auth.logout_all",
         entity_type="account",
@@ -587,7 +658,7 @@ async def logout_all(
         audit_metadata={"revoked_count": revoked_count},
     )
     if revoked_count > 0:
-        await _notify_owner_security_event(
+        await _notify_security_event(
             notifications,
             account,
             title="All other sessions signed out",
@@ -619,6 +690,7 @@ async def revoke_session(
     account: Account = Depends(get_current_account),
     service: AuthService = Depends(_service),
     audit: AuditService = Depends(_audit_service),
+    notifications: NotificationService = Depends(_notification_service),
 ) -> None:
     try:
         await service.revoke_session(account.id, session_id)
@@ -634,4 +706,10 @@ async def revoke_session(
         actor_account_id=account.id,
         actor_role=account.role.value,
         audit_metadata={"reason": "revoked_by_user"},
+    )
+    await _notify_security_event(
+        notifications,
+        account,
+        title="Session signed out",
+        message="An active session was signed out from your account security settings.",
     )

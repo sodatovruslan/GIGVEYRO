@@ -110,10 +110,6 @@ async def get_two_factor_setup_actor(
 
     account = await _resolve_access_account(credentials, db)
     if account is not None:
-        if account.role != UserRole.OWNER:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="insufficient permissions"
-            )
         return TwoFactorSetupActor(account=account, password_verified=False)
 
     if credentials is None:

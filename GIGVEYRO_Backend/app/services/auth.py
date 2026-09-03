@@ -47,6 +47,10 @@ class SessionNotFoundError(Exception):
     """Raised when a caller tries to act on a session that doesn't belong to them."""
 
 
+class InvalidCurrentPasswordError(Exception):
+    """Raised when self-service password re-authentication fails."""
+
+
 @dataclass(frozen=True)
 class TokenPair:
     access_token: str
@@ -218,6 +222,14 @@ class AuthService:
         session.revoked_at = datetime.now(UTC)
         session.revoked_reason = "revoked_by_user"
         await self._sessions.update(session)
+
+    async def change_password(
+        self, account: Account, current_password: str, new_password: str
+    ) -> None:
+        if not verify_password(current_password, account.password_hash):
+            raise InvalidCurrentPasswordError()
+        account.password_hash = hash_password(new_password)
+        await self._repository.update(account)
 
     async def cleanup_expired_sessions(self, *, retention_days: int | None = None) -> int:
         """Delete sessions that expired more than `retention_days` ago.
