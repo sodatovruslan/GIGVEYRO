@@ -5,11 +5,16 @@
 .cardHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
 .cardHeader h2 { font: 700 17px/1.2 var(--font-display); }
 .cardHeader p { margin-top: 6px; color: var(--text-secondary); font-size: 13px; max-width: 480px; }
+.accountGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.accountGrid div { min-width: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-control); }
+.accountGrid dt { color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+.accountGrid dd { margin-top: 5px; overflow-wrap: anywhere; font-size: 13px; font-weight: 700; }
 .statusRow { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
 .statusBadge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .statusEnabled { color: var(--success-text); background: var(--success-soft); }
 .statusDisabled { color: var(--text-muted); background: var(--surface-control); }
 .meta { color: var(--text-muted); font-size: 12px; }
+.policyNotice { margin: 12px 0; padding: 11px 13px; border-radius: var(--radius-sm); color: var(--warning-text); background: var(--warning-soft); font-size: 12px; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .actions button { height: 40px; padding: 0 18px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; }
 .primaryButton, .dangerButton, .secondaryButton { height: 40px; padding: 0 18px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; }
@@ -17,6 +22,7 @@
 .primaryButton:hover:not(:disabled) { background: var(--primary-hover); }
 .dangerButton { color: var(--danger-text); background: var(--danger-soft); border: 1px solid var(--danger-border); }
 .secondaryButton { color: var(--text-primary); background: var(--surface-control); border: 1px solid var(--border); }
+.secondaryLink { display: inline-grid; place-items: center; min-height: 40px; padding: 0 18px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); background: var(--surface-control); font-size: 13px; font-weight: 700; text-decoration: none; }
 .primaryButton:disabled, .dangerButton:disabled, .secondaryButton:disabled { opacity: .6; cursor: wait; }
 .actions button:disabled { opacity: .6; cursor: wait; }
 .modalBackdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: var(--overlay); backdrop-filter: blur(7px); padding: 20px; }
@@ -43,3 +49,11 @@
 .sessionRow > div { display: grid; gap: 4px; }
 .sessionRow strong { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .currentBadge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--success-text); background: var(--success-soft); }
+@media (max-width: 620px) {
+  .card { padding: 18px; }
+  .cardHeader, .sessionRow { align-items: stretch; flex-direction: column; }
+  .accountGrid { grid-template-columns: 1fr; }
+  .formActions { flex-direction: column-reverse; }
+  .formActions button, .secondaryLink { width: 100%; }
+  .recoveryGrid { grid-template-columns: 1fr; }
+}

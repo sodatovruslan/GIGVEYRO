@@ -36,6 +36,7 @@ export interface TwoFactorSetupRequiredResponse {
 
 export interface TwoFactorStatus {
   enabled: boolean;
+  required: boolean;
   enabled_at: string | null;
   recovery_codes_remaining: number;
 }

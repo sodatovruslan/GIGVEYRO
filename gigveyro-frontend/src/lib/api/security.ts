@@ -28,4 +28,13 @@ export const securityApi = {
   revokeSession: (sessionId: string) =>
     apiFetch<void>(`/auth/sessions/${sessionId}`, { method: "DELETE" }),
   logoutAll: () => apiFetch<LogoutAllResult>("/auth/logout-all", { method: "POST" }),
+  changePassword: (currentPassword: string, newPassword: string, code?: string) =>
+    apiFetch<void>("/auth/password/change", {
+      method: "POST",
+      body: {
+        current_password: currentPassword,
+        new_password: newPassword,
+        code: code || null,
+      },
+    }),
 };
