@@ -97,6 +97,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="GigaPay API",
+    description=(
+        "Closed V1 API. USER and MERCHANT accounts are provisioned by OWNER through "
+        "the authenticated /owner/accounts API. Public registration is disabled by design."
+    ),
     version="0.1.0",
     docs_url="/docs" if settings.DOCS_ENABLED else None,
     redoc_url="/redoc" if settings.DOCS_ENABLED else None,
