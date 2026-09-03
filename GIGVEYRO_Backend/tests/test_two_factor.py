@@ -80,7 +80,7 @@ async def test_setup_start_returns_otpauth_uri_and_manual_key(client, make_accou
     assert response.status_code == 200
     body = response.json()
     assert body["otpauth_uri"].startswith("otpauth://totp/")
-    assert "GIGVEYRO" in body["otpauth_uri"]
+    assert "GigaPay" in body["otpauth_uri"]
     assert body["manual_key"]
 
 

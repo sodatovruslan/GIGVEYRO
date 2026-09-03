@@ -21,7 +21,7 @@ from app.repositories.two_factor import (
     TwoFactorRecoveryCodeRepository,
 )
 
-_ISSUER = "GIGVEYRO"
+_ISSUER = "GigaPay"
 # No ambiguous characters (0/O, 1/I/L) so codes are easy to transcribe by hand.
 _RECOVERY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
