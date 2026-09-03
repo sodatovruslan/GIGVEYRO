@@ -4,7 +4,8 @@
 .brand > span:last-child { display: grid; }
 .brand strong { font: 800 17px/1 var(--font-display); letter-spacing: .08em; }
 .brand small { margin-top: 5px; color: var(--text-muted); font-size: 8px; letter-spacing: .19em; }
-.logo { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 12px; color: var(--on-accent); background: linear-gradient(135deg, var(--primary), var(--accent-logo-deep)); box-shadow: 0 0 24px var(--primary-glow); font: 800 19px/1 var(--font-display); }
+.logo { width: 39px; height: 39px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; color: var(--on-accent); background: linear-gradient(135deg, var(--primary), var(--accent-logo-deep)); box-shadow: 0 0 24px var(--primary-glow); font: 800 19px/1 var(--font-display); }
+.logo img { width: 100%; height: 100%; object-fit: cover; }
 .nav { display: grid; gap: 5px; margin-top: 48px; }
 .nav p { padding: 0 12px 9px; color: var(--text-muted); font-size: 9px; font-weight: 700; letter-spacing: .16em; }
 .nav a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 13px; border-radius: 11px; color: var(--text-secondary); font-size: 13px; font-weight: 500; transition: color var(--transition), background var(--transition); }

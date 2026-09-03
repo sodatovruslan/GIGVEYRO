@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
@@ -55,8 +56,8 @@ export function DashboardShell({ role, children }: { role: UserRole; children: R
       {menuOpen && <button className={styles.backdrop} aria-label={t("closeMenu")} onClick={() => setMenuOpen(false)} />}
       <aside className={`${styles.sidebar} ${menuOpen ? styles.open : ""}`}>
         <Link href={`/${role}`} className={styles.brand} onClick={() => setMenuOpen(false)}>
-          <span className={styles.logo}>G</span>
-          <span><strong>GIGVEYRO</strong><small>{common("paymentGateway")}</small></span>
+          <span className={styles.logo}><Image src="/brand/gigapay-mark.png" alt="" width={39} height={39} /></span>
+          <span><strong>GigaPay</strong><small>{common("paymentGateway")}</small></span>
         </Link>
         <nav className={styles.nav} aria-label={t("workspace")}>
           <p>{t("workspace")}</p>

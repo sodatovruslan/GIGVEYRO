@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import QRCode from "qrcode";
@@ -170,7 +171,7 @@ export default function LoginPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "gigveyro-recovery-codes.txt";
+    link.download = "gigapay-recovery-codes.txt";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -181,8 +182,9 @@ export default function LoginPage() {
         <section className={styles.panel}>
           <div className={styles.preferences}><LanguageSwitcher /><ThemeSwitcher /></div>
           <div className={styles.brand}>
-            <div className={styles.logo}>G</div>
-            <div><strong>GIGVEYRO</strong><span>{common("paymentGateway")}</span></div>
+            <div className={styles.brandPlate}>
+              <Image src="/brand/gigapay-logo-horizontal.png" alt="GigaPay" width={672} height={378} priority />
+            </div>
           </div>
           <div className={styles.heading}>
             <span className={styles.eyebrow}>{t("eyebrow")}</span>
@@ -251,8 +253,9 @@ export default function LoginPage() {
         <section className={styles.panel}>
           <div className={styles.preferences}><LanguageSwitcher /><ThemeSwitcher /></div>
           <div className={styles.brand}>
-            <div className={styles.logo}>G</div>
-            <div><strong>GIGVEYRO</strong><span>{common("paymentGateway")}</span></div>
+            <div className={styles.brandPlate}>
+              <Image src="/brand/gigapay-logo-horizontal.png" alt="GigaPay" width={672} height={378} priority />
+            </div>
           </div>
           <div className={styles.heading}>
             <span className={styles.eyebrow}>{t("eyebrow")}</span>
@@ -304,8 +307,9 @@ export default function LoginPage() {
       <section className={styles.panel}>
         <div className={styles.preferences}><LanguageSwitcher /><ThemeSwitcher /></div>
         <div className={styles.brand}>
-          <div className={styles.logo}>G</div>
-          <div><strong>GIGVEYRO</strong><span>{common("paymentGateway")}</span></div>
+          <div className={styles.brandPlate}>
+            <Image src="/brand/gigapay-logo-horizontal.png" alt="GigaPay" width={672} height={378} priority />
+          </div>
         </div>
         <div className={styles.heading}>
           <span className={styles.eyebrow}>{t("eyebrow")}</span><h1>{t("welcome")}</h1><p>{t("subtitle")}</p>

@@ -180,7 +180,7 @@ export function SecuritySettingsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "gigveyro-recovery-codes.txt";
+    link.download = "gigapay-recovery-codes.txt";
     link.click();
     URL.revokeObjectURL(url);
   }
