@@ -8,7 +8,13 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.enums.account import UserRole
-from app.enums.deposit import CorrelationStatus, DepositAsset, DepositNetwork, DepositStatus
+from app.enums.deposit import (
+    CorrelationStatus,
+    DepositAsset,
+    DepositNetwork,
+    DepositStatus,
+    ReconciliationStatus,
+)
 from app.enums.notification import NotificationMessageKey, NotificationType
 from app.models.account import Account
 from app.models.deposit import Deposit, UnmatchedTransfer
@@ -200,7 +206,9 @@ class DepositService:
         self,
         *,
         correlation_status: CorrelationStatus | None,
+        reconciliation_status: ReconciliationStatus | None,
         tx_hash: str | None,
+        reason: str | None,
         date_from: datetime | None,
         date_to: datetime | None,
         min_amount: Decimal | None,
@@ -210,7 +218,9 @@ class DepositService:
     ) -> tuple[list[UnmatchedTransfer], int]:
         items = await self._deposits.list_unmatched(
             correlation_status=correlation_status,
+            reconciliation_status=reconciliation_status,
             tx_hash=tx_hash,
+            reason=reason,
             date_from=date_from,
             date_to=date_to,
             min_amount=min_amount,
@@ -220,7 +230,9 @@ class DepositService:
         )
         total = await self._deposits.count_unmatched(
             correlation_status=correlation_status,
+            reconciliation_status=reconciliation_status,
             tx_hash=tx_hash,
+            reason=reason,
             date_from=date_from,
             date_to=date_to,
             min_amount=min_amount,
@@ -263,7 +275,7 @@ class DepositService:
                 processed_count += 1
                 continue
 
-            existing_unmatched = await self._deposits.get_unmatched_by_provider_event_id(
+            existing_unmatched = await self._deposits.get_unmatched_by_provider_event_id_for_update(
                 tx.provider_event_id
             )
             if existing_unmatched is None:
@@ -271,6 +283,26 @@ class DepositService:
                     tx.tx_hash
                 )
             if existing_unmatched:
+                if (
+                    existing_unmatched.tx_hash == tx.tx_hash
+                    and existing_unmatched.amount == tx.amount
+                    and existing_unmatched.from_address == tx.from_address
+                    and existing_unmatched.to_address == tx.to_address
+                    and existing_unmatched.asset_contract == tx.asset_contract
+                ):
+                    existing_unmatched.confirmations = max(
+                        existing_unmatched.confirmations, tx.confirmations
+                    )
+                    existing_unmatched.is_finalized = (
+                        existing_unmatched.is_finalized or tx.is_finalized
+                    )
+                    existing_unmatched.block_number = (
+                        existing_unmatched.block_number or tx.block_number
+                    )
+                    existing_unmatched.block_timestamp = (
+                        existing_unmatched.block_timestamp or tx.timestamp
+                    )
+                    await self._deposits.save_unmatched(existing_unmatched)
                 continue
 
             waiting_deposits = await self._deposits.list_all(
@@ -295,7 +327,14 @@ class DepositService:
                         to_address=tx.to_address,
                         amount=tx.amount,
                         asset_contract=tx.asset_contract,
+                        provider=tx.provider,
+                        network=tx.network,
+                        confirmations=tx.confirmations,
+                        is_finalized=tx.is_finalized,
+                        block_number=tx.block_number,
+                        block_timestamp=tx.timestamp,
                         correlation_status=CorrelationStatus.UNMATCHED,
+                        reconciliation_status=ReconciliationStatus.PENDING,
                         reason="No WAITING Deposit Intent matching amount found",
                     )
                 )
@@ -308,7 +347,14 @@ class DepositService:
                         to_address=tx.to_address,
                         amount=tx.amount,
                         asset_contract=tx.asset_contract,
+                        provider=tx.provider,
+                        network=tx.network,
+                        confirmations=tx.confirmations,
+                        is_finalized=tx.is_finalized,
+                        block_number=tx.block_number,
+                        block_timestamp=tx.timestamp,
                         correlation_status=CorrelationStatus.AMBIGUOUS,
+                        reconciliation_status=ReconciliationStatus.PENDING,
                         reason=(
                             f"Ambiguous match: {len(matching_deps)} WAITING deposits "
                             "share the same amount"

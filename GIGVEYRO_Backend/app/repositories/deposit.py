@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -5,13 +6,29 @@ from decimal import Decimal
 from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enums.deposit import CorrelationStatus, DepositStatus
-from app.models.deposit import Deposit, UnmatchedTransfer
+from app.enums.deposit import (
+    CorrelationStatus,
+    DepositAsset,
+    DepositStatus,
+    ReconciliationStatus,
+)
+from app.models.deposit import Deposit, DepositReconciliationAction, UnmatchedTransfer
 
 
 class DepositRepository:
     def __init__(self, session: AsyncSession):
         self._session = session
+
+    @property
+    def session(self) -> AsyncSession:
+        return self._session
+
+    async def lock_reconciliation_idempotency(
+        self, actor_account_id: uuid.UUID, idempotency_key: str
+    ) -> None:
+        digest = hashlib.sha256(f"{actor_account_id}:{idempotency_key}".encode()).digest()
+        lock_id = int.from_bytes(digest[:8], "big", signed=True)
+        await self._session.execute(select(func.pg_advisory_xact_lock(lock_id)))
 
     async def get_by_id(self, deposit_id: uuid.UUID) -> Deposit | None:
         return await self._session.get(Deposit, deposit_id)
@@ -92,14 +109,84 @@ class DepositRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_unmatched_by_provider_event_id_for_update(
+        self, provider_event_id: str
+    ) -> UnmatchedTransfer | None:
+        result = await self._session.execute(
+            select(UnmatchedTransfer)
+            .where(UnmatchedTransfer.provider_event_id == provider_event_id)
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()
+
     async def get_unmatched_by_id(self, transfer_id: uuid.UUID) -> UnmatchedTransfer | None:
         return await self._session.get(UnmatchedTransfer, transfer_id)
+
+    async def get_unmatched_by_id_for_update(
+        self, transfer_id: uuid.UUID
+    ) -> UnmatchedTransfer | None:
+        result = await self._session.execute(
+            select(UnmatchedTransfer).where(UnmatchedTransfer.id == transfer_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    async def save_unmatched(self, transfer: UnmatchedTransfer) -> UnmatchedTransfer:
+        await self._session.flush()
+        await self._session.refresh(transfer)
+        return transfer
+
+    async def list_reconciliation_candidates(self, transfer: UnmatchedTransfer) -> list[Deposit]:
+        query = (
+            select(Deposit)
+            .where(
+                Deposit.status == DepositStatus.WAITING,
+                Deposit.asset == DepositAsset.USDT,
+                Deposit.network == transfer.network,
+                Deposit.deposit_address == transfer.to_address,
+                Deposit.expires_at > func.now(),
+            )
+            .order_by((Deposit.expected_amount == transfer.amount).desc(), Deposit.created_at.asc())
+            .limit(50)
+        )
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_reconciliation_action(
+        self, actor_account_id: uuid.UUID, idempotency_key: str
+    ) -> DepositReconciliationAction | None:
+        result = await self._session.execute(
+            select(DepositReconciliationAction).where(
+                DepositReconciliationAction.actor_account_id == actor_account_id,
+                DepositReconciliationAction.idempotency_key == idempotency_key,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def create_reconciliation_action(
+        self, action: DepositReconciliationAction
+    ) -> DepositReconciliationAction:
+        self._session.add(action)
+        await self._session.flush()
+        await self._session.refresh(action)
+        return action
+
+    async def list_reconciliation_actions(
+        self, transfer_id: uuid.UUID
+    ) -> list[DepositReconciliationAction]:
+        result = await self._session.execute(
+            select(DepositReconciliationAction)
+            .where(DepositReconciliationAction.transfer_id == transfer_id)
+            .order_by(DepositReconciliationAction.created_at.desc())
+        )
+        return list(result.scalars().all())
 
     async def list_unmatched(
         self,
         *,
         correlation_status: CorrelationStatus | None,
+        reconciliation_status: ReconciliationStatus | None,
         tx_hash: str | None,
+        reason: str | None,
         date_from: datetime | None,
         date_to: datetime | None,
         min_amount: Decimal | None,
@@ -110,7 +197,9 @@ class DepositRepository:
         query = self._filtered_unmatched(
             select(UnmatchedTransfer),
             correlation_status=correlation_status,
+            reconciliation_status=reconciliation_status,
             tx_hash=tx_hash,
+            reason=reason,
             date_from=date_from,
             date_to=date_to,
             min_amount=min_amount,
@@ -124,7 +213,9 @@ class DepositRepository:
         self,
         *,
         correlation_status: CorrelationStatus | None,
+        reconciliation_status: ReconciliationStatus | None,
         tx_hash: str | None,
+        reason: str | None,
         date_from: datetime | None,
         date_to: datetime | None,
         min_amount: Decimal | None,
@@ -133,7 +224,9 @@ class DepositRepository:
         query = self._filtered_unmatched(
             select(func.count()).select_from(UnmatchedTransfer),
             correlation_status=correlation_status,
+            reconciliation_status=reconciliation_status,
             tx_hash=tx_hash,
+            reason=reason,
             date_from=date_from,
             date_to=date_to,
             min_amount=min_amount,
@@ -147,7 +240,9 @@ class DepositRepository:
         query: Select,
         *,
         correlation_status: CorrelationStatus | None,
+        reconciliation_status: ReconciliationStatus | None,
         tx_hash: str | None,
+        reason: str | None,
         date_from: datetime | None,
         date_to: datetime | None,
         min_amount: Decimal | None,
@@ -155,8 +250,12 @@ class DepositRepository:
     ) -> Select:
         if correlation_status is not None:
             query = query.where(UnmatchedTransfer.correlation_status == correlation_status)
+        if reconciliation_status is not None:
+            query = query.where(UnmatchedTransfer.reconciliation_status == reconciliation_status)
         if tx_hash:
             query = query.where(UnmatchedTransfer.tx_hash.ilike(f"%{tx_hash}%"))
+        if reason:
+            query = query.where(UnmatchedTransfer.reason.ilike(f"%{reason}%"))
         if date_from is not None:
             query = query.where(UnmatchedTransfer.created_at >= date_from)
         if date_to is not None:

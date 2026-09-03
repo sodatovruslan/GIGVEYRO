@@ -1,9 +1,16 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from app.enums.deposit import CorrelationStatus, DepositAsset, DepositNetwork, DepositStatus
+from app.enums.deposit import (
+    CorrelationStatus,
+    DepositAsset,
+    DepositNetwork,
+    DepositStatus,
+    ReconciliationActionType,
+    ReconciliationStatus,
+)
 from app.schemas.common import Money
 
 
@@ -48,13 +55,82 @@ class UnmatchedTransferRead(BaseModel):
 
     id: uuid.UUID
     tx_hash: str
+    provider_event_id: str
+    provider: str
     from_address: str
     to_address: str
     amount: Money
     asset_contract: str
+    network: DepositNetwork
+    confirmations: int
+    is_finalized: bool
+    block_number: int | None
+    block_timestamp: datetime | None
     correlation_status: CorrelationStatus
+    reconciliation_status: ReconciliationStatus
     reason: str
+    linked_deposit_id: uuid.UUID | None
+    resolution_reason: str | None
+    last_result_code: str | None
+    resolved_at: datetime | None
     created_at: datetime
+    updated_at: datetime
+
+    @field_serializer("from_address")
+    def mask_sender(self, value: str) -> str:
+        if len(value) <= 12:
+            return "***"
+        return f"{value[:6]}…{value[-6:]}"
+
+
+class DepositCandidateRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    public_id: str
+    account_id: uuid.UUID
+    expected_amount: Money
+    network: DepositNetwork
+    asset: DepositAsset
+    status: DepositStatus
+    expires_at: datetime
+    amount_matches: bool
+    amount_difference: Money
+
+
+class DepositReconciliationActionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    action: ReconciliationActionType
+    deposit_id: uuid.UUID | None
+    result_code: str
+    created_at: datetime
+
+
+class UnmatchedTransferDetail(UnmatchedTransferRead):
+    candidates: list[DepositCandidateRead]
+    history: list[DepositReconciliationActionRead]
+
+
+class DepositReconciliationLink(BaseModel):
+    deposit_id: uuid.UUID
+    idempotency_key: str = Field(min_length=8, max_length=128)
+
+
+class DepositReconciliationCommand(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=128)
+
+
+class DepositReconciliationIgnore(DepositReconciliationCommand):
+    reason: str = Field(min_length=5, max_length=500)
+
+
+class DepositReconciliationResultRead(BaseModel):
+    result_code: str
+    replayed: bool
+    transfer: UnmatchedTransferRead
+    deposit: DepositRead | None
 
 
 class UnmatchedTransferListResponse(BaseModel):

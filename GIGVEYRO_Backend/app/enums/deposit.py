@@ -24,3 +24,18 @@ class CorrelationStatus(StrEnum):
     MATCHED = "MATCHED"
     AMBIGUOUS = "AMBIGUOUS"
     UNMATCHED = "UNMATCHED"
+
+
+class ReconciliationStatus(StrEnum):
+    PENDING = "PENDING"
+    LINKED = "LINKED"
+    REPROCESSED = "REPROCESSED"
+    IGNORED = "IGNORED"
+    CREDITED = "CREDITED"
+    FAILED = "FAILED"
+
+
+class ReconciliationActionType(StrEnum):
+    LINK = "LINK"
+    REPROCESS = "REPROCESS"
+    IGNORE = "IGNORE"
