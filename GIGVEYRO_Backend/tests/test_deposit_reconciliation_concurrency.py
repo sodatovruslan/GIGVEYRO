@@ -131,6 +131,19 @@ async def _ignore(owner_id, transfer_id, key):
             return type(exc).__name__
 
 
+async def _reprocess(owner_id, transfer_id, key):
+    async with AsyncSessionLocal() as session:
+        _, service = _services(session)
+        owner = await session.get(Account, owner_id)
+        try:
+            result = await service.reprocess(transfer_id, owner, key)
+            await session.commit()
+            return result.result_code
+        except Exception as exc:
+            await session.rollback()
+            return type(exc).__name__
+
+
 async def _verify_single_outcome(user_ids, deposit_ids, transfer_id):
     async with AsyncSessionLocal() as session:
         balance = await session.scalar(
@@ -203,6 +216,23 @@ async def test_ignore_vs_link_has_one_terminal_outcome_and_never_double_credits(
             (ReconciliationStatus.IGNORED, Decimal("0"), 0),
             (ReconciliationStatus.CREDITED, Decimal("80"), 1),
         }
+    finally:
+        await _cleanup(owner_id, user_ids, deposit_ids, transfer_id)
+
+
+async def test_reprocess_vs_link_credits_exact_candidate_once():
+    owner_id, user_ids, deposit_ids, transfer_id = await _setup(target_count=1)
+    try:
+        results = await asyncio.gather(
+            _reprocess(owner_id, transfer_id, "race-reprocess-link"),
+            _link(owner_id, transfer_id, deposit_ids[0], "race-direct-link"),
+        )
+        assert results.count("CREDITED") == 1
+        assert await _verify_single_outcome(user_ids, deposit_ids, transfer_id) == (
+            Decimal("80"),
+            1,
+            ReconciliationStatus.CREDITED,
+        )
     finally:
         await _cleanup(owner_id, user_ids, deposit_ids, transfer_id)
 
