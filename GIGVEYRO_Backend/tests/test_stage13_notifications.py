@@ -69,7 +69,7 @@ async def test_notification_preferences_and_deduplication(
     assert await service.process_outbox_batch() == 1
     assert len(provider.sent_messages) == 1
     assert provider.sent_messages[0].chat_id == 67890
-    assert provider.sent_messages[0].button_text == "Open in GIGVEYRO"
+    assert provider.sent_messages[0].button_text == "Open in GigaPay"
 
 
 def test_telegram_web_link_omits_localhost_and_preserves_public_https(monkeypatch):
