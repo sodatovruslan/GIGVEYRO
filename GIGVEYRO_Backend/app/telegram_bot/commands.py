@@ -25,6 +25,7 @@ from app.models.wallet import UserWallet
 from app.models.withdrawal import MerchantWithdrawal
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
+from app.services.notification_messages import render_notification_message
 from app.services.telegram import TelegramLinkError, TelegramService
 from app.telegram_bot.i18n import (
     SUPPORTED_LANGUAGES,
@@ -160,10 +161,18 @@ class TelegramCommandService:
         ).scalars().all()
         if not rows:
             return text(language, "none")
-        items = "\n".join(
-            f"• {notification_label(language, item.type)}" for item in rows
-        )
-        return text(language, "notifications", items=items)
+        items = []
+        for item in rows:
+            fallback = notification_label(language, item.type)
+            title, _ = render_notification_message(
+                language,
+                item.message_key,
+                item.message_params,
+                fallback_title=fallback,
+                fallback_message="",
+            )
+            items.append(f"• {title}")
+        return text(language, "notifications", items="\n".join(items))
 
     async def _status(self, account_id, role: UserRole, language: str) -> str:  # noqa: ANN001
         unread = await self.notifications.get_unread_count(account_id)

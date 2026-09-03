@@ -10,6 +10,7 @@ import { useAppFormat } from "@/features/i18n/use-app-format";
 import { useEnumLabels } from "@/features/i18n/use-enum-labels";
 import { useLocalizedError } from "@/features/i18n/use-localized-error";
 import { notificationLink } from "@/features/notifications/links";
+import { useNotificationMessage } from "@/features/notifications/messages";
 import { notificationsApi } from "@/lib/api/notifications";
 import type {
   NotificationItem,
@@ -42,6 +43,7 @@ export function NotificationsPage() {
   const labels = useEnumLabels();
   const format = useAppFormat();
   const localizeError = useLocalizedError();
+  const localizeNotification = useNotificationMessage();
   const [offset, setOffset] = useState(0);
   const list = useApiQuery(() => notificationsApi.list(PAGE_SIZE, offset), `notifications:${offset}`);
   const preferences = useApiQuery(notificationsApi.preferences, "notification-preferences");
@@ -110,7 +112,10 @@ export function NotificationsPage() {
           {list.loading ? <div className={styles.state}>{t("loading")}</div>
             : list.error ? <div className={`${styles.state} ${styles.errorText}`}>{list.error}</div>
             : !list.data?.length ? <div className={styles.state}>{t("empty")}</div>
-            : <>{list.data.map((item) => <button key={item.id} className={item.is_read ? styles.read : ""} onClick={() => void open(item)}><i /><div><span>{labels.notification(item.type)}</span><h2>{item.title}</h2><p>{item.message}</p><small>{format.dateTime(item.created_at)}</small></div></button>)}<Pager offset={offset} limit={PAGE_SIZE} itemCount={list.data.length} onPage={setOffset} /></>}
+            : <>{list.data.map((item) => {
+              const localized = localizeNotification(item);
+              return <button key={item.id} className={item.is_read ? styles.read : ""} onClick={() => void open(item)}><i /><div><span>{labels.notification(item.type)}</span><h2>{localized.title}</h2><p>{localized.message}</p><small>{format.dateTime(item.created_at)}</small></div></button>;
+            })}<Pager offset={offset} limit={PAGE_SIZE} itemCount={list.data.length} onPage={setOffset} /></>}
         </div>
         <aside className={styles.settings}>
           <h2>{t("settings")}</h2>

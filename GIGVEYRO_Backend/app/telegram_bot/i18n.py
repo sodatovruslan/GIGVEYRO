@@ -4,7 +4,7 @@ SUPPORTED_LANGUAGES = {"ru", "en", "tg"}
 
 _MESSAGES = {
     "ru": {
-        "welcome": "Добро пожаловать в GigaPay. Подключите Telegram в веб-кабинете.",
+        "welcome": "Добро пожаловать в GIGVEYRO. Подключите Telegram в веб-кабинете.",
         "linked": "Telegram успешно подключён.",
         "invalid_link": "Ссылка недействительна или истекла. Создайте новую в кабинете.",
         "unlinked": "Telegram не подключён. Используйте ссылку из веб-кабинета.",
@@ -28,11 +28,11 @@ _MESSAGES = {
         "risk": "Статус риска казначейства: {status}",
         "payouts": "Выплаты, требующие внимания: {count}",
         "appeals": "Открытые апелляции: {count}",
-        "details": "Откройте GigaPay для безопасного просмотра деталей.",
-        "open_web": "Открыть в GigaPay",
+        "details": "Откройте GIGVEYRO для безопасного просмотра деталей.",
+        "open_web": "Открыть в GIGVEYRO",
     },
     "en": {
-        "welcome": "Welcome to GigaPay. Connect Telegram in the authenticated web cabinet.",
+        "welcome": "Welcome to GIGVEYRO. Connect Telegram in the authenticated web cabinet.",
         "linked": "Telegram connected successfully.",
         "invalid_link": "This link is invalid or expired. Generate a new one in the cabinet.",
         "unlinked": "Telegram is not connected. Use the link from the web cabinet.",
@@ -56,11 +56,11 @@ _MESSAGES = {
         "risk": "Treasury risk status: {status}",
         "payouts": "Payouts requiring attention: {count}",
         "appeals": "Open appeals: {count}",
-        "details": "Open GigaPay to view details securely.",
-        "open_web": "Open in GigaPay",
+        "details": "Open GIGVEYRO to view details securely.",
+        "open_web": "Open in GIGVEYRO",
     },
     "tg": {
-        "welcome": "Хуш омадед ба GigaPay. Telegram-ро дар кабинети веб пайваст кунед.",
+        "welcome": "Хуш омадед ба GIGVEYRO. Telegram-ро дар кабинети веб пайваст кунед.",
         "linked": "Telegram бомуваффақият пайваст шуд.",
         "invalid_link": "Пайванд нодуруст ё муҳлаташ гузаштааст. Дар кабинет пайванди нав созед.",
         "unlinked": "Telegram пайваст нест. Пайвандро аз кабинети веб истифода баред.",
@@ -84,8 +84,8 @@ _MESSAGES = {
         "risk": "Вазъи хавфи хазина: {status}",
         "payouts": "Пардохтҳои ниёзманди таваҷҷуҳ: {count}",
         "appeals": "Шикоятҳои кушода: {count}",
-        "details": "Барои дидани бехатари тафсилот GigaPay-ро кушоед.",
-        "open_web": "Дар GigaPay кушодан",
+        "details": "Барои дидани бехатари тафсилот GIGVEYRO-ро кушоед.",
+        "open_web": "Дар GIGVEYRO кушодан",
     },
 }
 

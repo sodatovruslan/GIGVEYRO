@@ -488,6 +488,39 @@
     "deliveryStatuses": {"all":"Ҳама","PENDING":"Дар интизорӣ","SENT":"Расонида шуд","FAILED":"Хато"},
     "deliveryFailures": {"blocked":"Қабулкунанда ботро баст","chat_not_found":"Чат дастнорас аст","invalid_token":"Хатои танзими бот","invalid_config":"Хатои танзими расонидан","temporary_unavailable":"Telegram муваққатан дастнорас аст","unavailable":"Telegram дастнорас аст","rate_limited":"Маҳдудияти Telegram API","unknown":"Расонидан номуваффақ шуд"}
   },
+  "notificationMessages": {
+    "appeal": {
+      "opened":{"title":"Шикоят кушода шуд","body":"Барои муомилаи {reference} шикоят кушода шуд."},
+      "resolved":{"title":"Шикоят ҳал шуд","body":"Шикояти муомилаи {reference} ҳал шуд."}
+    },
+    "deposit":{"credited":{"title":"Амонат ворид шуд","body":"Амонати {reference} ба маблағи {amount} {currency} ворид шуд."}},
+    "withdrawal": {
+      "cancelled":{"title":"Бардошт бекор шуд","body":"Бардошти {reference} бекор шуд."},
+      "approved":{"title":"Бардошт тасдиқ шуд","body":"Бардошти {reference} тасдиқ шуд."},
+      "rejected":{"title":"Бардошт рад шуд","body":"Бардошти {reference} рад шуд."},
+      "completed":{"title":"Бардошт анҷом ёфт","body":"Бардошти {reference} анҷом ёфт."}
+    },
+    "fiat":{"balance_updated":{"title":"Тавозун нав шуд","body":"Тавозуни шумо ба {amount} {currency} тағйир дода шуд."}},
+    "security": {
+      "recovery_used":{"title":"Рамзи захиравӣ истифода шуд","body":"Барои воридшавӣ ба ҳисоби шумо рамзи захиравӣ истифода шуд."},
+      "2fa_enabled":{"title":"Санҷиши дуфакторӣ фаъол шуд","body":"Барои ҳисоби шумо санҷиши дуфакторӣ фаъол карда шуд."},
+      "2fa_disabled":{"title":"Санҷиши дуфакторӣ ғайрифаъол шуд","body":"Барои ҳисоби шумо санҷиши дуфакторӣ ғайрифаъол карда шуд."},
+      "recovery_regenerated":{"title":"Рамзҳои захиравӣ нав шуданд","body":"Рамзҳои нави захиравӣ сохта шуданд. Рамзҳои пешина дигар кор намекунанд."},
+      "password_changed":{"title":"Парол иваз шуд","body":"Пароли шумо иваз шуд. Сессияҳои дигари фаъол қатъ шуданд."},
+      "logout_all":{"title":"Сессияҳои дигар қатъ шуданд","body":"Сессияҳои дигари қатъшуда: {count}."},
+      "session_revoked":{"title":"Сессия қатъ шуд","body":"Сессияи фаъол аз танзимоти амниятӣ қатъ карда шуд."}
+    },
+    "payout": {
+      "approval_required":{"title":"Пардохт тасдиқ мехоҳад","body":"Пардохти {reference} тасдиқро интизор аст."},
+      "execution_failed":{"title":"Пардохт иҷро нашуд","body":"Пардохти {reference} анҷом дода нашуд."},
+      "reconciliation_required":{"title":"Санҷиши пардохт лозим аст","body":"Натиҷаи пардохти {reference} дар провайдер номуайян аст."}
+    },
+    "treasury": {
+      "warning":{"title":"Огоҳии хазина","body":"Вазъи хазина таваҷҷуҳ мехоҳад."},
+      "critical":{"title":"Хавфи ҷиддии хазина","body":"Вазъи хазина ҷиддӣ аст."},
+      "stale":{"title":"Маълумоти хазина куҳна шудааст","body":"Пеш аз қабули қарор маълумоти хазинаро нав кунед."}
+    }
+  },
   "analytics": {
     "eyebrow": "МАРКАЗИ ИДОРАКУНИИ СОҲИБ",
     "title": "Таҳлил",

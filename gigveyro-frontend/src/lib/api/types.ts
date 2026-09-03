@@ -348,6 +348,8 @@ export interface NotificationItem {
   type: string;
   title: string;
   message: string;
+  message_key: string | null;
+  message_params: Record<string, string | number | boolean | null> | null;
   payload: Record<string, unknown> | null;
   is_read: boolean;
   created_at: string;

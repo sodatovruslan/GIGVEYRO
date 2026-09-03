@@ -85,7 +85,7 @@ class AiogramTelegramProvider(TelegramProvider):
         if web_url:
             reply_markup = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text=button_text or "GigaPay", url=web_url)]
+                    [InlineKeyboardButton(text=button_text or "GIGVEYRO", url=web_url)]
                 ]
             )
         try:

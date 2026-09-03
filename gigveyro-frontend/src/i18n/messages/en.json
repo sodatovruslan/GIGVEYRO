@@ -488,6 +488,39 @@
     "deliveryStatuses": {"all":"All","PENDING":"Pending","SENT":"Delivered","FAILED":"Failed"},
     "deliveryFailures": {"blocked":"The recipient blocked the bot","chat_not_found":"Chat is unavailable","invalid_token":"Bot configuration error","invalid_config":"Delivery configuration error","temporary_unavailable":"Telegram is temporarily unavailable","unavailable":"Telegram is unavailable","rate_limited":"Telegram API rate limit","unknown":"Delivery failed"}
   },
+  "notificationMessages": {
+    "appeal": {
+      "opened": {"title":"Appeal opened","body":"An appeal was opened for deal {reference}."},
+      "resolved": {"title":"Appeal resolved","body":"The appeal for deal {reference} was resolved."}
+    },
+    "deposit": {"credited":{"title":"Deposit credited","body":"Deposit {reference} for {amount} {currency} was credited."}},
+    "withdrawal": {
+      "cancelled":{"title":"Withdrawal cancelled","body":"Withdrawal {reference} was cancelled."},
+      "approved":{"title":"Withdrawal approved","body":"Withdrawal {reference} was approved."},
+      "rejected":{"title":"Withdrawal rejected","body":"Withdrawal {reference} was rejected."},
+      "completed":{"title":"Withdrawal completed","body":"Withdrawal {reference} was completed."}
+    },
+    "fiat": {"balance_updated":{"title":"Balance updated","body":"Your balance was updated by {amount} {currency}."}},
+    "security": {
+      "recovery_used":{"title":"Recovery code used","body":"A recovery code was used to sign in to your account."},
+      "2fa_enabled":{"title":"Two-factor authentication enabled","body":"Two-factor authentication was enabled on your account."},
+      "2fa_disabled":{"title":"Two-factor authentication disabled","body":"Two-factor authentication was disabled on your account."},
+      "recovery_regenerated":{"title":"Recovery codes regenerated","body":"New recovery codes were generated. Previous codes no longer work."},
+      "password_changed":{"title":"Password changed","body":"Your password was changed. Other active sessions were signed out."},
+      "logout_all":{"title":"Other sessions signed out","body":"Other active sessions signed out: {count}."},
+      "session_revoked":{"title":"Session signed out","body":"An active session was signed out from your security settings."}
+    },
+    "payout": {
+      "approval_required":{"title":"Payout requires approval","body":"Payout {reference} requires approval."},
+      "execution_failed":{"title":"Payout execution failed","body":"Payout {reference} could not be completed."},
+      "reconciliation_required":{"title":"Payout requires reconciliation","body":"Payout {reference} has an uncertain provider result."}
+    },
+    "treasury": {
+      "warning":{"title":"Treasury risk warning","body":"Treasury health requires attention."},
+      "critical":{"title":"Critical treasury risk","body":"Treasury health is in a critical state."},
+      "stale":{"title":"Treasury data is stale","body":"Treasury data must be refreshed before making decisions."}
+    }
+  },
   "analytics": {
     "eyebrow": "OWNER CONTROL CENTER",
     "title": "Analytics",
