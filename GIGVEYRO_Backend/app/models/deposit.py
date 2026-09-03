@@ -62,7 +62,10 @@ class Deposit(Base):
     credited_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
 
     deposit_address: Mapped[str] = mapped_column(String(128), nullable=False)
-    tx_hash: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    tx_hash: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    provider_event_id: Mapped[str | None] = mapped_column(
+        String(192), unique=True, nullable=True, index=True
+    )
 
     confirmations: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
@@ -104,7 +107,10 @@ class UnmatchedTransfer(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    tx_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    tx_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    provider_event_id: Mapped[str] = mapped_column(
+        String(192), unique=True, nullable=False, index=True
+    )
     from_address: Mapped[str] = mapped_column(String(128), nullable=False)
     to_address: Mapped[str] = mapped_column(String(128), nullable=False)
     amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)

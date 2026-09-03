@@ -146,14 +146,19 @@ class Settings(BaseSettings):
 
     # USDT TRC20 & TRON Settings
     USDT_TRC20_CONTRACT_ADDRESS: str = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+    USDT_TRC20_DECIMALS: int = 6
     USDT_TRC20_DEPOSIT_ADDRESS: str = "TMOCK_GIGVEYRO_DEPOSIT_ADDRESS"
     DEPOSIT_TTL_MINUTES: int = 30
     TRC20_REQUIRED_CONFIRMATIONS: int = 20
 
     # TRON / TRC20 Real-shaped Read-Only Provider Settings
     TRONGRID_API_URL: str = "https://api.trongrid.io"
-    TRONGRID_API_KEY: str = ""
+    TRONGRID_API_KEY: SecretStr = SecretStr("")
     TRON_SCANNER_TIMEOUT_SECONDS: float = 10.0
+    TRONGRID_MAX_RETRIES: int = 2
+    TRONGRID_PAGE_SIZE: int = 100
+    TRONGRID_MAX_PAGES: int = 10
+    TRONGRID_SCAN_OVERLAP_SECONDS: int = 300
 
     # Payout Provider Settings
     PAYOUT_API_URL: str = "https://api.payout-provider-mock.internal"
@@ -316,6 +321,27 @@ class Settings(BaseSettings):
         if not self.MARKET_DATA_SYMBOLS:
             raise ValueError("MARKET_DATA_SYMBOLS must not be empty")
         self.MARKET_DATA_SYMBOLS = [symbol.upper() for symbol in self.MARKET_DATA_SYMBOLS]
+        return self
+
+    @model_validator(mode="after")
+    def validate_trongrid_settings(self) -> "Settings":
+        if self.DEPOSIT_PROVIDER_TYPE not in {"mock", "trongrid"}:
+            raise ValueError("DEPOSIT_PROVIDER_TYPE must be 'mock' or 'trongrid'")
+        if self.DEPOSIT_PROVIDER_TYPE == "trongrid":
+            if not self.TRONGRID_API_URL.startswith("https://"):
+                raise ValueError("TRONGRID_API_URL must use HTTPS")
+            if self.APP_ENV == "production" and not self.TRONGRID_API_KEY.get_secret_value():
+                raise ValueError("TRONGRID_API_KEY is required in production")
+        if not 1 <= self.TRONGRID_PAGE_SIZE <= 200:
+            raise ValueError("TRONGRID_PAGE_SIZE must be between 1 and 200")
+        if not 1 <= self.TRONGRID_MAX_PAGES <= 100:
+            raise ValueError("TRONGRID_MAX_PAGES must be between 1 and 100")
+        if not 0 <= self.TRONGRID_MAX_RETRIES <= 5:
+            raise ValueError("TRONGRID_MAX_RETRIES must be between 0 and 5")
+        if not 0 <= self.TRONGRID_SCAN_OVERLAP_SECONDS <= 3600:
+            raise ValueError("TRONGRID_SCAN_OVERLAP_SECONDS must be between 0 and 3600")
+        if self.USDT_TRC20_DECIMALS != 6:
+            raise ValueError("USDT_TRC20_DECIMALS must remain 6")
         return self
 
     @model_validator(mode="after")

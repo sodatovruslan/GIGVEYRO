@@ -164,3 +164,18 @@ Worker metrics exposed at `/metrics` (Prometheus):
 | `gigveyro_outbox_pending_total` | Pending notification outbox gauge |
 | `gigveyro_deposit_scan_errors_total` | Deposit scanner provider errors |
 | `gigveyro_provider_errors_total{provider}` | External provider failures |
+
+### TronGrid scanner production notes
+
+- Confirmed-only account history is filtered to the exact USDT contract and destination.
+- Fingerprint pagination is bounded; repeated cursors and incomplete scans fail closed.
+- Transaction event indexes form `trongrid:<txid>:<event_index>` idempotency keys, so multiple
+  `Transfer` events in one transaction are supported.
+- A Redis timestamp watermark is advanced only after the database commit. Every scan replays a
+  configured overlap; a missing watermark replays the active deposit-intent lifetime.
+- The provider issues read-only `GET` requests and has no signing or fund-movement capability.
+
+Additional metrics are `deposit_scanner_requests_total`, `deposit_scanner_events_total`,
+`deposit_scanner_latency_seconds`, and `deposit_scanner_rate_limits_total`, all labelled by
+provider (and outcome where applicable). Operational details are in
+`GIGVEYRO_Backend/docs/integrations/trongrid-deposits.md`.

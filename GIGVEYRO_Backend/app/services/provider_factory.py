@@ -2,7 +2,6 @@ from app.core.config import settings
 from app.services.deposit_provider import (
     CryptoDepositProvider,
     MockTRC20DepositProvider,
-    TronGridTRC20DepositProvider,
 )
 from app.services.exchange_rate import (
     ConfiguredExchangeRateProvider,
@@ -10,6 +9,7 @@ from app.services.exchange_rate import (
     ExternalExchangeRateProvider,
     FallbackExchangeRateProvider,
 )
+from app.services.trongrid_provider import TronGridTRC20DepositProvider, trongrid_diagnostics
 
 
 def get_deposit_provider() -> CryptoDepositProvider:
@@ -48,7 +48,7 @@ def get_provider_diagnostics() -> dict:
         "payout_live_provider_available": False,
         "payout_enabled": settings.PAYOUT_ENABLED,
         "allow_mock_in_production": settings.ALLOW_MOCK_PROVIDERS_IN_PRODUCTION,
-        "trongrid_configured": bool(settings.TRONGRID_API_KEY),
+        "trongrid": trongrid_diagnostics(),
         "payout_api_configured": bool(settings.PAYOUT_API_KEY),
         "market_data_primary": settings.MARKET_DATA_PRIMARY,
         "market_data_secondary": settings.MARKET_DATA_SECONDARY,

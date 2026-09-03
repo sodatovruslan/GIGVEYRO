@@ -83,21 +83,50 @@ async def test_negative_confirmations_rejected_by_db(make_account, db_session):
             await db_session.flush()
 
 
-async def test_duplicate_tx_hash_rejected_by_db(make_account, db_session):
+async def test_duplicate_provider_event_id_rejected_by_db(make_account, db_session):
     user = await make_account(role=UserRole.USER)
     shared_tx_hash = "dup_db_level_tx"
+    shared_event_id = f"trongrid:{shared_tx_hash}:0"
 
-    first = Deposit(**_base_kwargs(user.id), expected_amount=Decimal("100"), tx_hash=shared_tx_hash)
+    first = Deposit(
+        **_base_kwargs(user.id),
+        expected_amount=Decimal("100"),
+        tx_hash=shared_tx_hash,
+        provider_event_id=shared_event_id,
+    )
     db_session.add(first)
     await db_session.flush()
 
     async with db_session.begin_nested():
         second = Deposit(
-            **_base_kwargs(user.id), expected_amount=Decimal("50"), tx_hash=shared_tx_hash
+            **_base_kwargs(user.id),
+            expected_amount=Decimal("50"),
+            tx_hash=shared_tx_hash,
+            provider_event_id=shared_event_id,
         )
         db_session.add(second)
         with pytest.raises(IntegrityError):
             await db_session.flush()
+
+
+async def test_same_tx_hash_with_distinct_event_ids_allowed(make_account, db_session):
+    user = await make_account(role=UserRole.USER)
+    shared_tx_hash = "multi_event_tx"
+    first = Deposit(
+        **_base_kwargs(user.id),
+        expected_amount=Decimal("100"),
+        tx_hash=shared_tx_hash,
+        provider_event_id=f"trongrid:{shared_tx_hash}:3",
+    )
+    second = Deposit(
+        **_base_kwargs(user.id),
+        expected_amount=Decimal("50"),
+        tx_hash=shared_tx_hash,
+        provider_event_id=f"trongrid:{shared_tx_hash}:4",
+    )
+    db_session.add_all([first, second])
+
+    await db_session.flush()
 
 
 async def test_multiple_null_tx_hash_allowed(make_account, db_session):

@@ -76,6 +76,26 @@ if _PROMETHEUS_AVAILABLE:
         "gigveyro_deposit_events_unmatched_total",
         "Total deposit events unmatched",
     )
+    DEPOSIT_SCANNER_REQUESTS = Counter(
+        "deposit_scanner_requests_total",
+        "Read-only deposit scanner provider request outcomes",
+        labelnames=["provider", "status"],
+    )
+    DEPOSIT_SCANNER_EVENTS = Counter(
+        "deposit_scanner_events_total",
+        "Deposit scanner provider event normalization outcomes",
+        labelnames=["provider", "result"],
+    )
+    DEPOSIT_SCANNER_LATENCY = Histogram(
+        "deposit_scanner_latency_seconds",
+        "Deposit scanner provider scan latency",
+        labelnames=["provider"],
+    )
+    DEPOSIT_SCANNER_RATE_LIMITS = Counter(
+        "deposit_scanner_rate_limits_total",
+        "Deposit scanner provider rate-limit responses",
+        labelnames=["provider"],
+    )
 
     # ── Worker & General Metrics
     WORKER_JOBS = Counter(
@@ -207,6 +227,10 @@ else:
     DEPOSIT_EVENTS_SEEN = _NoopMetric()  # type: ignore[assignment]
     DEPOSIT_EVENTS_CORRELATED = _NoopMetric()  # type: ignore[assignment]
     DEPOSIT_EVENTS_UNMATCHED = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_SCANNER_REQUESTS = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_SCANNER_EVENTS = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_SCANNER_LATENCY = _NoopMetric()  # type: ignore[assignment]
+    DEPOSIT_SCANNER_RATE_LIMITS = _NoopMetric()  # type: ignore[assignment]
     WORKER_JOBS = _NoopMetric()  # type: ignore[assignment]
     PROVIDER_ERRORS = _NoopMetric()  # type: ignore[assignment]
     MARKET_PROVIDER_REQUESTS = _NoopMetric()  # type: ignore[assignment]
@@ -298,6 +322,22 @@ def record_worker_failure(job_name: str) -> None:
 def record_deposit_scan_error() -> None:
     """Record a deposit scanner provider error."""
     DEPOSIT_SCAN_ERRORS.inc()
+
+
+def record_deposit_scanner_request(provider: str, status: str) -> None:
+    DEPOSIT_SCANNER_REQUESTS.labels(provider=provider, status=status).inc()
+
+
+def record_deposit_scanner_event(provider: str, result: str) -> None:
+    DEPOSIT_SCANNER_EVENTS.labels(provider=provider, result=result).inc()
+
+
+def observe_deposit_scanner_latency(provider: str, latency_seconds: float) -> None:
+    DEPOSIT_SCANNER_LATENCY.labels(provider=provider).observe(latency_seconds)
+
+
+def record_deposit_scanner_rate_limit(provider: str) -> None:
+    DEPOSIT_SCANNER_RATE_LIMITS.labels(provider=provider).inc()
 
 
 def record_provider_error(provider: str) -> None:

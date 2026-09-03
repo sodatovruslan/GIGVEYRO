@@ -28,6 +28,7 @@ def _production_settings(**overrides) -> Settings:
         "CORS_ALLOWED_ORIGINS": ["https://example.com"],
         "ALLOWED_HOSTS": ["example.com"],
         "DEPOSIT_PROVIDER_TYPE": "trongrid",
+        "TRONGRID_API_KEY": "test-trongrid-read-only-key",
         "PAYOUT_ENABLED": False,
         "PAYOUT_PROVIDER_MODE": "disabled",
         "ALLOW_MOCK_PROVIDERS_IN_PRODUCTION": False,
@@ -267,6 +268,11 @@ class TestDepositScannerSafety:
 
         provider = MagicMock()
         provider.get_deposit_address.return_value = "test-deposit-address"
+        provider.last_scan_upper_timestamp_ms = 1_700_000_123_456
+        provider.aclose = AsyncMock()
+        watermark_store = MagicMock()
+        watermark_store.get = AsyncMock(return_value=None)
+        watermark_store.set = AsyncMock()
         service = MagicMock()
         service.scan_and_correlate_deposits = AsyncMock(return_value=2)
 
@@ -281,10 +287,43 @@ class TestDepositScannerSafety:
             ),
             patch("app.workers.jobs.deposit_scanner.DepositService", return_value=service),
         ):
-            result = await _run_scan("scanner-test", 1)
+            result = await _run_scan(
+                "scanner-test", 1, watermark_store=watermark_store
+            )
 
         assert result == {"status": "ok", "processed": 2}
         session.commit.assert_awaited_once()
+        watermark_store.set.assert_awaited_once()
+        provider.aclose.assert_awaited_once()
+
+    async def test_deposit_scanner_uses_redis_watermark_with_overlap(self):
+        from app.workers.jobs.deposit_scanner import _scan_lower_bound
+
+        watermark_store = MagicMock()
+        watermark_store.get = AsyncMock(return_value=b"1700000000000")
+        with patch("app.workers.jobs.deposit_scanner.settings") as scanner_settings:
+            scanner_settings.TRONGRID_SCAN_OVERLAP_SECONDS = 300
+            lower_bound = await _scan_lower_bound(watermark_store)
+
+        assert lower_bound == 1_699_999_700_000
+
+    async def test_deposit_scanner_missing_watermark_replays_active_intent_window(self):
+        from app.workers.jobs.deposit_scanner import _scan_lower_bound
+
+        watermark_store = MagicMock()
+        watermark_store.get = AsyncMock(return_value=None)
+        with (
+            patch("app.workers.jobs.deposit_scanner.settings") as scanner_settings,
+            patch(
+                "app.workers.jobs.deposit_scanner.time.time_ns",
+                return_value=2_000_000_000_000_000,
+            ),
+        ):
+            scanner_settings.TRONGRID_SCAN_OVERLAP_SECONDS = 300
+            scanner_settings.DEPOSIT_TTL_MINUTES = 30
+            lower_bound = await _scan_lower_bound(watermark_store)
+
+        assert lower_bound == 1_997_900_000
 
 
 class TestWorkerSettings:

@@ -28,6 +28,8 @@ def _tx(
     to_address: str | None = None,
     is_success: bool = True,
     asset_contract: str | None = None,
+    event_index: int = 0,
+    is_finalized: bool = True,
 ) -> OnChainTransactionDTO:
     return OnChainTransactionDTO(
         tx_hash=tx_hash,
@@ -39,6 +41,8 @@ def _tx(
         confirmations=confirmations,
         is_success=is_success,
         timestamp=datetime.now(UTC),
+        event_index=event_index,
+        is_finalized=is_finalized,
     )
 
 
@@ -149,6 +153,23 @@ async def test_scan_skips_failed_transactions(
     assert deposit.status == DepositStatus.WAITING
 
 
+async def test_scan_skips_unfinalized_transactions(
+    db_session: AsyncSession, make_account, make_wallet, make_deposit, make_deposit_service
+):
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user)
+    deposit = await make_deposit(user, expected_amount=Decimal("30"))
+
+    provider = MockTRC20DepositProvider()
+    provider.add_simulated_tx(
+        _tx(tx_hash="tx-unfinalized-1", amount=Decimal("30"), is_finalized=False)
+    )
+
+    assert await make_deposit_service(provider).scan_and_correlate_deposits() == 0
+    await db_session.refresh(deposit)
+    assert deposit.status == DepositStatus.WAITING
+
+
 async def test_scan_skips_wrong_contract_address(
     db_session: AsyncSession, make_account, make_wallet, make_deposit, make_deposit_service
 ):
@@ -192,3 +213,30 @@ async def test_scan_does_not_double_credit_when_run_twice_for_same_tx(
         )
     ).scalars().all()
     assert len(ledger_entries) == 1
+
+
+async def test_scan_tracks_multiple_transfer_events_in_one_transaction(
+    db_session: AsyncSession, make_account, make_wallet, make_deposit, make_deposit_service
+):
+    user_a = await make_account(role=UserRole.USER)
+    await make_wallet(user_a)
+    deposit_a = await make_deposit(user_a, expected_amount=Decimal("41"))
+    user_b = await make_account(role=UserRole.USER)
+    await make_wallet(user_b)
+    deposit_b = await make_deposit(user_b, expected_amount=Decimal("42"))
+
+    provider = MockTRC20DepositProvider()
+    provider.add_simulated_tx(
+        _tx(tx_hash="same-chain-tx", amount=Decimal("41"), event_index=3)
+    )
+    provider.add_simulated_tx(
+        _tx(tx_hash="same-chain-tx", amount=Decimal("42"), event_index=4)
+    )
+
+    assert await make_deposit_service(provider).scan_and_correlate_deposits() == 2
+    await db_session.refresh(deposit_a)
+    await db_session.refresh(deposit_b)
+    assert deposit_a.status == DepositStatus.CREDITED
+    assert deposit_b.status == DepositStatus.CREDITED
+    assert deposit_a.provider_event_id.endswith(":3")
+    assert deposit_b.provider_event_id.endswith(":4")

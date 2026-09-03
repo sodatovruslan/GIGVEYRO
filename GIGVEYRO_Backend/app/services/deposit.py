@@ -228,22 +228,27 @@ class DepositService:
         )
         return items, total
 
-    async def scan_and_correlate_deposits(self) -> int:
+    async def scan_and_correlate_deposits(self, *, min_timestamp_ms: int | None = None) -> int:
         """Scan recent on-chain transfers and correlate them with active deposit intents."""
         await self._deposits.expire_stale_waiting()
         address = self._provider.get_deposit_address()
-        recent_txs = await self._provider.fetch_recent_transactions(address)
+        recent_txs = await self._provider.fetch_recent_transactions(
+            address, min_timestamp_ms=min_timestamp_ms
+        )
 
         processed_count = 0
         for tx in recent_txs:
-            if not tx.is_success:
+            if not tx.is_success or not tx.is_finalized:
                 continue
             if tx.asset_contract != settings.USDT_TRC20_CONTRACT_ADDRESS:
                 continue
             if tx.to_address != address:
                 continue
 
-            existing_dep = await self._deposits.get_by_tx_hash(tx.tx_hash)
+            existing_dep = await self._deposits.get_by_provider_event_id(tx.provider_event_id)
+            if existing_dep is None:
+                # Compatibility with deposits recorded before provider-event identity existed.
+                existing_dep = await self._deposits.get_legacy_by_tx_hash(tx.tx_hash)
             if existing_dep:
                 await self.ingest_transaction_event(
                     deposit_id=existing_dep.id,
@@ -253,11 +258,18 @@ class DepositService:
                     network=tx.network,
                     asset=DepositAsset.USDT,
                     destination_address=tx.to_address,
+                    provider_event_id=tx.provider_event_id,
                 )
                 processed_count += 1
                 continue
 
-            existing_unmatched = await self._deposits.get_unmatched_by_tx_hash(tx.tx_hash)
+            existing_unmatched = await self._deposits.get_unmatched_by_provider_event_id(
+                tx.provider_event_id
+            )
+            if existing_unmatched is None:
+                existing_unmatched = await self._deposits.get_legacy_unmatched_by_tx_hash(
+                    tx.tx_hash
+                )
             if existing_unmatched:
                 continue
 
@@ -278,6 +290,7 @@ class DepositService:
                 await self._deposits.create_unmatched_transfer(
                     UnmatchedTransfer(
                         tx_hash=tx.tx_hash,
+                        provider_event_id=tx.provider_event_id,
                         from_address=tx.from_address,
                         to_address=tx.to_address,
                         amount=tx.amount,
@@ -290,6 +303,7 @@ class DepositService:
                 await self._deposits.create_unmatched_transfer(
                     UnmatchedTransfer(
                         tx_hash=tx.tx_hash,
+                        provider_event_id=tx.provider_event_id,
                         from_address=tx.from_address,
                         to_address=tx.to_address,
                         amount=tx.amount,
@@ -312,6 +326,7 @@ class DepositService:
                         network=tx.network,
                         asset=DepositAsset.USDT,
                         destination_address=tx.to_address,
+                        provider_event_id=tx.provider_event_id,
                     )
                     processed_count += 1
                 except (InvalidTransactionError, DuplicateTransactionError) as exc:
@@ -329,6 +344,7 @@ class DepositService:
         network: DepositNetwork,
         asset: DepositAsset,
         destination_address: str,
+        provider_event_id: str | None = None,
     ) -> Deposit:
         deposit = await self._deposits.get_by_id_for_update(deposit_id)
         if deposit is None:
@@ -351,12 +367,14 @@ class DepositService:
         if not amount.is_finite() or amount <= 0:
             raise InvalidTransactionError("invalid amount")
 
+        normalized_event_id = provider_event_id or f"legacy:{tx_hash}:0"
         if deposit.tx_hash is None:
-            existing = await self._deposits.get_by_tx_hash(tx_hash)
+            existing = await self._deposits.get_by_provider_event_id(normalized_event_id)
             if existing is not None:
-                raise DuplicateTransactionError("this transaction has already been used")
+                raise DuplicateTransactionError("this provider event has already been used")
 
             deposit.tx_hash = tx_hash
+            deposit.provider_event_id = normalized_event_id
             deposit.received_amount = amount
             deposit.detected_at = datetime.now(UTC)
             deposit.confirmations = max(deposit.confirmations, confirmations)
@@ -373,6 +391,11 @@ class DepositService:
                 raise InvalidTransactionError(
                     "tx_hash does not match the transaction already recorded for this deposit"
                 )
+            if deposit.provider_event_id not in {None, normalized_event_id}:
+                raise InvalidTransactionError(
+                    "provider event does not match the event already recorded for this deposit"
+                )
+            deposit.provider_event_id = normalized_event_id
             deposit.confirmations = max(deposit.confirmations, confirmations)
 
         if deposit.status == DepositStatus.DETECTED and deposit.confirmations > 0:

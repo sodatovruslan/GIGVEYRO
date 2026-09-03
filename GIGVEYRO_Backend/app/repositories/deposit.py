@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.deposit import CorrelationStatus, DepositStatus
@@ -23,7 +23,29 @@ class DepositRepository:
         return result.scalar_one_or_none()
 
     async def get_by_tx_hash(self, tx_hash: str) -> Deposit | None:
-        result = await self._session.execute(select(Deposit).where(Deposit.tx_hash == tx_hash))
+        result = await self._session.execute(
+            select(Deposit).where(Deposit.tx_hash == tx_hash).limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_legacy_by_tx_hash(self, tx_hash: str) -> Deposit | None:
+        result = await self._session.execute(
+            select(Deposit)
+            .where(
+                Deposit.tx_hash == tx_hash,
+                or_(
+                    Deposit.provider_event_id.is_(None),
+                    Deposit.provider_event_id.like("legacy:%"),
+                ),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_provider_event_id(self, provider_event_id: str) -> Deposit | None:
+        result = await self._session.execute(
+            select(Deposit).where(Deposit.provider_event_id == provider_event_id)
+        )
         return result.scalar_one_or_none()
 
     async def create(self, deposit: Deposit) -> Deposit:
@@ -45,7 +67,28 @@ class DepositRepository:
 
     async def get_unmatched_by_tx_hash(self, tx_hash: str) -> UnmatchedTransfer | None:
         result = await self._session.execute(
-            select(UnmatchedTransfer).where(UnmatchedTransfer.tx_hash == tx_hash)
+            select(UnmatchedTransfer).where(UnmatchedTransfer.tx_hash == tx_hash).limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_legacy_unmatched_by_tx_hash(self, tx_hash: str) -> UnmatchedTransfer | None:
+        result = await self._session.execute(
+            select(UnmatchedTransfer)
+            .where(
+                UnmatchedTransfer.tx_hash == tx_hash,
+                UnmatchedTransfer.provider_event_id.like("legacy:%"),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_unmatched_by_provider_event_id(
+        self, provider_event_id: str
+    ) -> UnmatchedTransfer | None:
+        result = await self._session.execute(
+            select(UnmatchedTransfer).where(
+                UnmatchedTransfer.provider_event_id == provider_event_id
+            )
         )
         return result.scalar_one_or_none()
 

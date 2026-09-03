@@ -10,7 +10,7 @@ STRICT SAFETY RULES:
   - READ-ONLY provider calls only (fetch_recent_transactions)
   - NO private keys, NO transaction signing, NO fund movement
   - Provider in mock mode → safe no-op (no blockchain calls)
-  - Idempotent: duplicate tx_hash is rejected by DB unique constraint
+  - Idempotent: each provider transaction event has a stable unique identity
   - Uses distributed lock to prevent concurrent scanner runs
 
 Schedule: every SCAN_INTERVAL_SECONDS (default 60s via cron).
@@ -19,6 +19,8 @@ Schedule: every SCAN_INTERVAL_SECONDS (default 60s via cron).
 from __future__ import annotations
 
 import logging
+import time
+from typing import Any
 
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
@@ -47,6 +49,7 @@ JOB_NAME = "deposit_scanner"
 LOCK_NAME = "deposit_scanner_singleton"
 # Lock TTL = scan interval + 10s buffer, in milliseconds
 LOCK_TTL_MS = (settings.SCAN_INTERVAL_SECONDS + 10) * 1000
+WATERMARK_KEY = f"{settings.REDIS_KEY_PREFIX}:deposit_scanner:watermark_ms"
 
 
 async def scan_deposits(ctx: dict) -> dict:
@@ -95,15 +98,16 @@ async def scan_deposits(ctx: dict) -> dict:
             )
             return {"status": "skipped", "reason": "lock_held"}
 
-        return await _run_scan(job_id, attempt)
+        return await _run_scan(job_id, attempt, watermark_store=redis)
 
 
-async def _run_scan(job_id: str, attempt: int) -> dict:
+async def _run_scan(job_id: str, attempt: int, *, watermark_store: Any | None = None) -> dict:
     """Execute the deposit scan within the distributed lock."""
     provider = get_deposit_provider()
-    deposit_address = provider.get_deposit_address()
 
     try:
+        provider.get_deposit_address()  # fail closed before opening a database transaction
+        min_timestamp_ms = await _scan_lower_bound(watermark_store)
         async with AsyncSessionLocal() as session:
             account_repo = AccountRepository(session)
             wallet_service = WalletService(
@@ -123,17 +127,22 @@ async def _run_scan(job_id: str, attempt: int) -> dict:
                 provider=provider,
                 notification_service=notification_service,
             )
-            processed = await service.scan_and_correlate_deposits()
+            processed = await service.scan_and_correlate_deposits(
+                min_timestamp_ms=min_timestamp_ms
+            )
             await session.commit()
+
+        upper_timestamp_ms = provider.last_scan_upper_timestamp_ms
+        if watermark_store is not None and upper_timestamp_ms is not None:
+            await watermark_store.set(WATERMARK_KEY, str(upper_timestamp_ms))
 
         record_worker_success(JOB_NAME)
         logger.info(
-            "event=worker.job.completed job=%s job_id=%s attempt=%d processed=%d address=%s",
+            "event=worker.job.completed job=%s job_id=%s attempt=%d processed=%d",
             JOB_NAME,
             job_id,
             attempt,
             processed,
-            deposit_address,
         )
         return {"status": "ok", "processed": processed}
 
@@ -149,3 +158,22 @@ async def _run_scan(job_id: str, attempt: int) -> dict:
             exc_info=True,
         )
         raise
+    finally:
+        await provider.aclose()
+
+
+async def _scan_lower_bound(watermark_store: Any | None) -> int:
+    now_ms = time.time_ns() // 1_000_000
+    overlap_ms = settings.TRONGRID_SCAN_OVERLAP_SECONDS * 1000
+    if watermark_store is not None:
+        raw = await watermark_store.get(WATERMARK_KEY)
+        if isinstance(raw, bytes):
+            raw = raw.decode("ascii", errors="ignore")
+        try:
+            watermark = int(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            watermark = None
+        if watermark is not None and 0 <= watermark <= now_ms:
+            return max(0, watermark - overlap_ms)
+    # A restart or missing Redis state replays the full active-intent lifetime.
+    return max(0, now_ms - (settings.DEPOSIT_TTL_MINUTES * 60 * 1000) - overlap_ms)
