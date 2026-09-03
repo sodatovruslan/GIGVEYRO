@@ -219,7 +219,12 @@ async def test_setup_token_scoped_to_its_own_account(client, make_account, monke
 
     # owner_b must remain untouched - no pending setup, no 2FA, unaffected.
     status_b = await client.get("/auth/2fa/status", headers=_auth_headers(owner_b))
-    assert status_b.json() == {"enabled": False, "enabled_at": None, "recovery_codes_remaining": 0}
+    assert status_b.json() == {
+        "enabled": False,
+        "required": True,
+        "enabled_at": None,
+        "recovery_codes_remaining": 0,
+    }
 
 
 async def test_setup_token_cannot_restart_setup_after_successful_confirm(

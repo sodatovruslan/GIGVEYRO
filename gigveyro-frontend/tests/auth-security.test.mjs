@@ -51,7 +51,7 @@ test("2FA challenge and forced-setup tokens are never persisted as cookies thems
 
 test("recovery codes and TOTP secrets never touch localStorage/sessionStorage", async () => {
   const loginPage = await source("src/app/login/page.tsx");
-  const settingsPage = await source("src/app/owner/settings/page.tsx");
+  const settingsPage = await source("src/components/security/security-settings-page.tsx");
   for (const content of [loginPage, settingsPage]) {
     assert.doesNotMatch(content, /localStorage/);
     assert.doesNotMatch(content, /sessionStorage/);
@@ -76,7 +76,7 @@ test("forced 2FA onboarding and session-management flows exist in RU/TG/EN", asy
 });
 
 test("revoking the current session logs the browser out instead of leaving a stale authenticated UI", async () => {
-  const settingsPage = await source("src/app/owner/settings/page.tsx");
+  const settingsPage = await source("src/components/security/security-settings-page.tsx");
   assert.match(settingsPage, /isCurrent\)\s*\{[\s\S]*?await logout\(\)/);
   assert.match(settingsPage, /router\.replace\("\/login"\)/);
 });

@@ -55,12 +55,13 @@ async def test_setup_start_requires_authentication(client):
     assert response.status_code == 401
 
 
-async def test_setup_start_rejects_non_owner(client, make_account):
+async def test_setup_start_supports_user_self_service(client, make_account):
     user = await make_account(role=UserRole.USER, password="UserPass123")
     response = await client.post(
         "/auth/2fa/setup/start", json={"password": "UserPass123"}, headers=_auth_headers(user)
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert response.json()["manual_key"]
 
 
 async def test_setup_start_rejects_wrong_password(client, make_account):
@@ -471,6 +472,7 @@ async def test_disabled_status_reports_correctly(client, make_account):
     assert response.status_code == 200
     assert response.json() == {
         "enabled": False,
+        "required": False,
         "enabled_at": None,
         "recovery_codes_remaining": 0,
     }

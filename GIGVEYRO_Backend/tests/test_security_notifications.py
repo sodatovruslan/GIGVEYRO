@@ -1,4 +1,5 @@
 import pyotp
+import pytest
 from sqlalchemy import select
 
 from app.core.security import create_access_token
@@ -123,7 +124,17 @@ async def test_recovery_code_login_notifies_owner(client, make_account, db_sessi
         assert recovery_code not in notification.message
 
 
-async def test_user_and_merchant_get_no_security_notifications(client, make_account, db_session):
-    user = await make_account(role=UserRole.USER, password="UserPass123")
-    await client.post("/auth/logout-all", headers=_auth_headers(user))
-    assert await _security_notifications(db_session, user.id) == []
+@pytest.mark.parametrize("role", [UserRole.USER, UserRole.MERCHANT])
+async def test_user_and_merchant_receive_security_notifications(
+    client, make_account, db_session, role
+):
+    account = await make_account(role=role, password="SelfSecurityPass123")
+    await client.post(
+        "/auth/login",
+        json={"username": account.username, "password": "SelfSecurityPass123"},
+    )
+    response = await client.post("/auth/logout-all", headers=_auth_headers(account))
+    assert response.json()["revoked_count"] == 1
+    notifications = await _security_notifications(db_session, account.id)
+    assert len(notifications) == 1
+    assert "session" in notifications[0].title.lower()
