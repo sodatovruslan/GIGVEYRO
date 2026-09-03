@@ -66,6 +66,12 @@ enabled, a notification outbox row in the same database transaction. The ARQ wor
 through the aiogram adapter. Telegram downtime therefore cannot roll back a deal, withdrawal,
 balance, fee, conversion or payout-state transaction.
 
+New notifications store a locale-neutral semantic key and safe typed parameters. Telegram and
+the Web cabinet render the same event semantics in RU, EN or TG; Telegram uses the linked
+connection language. Legacy rows remain readable without forwarding arbitrary historical text.
+The complete contract and extension checklist are documented in
+[`docs/notification-localization.md`](../../../docs/notification-localization.md).
+
 Delivery is unique per canonical notification/channel. Network failures and Telegram 5xx errors
 use bounded exponential retry; HTTP 429 honors `retry_after`. Blocked/chat-missing and invalid
 credential/config errors are terminal. A blocked bot connection is marked delivery-disabled and
