@@ -521,16 +521,63 @@ export interface AuditLogEntry {
 }
 
 export type CorrelationStatus = "MATCHED" | "AMBIGUOUS" | "UNMATCHED";
+export type ReconciliationStatus = "PENDING" | "LINKED" | "REPROCESSED" | "IGNORED" | "CREDITED" | "FAILED";
 export interface UnmatchedTransfer {
   id: string;
   tx_hash: string;
+  provider_event_id: string;
+  provider: string;
   from_address: string;
   to_address: string;
   amount: string;
   asset_contract: string;
+  network: string;
+  confirmations: number;
+  is_finalized: boolean;
+  block_number: number | null;
+  block_timestamp: string | null;
   correlation_status: CorrelationStatus;
+  reconciliation_status: ReconciliationStatus;
   reason: string;
+  linked_deposit_id: string | null;
+  resolution_reason: string | null;
+  last_result_code: string | null;
+  resolved_at: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export interface DepositCandidate {
+  id: string;
+  public_id: string;
+  account_id: string;
+  expected_amount: string;
+  network: string;
+  asset: string;
+  status: DepositStatus;
+  expires_at: string;
+  amount_matches: boolean;
+  amount_difference: string;
+}
+
+export interface DepositReconciliationAction {
+  id: string;
+  action: "LINK" | "REPROCESS" | "IGNORE";
+  deposit_id: string | null;
+  result_code: string;
+  created_at: string;
+}
+
+export interface UnmatchedTransferDetail extends UnmatchedTransfer {
+  candidates: DepositCandidate[];
+  history: DepositReconciliationAction[];
+}
+
+export interface DepositReconciliationResult {
+  result_code: string;
+  replayed: boolean;
+  transfer: UnmatchedTransfer;
+  deposit: Deposit | null;
 }
 
 export type DepositStatus = "waiting" | "detected" | "confirming" | "confirmed" | "credited" | "expired" | "failed" | "amount_mismatch";

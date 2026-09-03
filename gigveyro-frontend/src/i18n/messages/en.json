@@ -368,6 +368,45 @@
       "UNMATCHED": "Unmatched",
       "AMBIGUOUS": "Ambiguous",
       "MATCHED": "Matched"
+    },
+    "correlationStatus": "Correlation",
+    "reconciliationStatus": "Reconciliation",
+    "network": "Network",
+    "finality": "Finality / confirmations",
+    "finalized": "Finalized",
+    "notFinalized": "Not finalized",
+    "candidateTitle": "Candidate deposit intents",
+    "candidateEmpty": "No current safe candidates",
+    "amountMatch": "Exact amount",
+    "amountMismatch": "Amount mismatch",
+    "linkAction": "Link to selected deposit",
+    "reprocessAction": "Reprocess",
+    "ignoreAction": "Ignore transfer",
+    "ignoreReason": "Required investigation reason",
+    "observedAmount": "Observed amount",
+    "expectedAmount": "Expected amount",
+    "amountDifference": "Difference",
+    "historyTitle": "Reconciliation history",
+    "cancel": "Cancel",
+    "processing": "Processing…",
+    "confirmAction": "Confirm action",
+    "ignoreWarning": "Ignoring does not move or credit money. The transfer will remain in the audit history.",
+    "actions": { "LINK": "Linked", "REPROCESS": "Reprocessed", "IGNORE": "Ignored" },
+    "actionSuccess": { "link": "Transfer linked and credited safely", "reprocess": "Transfer reprocessed", "ignore": "Transfer ignored" },
+    "confirmation": {
+      "link": { "title": "Confirm safe link", "text": "The backend will revalidate finality, token, network, address, amount, expiry, and current deposit state before using the normal credit path." },
+      "reprocess": { "title": "Confirm reprocessing", "text": "Current open deposit intents will be checked again. Credit occurs only when one exact safe candidate exists." },
+      "ignore": { "title": "Confirm ignore", "text": "Record the investigation result and stop this transfer from being actioned." }
+    },
+    "reconciliation": {
+      "PENDING": "Pending review", "LINKED": "Linked", "REPROCESSED": "Reprocessed", "IGNORED": "Ignored", "CREDITED": "Credited", "FAILED": "Failed"
+    },
+    "reconciliationErrors": {
+      "TRANSFER_NOT_FOUND": "Transfer not found.", "DEPOSIT_NOT_FOUND": "Deposit intent not found.", "IDEMPOTENCY_CONFLICT": "This action key was already used for another request.",
+      "NETWORK_MISMATCH": "Network does not match.", "TOKEN_MISMATCH": "Token contract does not match USDT/TRC20.", "ADDRESS_MISMATCH": "Destination address does not match.",
+      "TRANSFER_NOT_FINAL": "Transfer is not final or lacks confirmations.", "DEPOSIT_ALREADY_CREDITED": "Deposit is already credited.", "DEPOSIT_EXPIRED": "Deposit intent has expired.",
+      "STALE_STATE": "State changed. Refresh and investigate again.", "AMOUNT_MISMATCH": "Observed and expected amounts do not match.", "TRANSFER_ALREADY_CREDITED": "Transfer is already credited.",
+      "TRANSFER_IGNORED": "Transfer was already ignored.", "TRANSFER_ALREADY_LINKED": "Transfer is already linked."
     }
   },
   "withdrawals": {

@@ -11,6 +11,7 @@ export const realtimeEventNames = [
   "fiat.converted",
   "payout.updated",
   "withdrawal.updated",
+  "deposit.updated",
 ] as const;
 
 export type RealtimeEventName = (typeof realtimeEventNames)[number];
@@ -25,6 +26,11 @@ const ownerWithdrawals = ["owner-withdrawals:*", "owner-withdrawal:*"];
 const merchantWithdrawals = ["merchant-withdrawals:*", "merchant-withdrawal:*"];
 
 export function queryKeysForRealtimeEvent(event: RealtimeEventName, role: UserRole) {
+  if (event === "deposit.updated") {
+    if (role === "owner") return ["deposits:*", "unmatched-transfers:*", "owner-summary", "owner-activity"];
+    if (role === "user") return ["deposits:*", ...userFunds];
+    return [];
+  }
   if (event === "payout.updated") {
     if (role === "owner") return [...ownerPayouts, "owner-summary", "owner-activity"];
     if (role === "merchant") {

@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { Deposit, DepositStatus, Paginated, UnmatchedTransfer } from "@/lib/api/types";
+import type { Deposit, DepositReconciliationResult, DepositStatus, Paginated, ReconciliationStatus, UnmatchedTransfer, UnmatchedTransferDetail } from "@/lib/api/types";
 
 export interface DepositOwnerFilters {
   search?: string;
@@ -29,7 +29,9 @@ export const depositsApi = {
 
 export interface UnmatchedTransferFilters {
   status?: "MATCHED" | "AMBIGUOUS" | "UNMATCHED";
+  reconciliationStatus?: ReconciliationStatus;
   txHash?: string;
+  reason?: string;
   dateFrom?: string;
   dateTo?: string;
   minAmount?: string;
@@ -39,7 +41,9 @@ export interface UnmatchedTransferFilters {
 export const unmatchedTransfersApi = {
   list: (filters: UnmatchedTransferFilters = {}, limit = 20, offset = 0) => apiFetch<Paginated<UnmatchedTransfer>>(`/owner/deposits/unmatched?${queryString({
     status: filters.status,
+    reconciliation_status: filters.reconciliationStatus,
     tx_hash: filters.txHash,
+    reason: filters.reason,
     date_from: filters.dateFrom,
     date_to: filters.dateTo,
     min_amount: filters.minAmount,
@@ -47,5 +51,8 @@ export const unmatchedTransfersApi = {
     limit,
     offset,
   })}`),
-  get: (id: string) => apiFetch<UnmatchedTransfer>(`/owner/deposits/unmatched/${id}`),
+  get: (id: string) => apiFetch<UnmatchedTransferDetail>(`/owner/deposits/unmatched/${id}`),
+  link: (id: string, depositId: string, idempotencyKey: string) => apiFetch<DepositReconciliationResult>(`/owner/deposits/unmatched/${id}/link`, { method: "POST", body: { deposit_id: depositId, idempotency_key: idempotencyKey } }),
+  reprocess: (id: string, idempotencyKey: string) => apiFetch<DepositReconciliationResult>(`/owner/deposits/unmatched/${id}/reprocess`, { method: "POST", body: { idempotency_key: idempotencyKey } }),
+  ignore: (id: string, reason: string, idempotencyKey: string) => apiFetch<DepositReconciliationResult>(`/owner/deposits/unmatched/${id}/ignore`, { method: "POST", body: { reason, idempotency_key: idempotencyKey } }),
 };
