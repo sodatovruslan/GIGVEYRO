@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from app.core.config import settings
 from app.core.security import create_access_token
 from app.enums.account import UserRole
+from app.enums.notification import NotificationMessageKey
 from app.enums.payout import PayoutSimulationOutcome, PayoutStatus
 from app.enums.wallet import LedgerEntryType
 from app.models.audit import AuditLog
@@ -82,13 +83,17 @@ def test_payout_state_machine_rejects_arbitrary_jumps():
 
 
 async def test_payout_defaults_are_disabled_and_live_execute_endpoint_is_blocked(
-    client, make_account, make_merchant_wallet
+    client, db_session, make_account, make_merchant_wallet
 ):
     merchant = await make_account(role=UserRole.MERCHANT)
     owner = await make_account(role=UserRole.OWNER)
     await make_merchant_wallet(merchant, available=Decimal("100"))
     await _withdrawal(client, merchant)
     intent = await _intent(client, owner)
+    owner_notification = await db_session.scalar(
+        select(Notification).where(Notification.account_id == owner.id)
+    )
+    assert owner_notification.message_key == NotificationMessageKey.PAYOUT_APPROVAL_REQUIRED
     assert intent["provider_mode"] == "disabled"
     assert intent["status"] == "risk_review"
     response = await client.post(
@@ -144,17 +149,18 @@ async def test_simulated_success_is_exactly_once_and_finalizes_existing_hold(
         )
         == 1
     )
-    assert (
-        await db_session.scalar(
-            select(func.count())
-            .select_from(Notification)
-            .where(
+    merchant_notifications = (
+        await db_session.scalars(
+            select(Notification).where(
                 Notification.account_id == merchant.id,
                 Notification.type == "WITHDRAWAL_STATUS_CHANGED",
             )
         )
-        == 2
-    )
+    ).all()
+    assert {item.message_key for item in merchant_notifications} == {
+        NotificationMessageKey.WITHDRAWAL_APPROVED,
+        NotificationMessageKey.WITHDRAWAL_COMPLETED,
+    }
 
 
 async def test_unknown_result_never_retries_and_requires_reconciliation(
@@ -217,9 +223,7 @@ async def test_pending_result_is_not_selected_for_blind_retry(
     await db_session.refresh(wallet)
     assert wallet.held_balance == Decimal("15")
 
-    still_pending = await service.reconcile(
-        intent["id"], owner, PayoutSimulationOutcome.PENDING
-    )
+    still_pending = await service.reconcile(intent["id"], owner, PayoutSimulationOutcome.PENDING)
     assert still_pending.status == PayoutStatus.RECONCILIATION_REQUIRED
     await db_session.refresh(wallet)
     assert wallet.held_balance == Decimal("15")
@@ -350,12 +354,14 @@ async def test_payout_limit_and_stale_execution_snapshot_block_safely(
         headers=_headers(owner),
     )
     latest = (
-        await db_session.execute(
-            select(TreasurySnapshotRecord).order_by(
-                TreasurySnapshotRecord.generated_at.desc()
+        (
+            await db_session.execute(
+                select(TreasurySnapshotRecord).order_by(TreasurySnapshotRecord.generated_at.desc())
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     assert latest is not None
     latest.external_observed_at = datetime.now(UTC) - timedelta(days=1)
 

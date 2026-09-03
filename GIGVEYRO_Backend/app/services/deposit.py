@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.enums.account import UserRole
 from app.enums.deposit import CorrelationStatus, DepositAsset, DepositNetwork, DepositStatus
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.models.account import Account
 from app.models.deposit import Deposit, UnmatchedTransfer
 from app.repositories.account import AccountRepository
@@ -423,14 +423,15 @@ class DepositService:
         saved = await self._deposits.save(deposit)
 
         if self._notifications is not None:
-            await self._notifications.emit_notification(
+            await self._notifications.emit_semantic_notification(
                 deposit.account_id,
                 NotificationType.DEPOSIT_CONFIRMED,
-                title="Deposit credited",
-                message=(
-                    f"Deposit {deposit.public_id} for {deposit.credited_amount} "
-                    "USDT was credited"
-                ),
+                NotificationMessageKey.DEPOSIT_CREDITED,
+                message_params={
+                    "reference": deposit.public_id,
+                    "amount": deposit.credited_amount,
+                    "currency": "USDT",
+                },
                 payload={"deposit_id": str(deposit.id)},
                 dedupe_key=f"deposit_credited:{deposit.id}",
             )

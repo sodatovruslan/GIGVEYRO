@@ -7,13 +7,22 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from app.core.config import settings
-from app.enums.notification import NotificationChannel, NotificationStatus, NotificationType
+from app.enums.notification import (
+    NotificationChannel,
+    NotificationMessageKey,
+    NotificationStatus,
+    NotificationType,
+)
 from app.models.account import Account
 from app.models.notification import Notification, NotificationDelivery, NotificationOutbox
 from app.repositories.audit import AuditRepository
 from app.repositories.notification import NotificationRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.services.audit import AuditService
+from app.services.notification_messages import (
+    normalize_message_params,
+    render_notification_message,
+)
 from app.services.telegram_provider import TelegramDeliveryError, TelegramProvider
 from app.telegram_bot.i18n import notification_label, text
 
@@ -64,6 +73,47 @@ class NotificationService:
         payload: dict[str, Any] | None = None,
         dedupe_key: str | None = None,
     ) -> Notification | None:
+        return await self._emit_notification(
+            account_id,
+            type_,
+            title=title,
+            message=message,
+            payload=payload,
+            dedupe_key=dedupe_key,
+        )
+
+    async def emit_semantic_notification(
+        self,
+        account_id: uuid.UUID,
+        type_: NotificationType,
+        message_key: NotificationMessageKey,
+        message_params: dict[str, Any] | None = None,
+        payload: dict[str, Any] | None = None,
+        dedupe_key: str | None = None,
+    ) -> Notification | None:
+        return await self._emit_notification(
+            account_id,
+            type_,
+            title="",
+            message="",
+            message_key=message_key,
+            message_params=normalize_message_params(message_params),
+            payload=payload,
+            dedupe_key=dedupe_key,
+        )
+
+    async def _emit_notification(
+        self,
+        account_id: uuid.UUID,
+        type_: NotificationType,
+        *,
+        title: str,
+        message: str,
+        message_key: NotificationMessageKey | None = None,
+        message_params: dict[str, Any] | None = None,
+        payload: dict[str, Any] | None = None,
+        dedupe_key: str | None = None,
+    ) -> Notification | None:
         pref = await self.notification_repo.get_or_create_preference(account_id)
         if not self._is_type_enabled(pref, type_):
             return None
@@ -82,6 +132,8 @@ class NotificationService:
                 type=type_,
                 title=title,
                 message=message,
+                message_key=message_key.value if message_key else None,
+                message_params=message_params,
                 payload=payload,
                 dedupe_hash=dedupe_hash,
                 is_read=False,
@@ -165,7 +217,22 @@ class NotificationService:
                 )
             delivery.attempts += 1
             language = connection.language
-            message = f"{notification_label(language, entry.type)}\n{text(language, 'details')}"
+            canonical = await self._session.get(Notification, entry.notification_id)
+            if canonical is not None and canonical.message_key:
+                fallback_title = notification_label(language, entry.type)
+                title, body = render_notification_message(
+                    language,
+                    canonical.message_key,
+                    canonical.message_params,
+                    fallback_title=fallback_title,
+                    fallback_message=text(language, "details"),
+                )
+                message = f"{title}\n{body}"
+            else:
+                # Legacy rows may contain arbitrary historical text. Keep the
+                # established safe generic Telegram presentation rather than
+                # forwarding unstructured content to another channel.
+                message = f"{notification_label(language, entry.type)}\n{text(language, 'details')}"
             try:
                 await self.telegram_provider.send_message(
                     connection.chat_id,

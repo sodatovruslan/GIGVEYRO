@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 
 from app.core.security import create_access_token
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.enums.risk import RiskDecision, RiskReason, RiskStatus
 from app.models.notification import Notification
 from app.models.risk import RiskPolicy, TreasurySnapshotRecord
@@ -203,9 +203,7 @@ async def test_treasury_refresh_notifies_owner_only_on_risk_transition(
         "app.api.owner.treasury.get_bybit_private_diagnostics", critical_diagnostics
     )
     for _ in range(2):
-        response = await client.post(
-            "/api/v1/owner/treasury/refresh", headers=_headers(owner)
-        )
+        response = await client.post("/api/v1/owner/treasury/refresh", headers=_headers(owner))
         assert response.status_code == 200
         assert response.json()["risk_status"] == "critical"
 
@@ -216,6 +214,13 @@ async def test_treasury_refresh_notifies_owner_only_on_risk_transition(
         )
     )
     assert count == 1
+    notification = await db_session.scalar(
+        select(Notification).where(
+            Notification.account_id == owner.id,
+            Notification.type == NotificationType.TREASURY_RISK_CHANGED,
+        )
+    )
+    assert notification.message_key == NotificationMessageKey.TREASURY_CRITICAL
 
 
 async def test_enabled_guard_allows_healthy_and_blocks_limits_or_stale(

@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.core.security import create_access_token
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.models.notification import Notification
 
 
@@ -43,8 +43,8 @@ async def test_enabling_2fa_notifies_owner(client, make_account, db_session):
 
     notifications = await _security_notifications(db_session, owner.id)
     assert len(notifications) == 1
-    assert "enabled" in notifications[0].title.lower()
-    assert secret not in notifications[0].message
+    assert notifications[0].message_key == NotificationMessageKey.SECURITY_TWO_FACTOR_ENABLED
+    assert secret not in str(notifications[0].message_params)
 
 
 async def test_disabling_2fa_notifies_owner(client, make_account, db_session):
@@ -67,8 +67,8 @@ async def test_disabling_2fa_notifies_owner(client, make_account, db_session):
     assert response.status_code == 204
 
     notifications = await _security_notifications(db_session, owner.id)
-    titles = [n.title.lower() for n in notifications]
-    assert any("disabled" in title for title in titles)
+    keys = [n.message_key for n in notifications]
+    assert NotificationMessageKey.SECURITY_TWO_FACTOR_DISABLED in keys
 
 
 async def test_logout_all_notifies_owner_only_when_sessions_revoked(
@@ -83,16 +83,15 @@ async def test_logout_all_notifies_owner_only_when_sessions_revoked(
     assert await _security_notifications(db_session, owner.id) == []
 
     # Create a real extra session, then logout-all again.
-    await client.post(
-        "/auth/login", json={"username": owner.username, "password": "OwnerPass123"}
-    )
+    await client.post("/auth/login", json={"username": owner.username, "password": "OwnerPass123"})
     response = await client.post("/auth/logout-all", headers=_auth_headers(owner))
     assert response.status_code == 200
     assert response.json()["revoked_count"] >= 1
 
     notifications = await _security_notifications(db_session, owner.id)
     assert len(notifications) == 1
-    assert "session" in notifications[0].title.lower()
+    assert notifications[0].message_key == NotificationMessageKey.SECURITY_LOGOUT_ALL
+    assert notifications[0].message_params["count"] >= 1
 
 
 async def test_recovery_code_login_notifies_owner(client, make_account, db_session):
@@ -118,10 +117,10 @@ async def test_recovery_code_login_notifies_owner(client, make_account, db_sessi
     assert verify.status_code == 200
 
     notifications = await _security_notifications(db_session, owner.id)
-    titles = [n.title.lower() for n in notifications]
-    assert any("recovery" in title for title in titles)
+    keys = [n.message_key for n in notifications]
+    assert NotificationMessageKey.SECURITY_RECOVERY_USED in keys
     for notification in notifications:
-        assert recovery_code not in notification.message
+        assert recovery_code not in str(notification.message_params)
 
 
 @pytest.mark.parametrize("role", [UserRole.USER, UserRole.MERCHANT])
@@ -137,4 +136,4 @@ async def test_user_and_merchant_receive_security_notifications(
     assert response.json()["revoked_count"] == 1
     notifications = await _security_notifications(db_session, account.id)
     assert len(notifications) == 1
-    assert "session" in notifications[0].title.lower()
+    assert notifications[0].message_key == NotificationMessageKey.SECURITY_LOGOUT_ALL

@@ -50,6 +50,8 @@ class NotificationRead(BaseModel):
     type: NotificationType
     title: str
     message: str
+    message_key: str | None = None
+    message_params: dict[str, Any] | None = None
     payload: dict[str, Any] | None = None
     is_read: bool
     created_at: datetime

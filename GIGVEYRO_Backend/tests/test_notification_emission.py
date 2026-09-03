@@ -39,6 +39,8 @@ async def test_opening_appeal_notifies_counterparty(
 
     merchant_notifications = await _notifications_for(client, merchant, "APPEAL_OPENED")
     assert len(merchant_notifications) == 1
+    assert merchant_notifications[0]["message_key"] == "appeal.opened"
+    assert merchant_notifications[0]["message_params"] == {"reference": deal.public_id}
 
     user_notifications = await _notifications_for(client, user, "APPEAL_OPENED")
     assert len(user_notifications) == 0
@@ -70,8 +72,10 @@ async def test_resolving_appeal_notifies_both_parties(
     )
     assert resolve_resp.status_code == 200
 
-    assert len(await _notifications_for(client, user, "APPEAL_RESOLVED")) == 1
-    assert len(await _notifications_for(client, merchant, "APPEAL_RESOLVED")) == 1
+    user_notifications = await _notifications_for(client, user, "APPEAL_RESOLVED")
+    merchant_notifications = await _notifications_for(client, merchant, "APPEAL_RESOLVED")
+    assert user_notifications[0]["message_key"] == "appeal.resolved"
+    assert merchant_notifications[0]["message_key"] == "appeal.resolved"
 
 
 async def test_credited_deposit_notifies_user(client, make_account, make_wallet, make_deposit):
@@ -95,7 +99,12 @@ async def test_credited_deposit_notifies_user(client, make_account, make_wallet,
     assert response.status_code == 200
     assert response.json()["status"] == "credited"
 
-    assert len(await _notifications_for(client, user, "DEPOSIT_CONFIRMED")) == 1
+    notifications = await _notifications_for(client, user, "DEPOSIT_CONFIRMED")
+    assert notifications[0]["message_key"] == "deposit.credited"
+    assert notifications[0]["message_params"]["reference"] == deposit.public_id
+    assert notifications[0]["message_params"]["currency"] == "USDT"
+    assert isinstance(notifications[0]["message_params"]["amount"], str)
+    assert Decimal(notifications[0]["message_params"]["amount"]) == Decimal("60")
 
 
 async def test_withdrawal_status_change_notifies_merchant(
@@ -130,3 +139,4 @@ async def test_withdrawal_status_change_notifies_merchant(
     notifications = await _notifications_for(client, merchant, "WITHDRAWAL_STATUS_CHANGED")
     # Approval is emitted, but direct paid finalization is blocked by the payout control plane.
     assert len(notifications) == 1
+    assert notifications[0]["message_key"] == "withdrawal.approved"

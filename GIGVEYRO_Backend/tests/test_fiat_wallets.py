@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from app.api.fiat_deps import get_conversion_rate_dependency
 from app.core.security import create_access_token
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.enums.wallet import Currency, FiatLedgerEntryType
 from app.main import app
 from app.models.account import Account
@@ -22,9 +22,7 @@ from app.services.fiat_rate.models import FiatConversionQuote, FiatSourceType
 
 
 def _headers(account) -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {create_access_token(account.id, role=account.role)}"
-    }
+    return {"Authorization": f"Bearer {create_access_token(account.id, role=account.role)}"}
 
 
 class StubConversionRates:
@@ -88,9 +86,9 @@ async def test_user_initial_fiat_balances_are_read_only_zero_without_rows(
         },
     ]
     count = await db_session.scalar(
-        select(func.count()).select_from(FiatWalletBalance).where(
-            FiatWalletBalance.account_id == user.id
-        )
+        select(func.count())
+        .select_from(FiatWalletBalance)
+        .where(FiatWalletBalance.account_id == user.id)
     )
     assert count == 0
     assert (await client.post("/fiat-wallets", headers=_headers(user))).status_code == 405
@@ -145,6 +143,10 @@ async def test_owner_allocates_tjs_or_rub_with_ledger_audit_notification_and_rea
         )
     ).scalar_one()
     assert notification.payload["currency"] == currency
+    assert notification.message_key == NotificationMessageKey.FIAT_BALANCE_UPDATED
+    assert notification.message_params["currency"] == currency
+    assert isinstance(notification.message_params["amount"], str)
+    assert Decimal(notification.message_params["amount"]) == Decimal(amount)
     event = (
         await db_session.execute(
             select(RealtimeOutbox).where(RealtimeOutbox.entity_id == ledger.reference_id)
@@ -170,9 +172,7 @@ async def test_allocation_is_idempotent_and_payload_mismatch_conflicts(
     second = await client.post(url, json=payload, headers=_headers(owner))
     assert first.status_code == second.status_code == 200
     assert first.json()["operation_id"] == second.json()["operation_id"]
-    mismatch = await client.post(
-        url, json={**payload, "amount": "101"}, headers=_headers(owner)
-    )
+    mismatch = await client.post(url, json={**payload, "amount": "101"}, headers=_headers(owner))
     assert mismatch.status_code == 409
     balance = await db_session.scalar(
         select(FiatWalletBalance.available).where(
@@ -181,14 +181,15 @@ async def test_allocation_is_idempotent_and_payload_mismatch_conflicts(
         )
     )
     assert balance == Decimal("100")
-    assert await db_session.scalar(
-        select(func.count()).select_from(AuditLog).where(AuditLog.action == "fiat.allocate")
-    ) == 1
+    assert (
+        await db_session.scalar(
+            select(func.count()).select_from(AuditLog).where(AuditLog.action == "fiat.allocate")
+        )
+        == 1
+    )
 
 
-async def test_non_owner_cannot_allocate_or_convert(
-    client, make_account, conversion_rates
-):
+async def test_non_owner_cannot_allocate_or_convert(client, make_account, conversion_rates):
     target = await make_account(role=UserRole.USER)
     user = await make_account(role=UserRole.USER)
     merchant = await make_account(role=UserRole.MERCHANT)
@@ -305,19 +306,19 @@ async def test_owner_previews_and_converts_tjs_to_rub_atomically(
     assert body["rate_provider"] == "nbt"
 
     entries = (
-        await db_session.execute(
-            select(FiatLedgerEntry).where(
-                FiatLedgerEntry.reference_id == uuid.UUID(body["id"])
+        (
+            await db_session.execute(
+                select(FiatLedgerEntry).where(FiatLedgerEntry.reference_id == uuid.UUID(body["id"]))
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert {item.type for item in entries} == {
         FiatLedgerEntryType.CONVERSION_DEBIT,
         FiatLedgerEntryType.CONVERSION_CREDIT,
     }
-    tjs_amount = sum(
-        (item.amount for item in entries if item.currency == Currency.TJS), Decimal()
-    )
+    tjs_amount = sum((item.amount for item in entries if item.currency == Currency.TJS), Decimal())
     assert tjs_amount == Decimal("-100")
     event = await db_session.scalar(
         select(RealtimeOutbox).where(RealtimeOutbox.entity_id == uuid.UUID(body["id"]))
@@ -326,20 +327,22 @@ async def test_owner_previews_and_converts_tjs_to_rub_atomically(
     assert set(event.recipient_account_ids) == {str(owner.id), str(user.id)}
     assert event.recipient_roles == []
     audit = await db_session.scalar(
-        select(AuditLog).where(
-            AuditLog.action == "fiat.convert", AuditLog.entity_id == body["id"]
-        )
+        select(AuditLog).where(AuditLog.action == "fiat.convert", AuditLog.entity_id == body["id"])
     )
     assert audit.audit_metadata["rate_provider"] == "nbt"
     notifications = (
-        await db_session.execute(
-            select(Notification).where(
-            Notification.account_id == user.id,
-            Notification.type == NotificationType.FIAT_BALANCE_UPDATED,
-            Notification.dedupe_hash.is_not(None),
+        (
+            await db_session.execute(
+                select(Notification).where(
+                    Notification.account_id == user.id,
+                    Notification.type == NotificationType.FIAT_BALANCE_UPDATED,
+                    Notification.dedupe_hash.is_not(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert any(item.payload["currency"] == "RUB" for item in notifications)
 
 
@@ -382,9 +385,7 @@ async def test_conversion_validation_insufficient_and_idempotent_retry(
     }
     assert (await client.post(url, json=same, headers=_headers(owner))).status_code == 400
     insufficient = {**same, "to_currency": "RUB", "source_amount": "101"}
-    assert (
-        await client.post(url, json=insufficient, headers=_headers(owner))
-    ).status_code == 400
+    assert (await client.post(url, json=insufficient, headers=_headers(owner))).status_code == 400
     assert (
         await client.post(
             url,
@@ -399,13 +400,18 @@ async def test_conversion_validation_insufficient_and_idempotent_retry(
     assert first.status_code == second.status_code == 200
     assert first.json()["id"] == second.json()["id"]
     assert await db_session.scalar(select(func.count()).select_from(FiatConversion)) == 1
-    assert await db_session.scalar(
-        select(func.count()).select_from(FiatLedgerEntry).where(
-            FiatLedgerEntry.type.in_(
-                [FiatLedgerEntryType.CONVERSION_DEBIT, FiatLedgerEntryType.CONVERSION_CREDIT]
+    assert (
+        await db_session.scalar(
+            select(func.count())
+            .select_from(FiatLedgerEntry)
+            .where(
+                FiatLedgerEntry.type.in_(
+                    [FiatLedgerEntryType.CONVERSION_DEBIT, FiatLedgerEntryType.CONVERSION_CREDIT]
+                )
             )
         )
-    ) == 2
+        == 2
+    )
 
 
 async def test_conversion_history_snapshot_is_immutable_when_rate_changes(
@@ -487,8 +493,7 @@ async def test_managed_fiat_business_e2e_on_disposable_database(
 
     balances = await client.get("/fiat-wallets", headers=_headers(user))
     by_currency = {
-        item["currency"]: Decimal(item["available"])
-        for item in balances.json()["items"]
+        item["currency"]: Decimal(item["available"]) for item in balances.json()["items"]
     }
     assert by_currency == {"TJS": Decimal("905.545"), "RUB": Decimal("851.713255")}
     history = await client.get("/fiat-wallets/conversions", headers=_headers(user))
@@ -507,14 +512,22 @@ async def test_managed_fiat_business_e2e_on_disposable_database(
             headers=_headers(user),
         )
     ).status_code == 403
-    assert await db_session.scalar(
-        select(func.count()).select_from(AuditLog).where(
-            AuditLog.action.in_(["fiat.allocate", "fiat.convert"])
+    assert (
+        await db_session.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(AuditLog.action.in_(["fiat.allocate", "fiat.convert"]))
         )
-    ) == 3
-    assert await db_session.scalar(
-        select(func.count()).select_from(Notification).where(
-            Notification.account_id == user.id,
-            Notification.type == NotificationType.FIAT_BALANCE_UPDATED,
+        == 3
+    )
+    assert (
+        await db_session.scalar(
+            select(func.count())
+            .select_from(Notification)
+            .where(
+                Notification.account_id == user.id,
+                Notification.type == NotificationType.FIAT_BALANCE_UPDATED,
+            )
         )
-    ) == 3
+        == 3
+    )

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_account, require_roles
 from app.db.session import get_db
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.enums.risk import RiskStatus
 from app.models.account import Account
 from app.models.risk import RiskPolicy
@@ -108,13 +108,18 @@ async def refresh(
             TelegramLinkRepository(repo.session),
             MockTelegramProvider(),
         )
-        await notifications.emit_notification(
+        message_key = {
+            RiskStatus.WARNING: NotificationMessageKey.TREASURY_WARNING,
+            RiskStatus.CRITICAL: NotificationMessageKey.TREASURY_CRITICAL,
+            RiskStatus.STALE: NotificationMessageKey.TREASURY_STALE,
+        }[snapshot.risk_status]
+        await notifications.emit_semantic_notification(
             account.id,
             NotificationType.TREASURY_RISK_CHANGED,
-            "Статус риска казначейства изменён",
-            "Откройте раздел казначейства для безопасного просмотра деталей.",
-            {"risk_status": snapshot.risk_status.value},
-            (
+            message_key,
+            message_params={"risk_status": snapshot.risk_status.value},
+            payload={"risk_status": snapshot.risk_status.value},
+            dedupe_key=(
                 f"treasury-risk:{previous.id if previous else 'initial'}:"
                 f"{snapshot.risk_status.value}"
             ),

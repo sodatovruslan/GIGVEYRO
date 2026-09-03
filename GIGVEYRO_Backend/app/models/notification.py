@@ -63,6 +63,8 @@ class Notification(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    message_key: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    message_params: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     dedupe_hash: Mapped[str | None] = mapped_column(
         String(64), nullable=True, unique=True, index=True

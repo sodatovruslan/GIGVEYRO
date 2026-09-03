@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from app.core.config import settings
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.enums.payout import (
     PayoutApprovalDecision,
     PayoutFailureKind,
@@ -286,7 +286,7 @@ class ControlledPayoutService:
             },
         )
         await self._notify_owner(
-            intent, "Payout requires approval", f"Payout {intent.id} requires approval", "approval"
+            intent, NotificationMessageKey.PAYOUT_APPROVAL_REQUIRED, "approval"
         )
         return intent
 
@@ -339,8 +339,8 @@ class ControlledPayoutService:
             await self.repo.save_intent(intent)
             await self._notify_merchant(
                 intent,
-                "Withdrawal approved",
-                f"Withdrawal {withdrawal.public_id} approved",
+                NotificationMessageKey.WITHDRAWAL_APPROVED,
+                withdrawal.public_id,
                 "approved",
             )
         return intent
@@ -376,7 +376,10 @@ class ControlledPayoutService:
         await self.repo.save_intent(intent)
         await self._event(intent, "payout.rejected", owner.id)
         await self._notify_merchant(
-            intent, "Withdrawal rejected", f"Withdrawal {withdrawal.public_id} rejected", "rejected"
+            intent,
+            NotificationMessageKey.WITHDRAWAL_REJECTED,
+            withdrawal.public_id,
+            "rejected",
         )
         return intent
 
@@ -477,7 +480,7 @@ class ControlledPayoutService:
                 {"failure_kind": intent.failure_kind, "code": result.failure_code},
             )
             await self._notify_owner(
-                intent, "Payout execution failed", f"Simulated payout {intent.id} failed", "failed"
+                intent, NotificationMessageKey.PAYOUT_EXECUTION_FAILED, "failed"
             )
         elif result.status == PayoutProviderResult.PENDING:
             intent.failure_kind = PayoutFailureKind.UNKNOWN.value
@@ -498,8 +501,7 @@ class ControlledPayoutService:
             )
             await self._notify_owner(
                 intent,
-                "Payout requires reconciliation",
-                f"Payout {intent.id} has an unknown result",
+                NotificationMessageKey.PAYOUT_RECONCILIATION_REQUIRED,
                 "reconcile",
             )
         return await self.repo.save_intent(intent)
@@ -682,8 +684,8 @@ class ControlledPayoutService:
         await self.withdrawals.save(withdrawal)
         await self._notify_merchant(
             intent,
-            "Withdrawal completed",
-            f"Withdrawal {withdrawal.public_id} completed",
+            NotificationMessageKey.WITHDRAWAL_COMPLETED,
+            withdrawal.public_id,
             "completed",
         )
 
@@ -726,30 +728,37 @@ class ControlledPayoutService:
             await self.realtime.enqueue_payout(intent, withdrawal_id=intent.withdrawal_id)
 
     async def _notify_owner(
-        self, intent: PayoutIntent, title: str, message: str, suffix: str
+        self, intent: PayoutIntent, message_key: NotificationMessageKey, suffix: str
     ) -> None:
         if not self.notifications:
             return
         owner = await self.accounts.get_by_role(UserRole.OWNER)
         if owner:
-            await self.notifications.emit_notification(
+            await self.notifications.emit_semantic_notification(
                 owner.id,
                 NotificationType.PAYOUT_ACTION_REQUIRED,
-                title,
-                message,
-                {"payout_intent_id": str(intent.id)},
-                f"payout:{intent.id}:{suffix}",
+                message_key,
+                {"reference": str(intent.id)[:8]},
+                payload={"payout_intent_id": str(intent.id)},
+                dedupe_key=f"payout:{intent.id}:{suffix}",
             )
 
     async def _notify_merchant(
-        self, intent: PayoutIntent, title: str, message: str, suffix: str
+        self,
+        intent: PayoutIntent,
+        message_key: NotificationMessageKey,
+        withdrawal_reference: str,
+        suffix: str,
     ) -> None:
         if self.notifications:
-            await self.notifications.emit_notification(
+            await self.notifications.emit_semantic_notification(
                 intent.beneficiary_account_id,
                 NotificationType.WITHDRAWAL_STATUS_CHANGED,
-                title,
-                message,
-                {"withdrawal_id": str(intent.withdrawal_id), "payout_status": intent.status},
-                f"payout:{intent.id}:{suffix}",
+                message_key,
+                {"reference": withdrawal_reference},
+                payload={
+                    "withdrawal_id": str(intent.withdrawal_id),
+                    "payout_status": intent.status,
+                },
+                dedupe_key=f"payout:{intent.id}:{suffix}",
             )

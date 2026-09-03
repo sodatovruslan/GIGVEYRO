@@ -45,7 +45,7 @@ async def test_managed_fiat_migration_upgrade_downgrade_upgrade_on_disposable_da
             disposable_url.set(drivername="postgresql").render_as_string(hide_password=False)
         )
         try:
-            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0027"
+            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0028"
             assert (
                 await connection.fetchval("SELECT to_regclass('public.fiat_wallet_balances')::text")
                 == "fiat_wallet_balances"

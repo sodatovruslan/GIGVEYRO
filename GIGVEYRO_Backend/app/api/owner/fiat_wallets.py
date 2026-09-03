@@ -8,7 +8,7 @@ from app.api.deps import get_current_account, require_roles
 from app.api.fiat_deps import get_fiat_wallet_service
 from app.db.session import get_db
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.enums.wallet import Currency
 from app.models.account import Account
 from app.realtime.contracts import RealtimeEventName
@@ -280,11 +280,11 @@ async def _notify(
     service = NotificationService(
         NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
     )
-    await service.emit_notification(
+    await service.emit_semantic_notification(
         account_id,
         NotificationType.FIAT_BALANCE_UPDATED,
-        title="Баланс обновлён",
-        message="Ваш баланс был обновлён администратором.",
+        NotificationMessageKey.FIAT_BALANCE_UPDATED,
+        message_params={"currency": currency.value, "amount": amount},
         payload={"currency": currency.value, "amount": str(amount)},
         dedupe_key=f"fiat_balance:{operation_id}",
     )

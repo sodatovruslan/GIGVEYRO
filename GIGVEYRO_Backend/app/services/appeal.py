@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.enums.account import UserRole
 from app.enums.appeal import AppealReason, AppealResolution, AppealStatus
 from app.enums.deal import DealStatus
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.models.account import Account
 from app.models.appeal import DealAppeal
 from app.models.deal import Deal
@@ -135,8 +135,8 @@ class AppealService:
             await self._notify(
                 counterparty_id,
                 NotificationType.APPEAL_OPENED,
-                title="Appeal opened",
-                message=f"An appeal was opened for deal {deal.public_id}",
+                message_key=NotificationMessageKey.APPEAL_OPENED,
+                message_params={"reference": deal.public_id},
                 payload={"appeal_id": str(appeal.id), "deal_id": str(deal.id)},
                 dedupe_key=f"appeal_opened:{appeal.id}",
             )
@@ -269,8 +269,8 @@ class AppealService:
                 await self._notify(
                     recipient_id,
                     NotificationType.APPEAL_RESOLVED,
-                    title="Appeal resolved",
-                    message=f"The appeal for deal {deal.public_id} was resolved",
+                    message_key=NotificationMessageKey.APPEAL_RESOLVED,
+                    message_params={"reference": deal.public_id},
                     payload={
                         "appeal_id": str(appeal.id),
                         "deal_id": str(deal.id),
@@ -290,14 +290,14 @@ class AppealService:
         account_id: uuid.UUID,
         type_: NotificationType,
         *,
-        title: str,
-        message: str,
+        message_key: NotificationMessageKey,
+        message_params: dict[str, object] | None = None,
         payload: dict | None = None,
         dedupe_key: str | None = None,
     ) -> None:
         if self._notifications is not None:
-            await self._notifications.emit_notification(
-                account_id, type_, title, message, payload, dedupe_key
+            await self._notifications.emit_semantic_notification(
+                account_id, type_, message_key, message_params, payload, dedupe_key
             )
 
     async def get_for_owner(self, appeal_id: uuid.UUID) -> DealAppeal:

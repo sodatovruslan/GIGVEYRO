@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.exc import IntegrityError
 
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.enums.withdrawal import WithdrawalDestinationType, WithdrawalStatus
 from app.models.account import Account
 from app.models.withdrawal import MerchantWithdrawal
@@ -97,11 +97,17 @@ class WithdrawalService:
     async def _notify_status_changed(self, withdrawal: MerchantWithdrawal) -> None:
         if self._notifications is None:
             return
-        await self._notifications.emit_notification(
+        message_key = {
+            WithdrawalStatus.CANCELLED: NotificationMessageKey.WITHDRAWAL_CANCELLED,
+            WithdrawalStatus.APPROVED: NotificationMessageKey.WITHDRAWAL_APPROVED,
+            WithdrawalStatus.REJECTED: NotificationMessageKey.WITHDRAWAL_REJECTED,
+            WithdrawalStatus.PAID: NotificationMessageKey.WITHDRAWAL_COMPLETED,
+        }[withdrawal.status]
+        await self._notifications.emit_semantic_notification(
             withdrawal.merchant_id,
             NotificationType.WITHDRAWAL_STATUS_CHANGED,
-            title="Withdrawal status changed",
-            message=f"Withdrawal {withdrawal.public_id} is now {withdrawal.status.value}",
+            message_key,
+            {"reference": withdrawal.public_id},
             payload={"withdrawal_id": str(withdrawal.id), "status": withdrawal.status.value},
             dedupe_key=f"withdrawal_status:{withdrawal.id}:{withdrawal.status.value}",
         )

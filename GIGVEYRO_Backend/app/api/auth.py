@@ -20,7 +20,7 @@ from app.core.security import (
 from app.core.totp_crypto import decrypt_totp_secret
 from app.db.session import get_db
 from app.enums.account import UserRole
-from app.enums.notification import NotificationType
+from app.enums.notification import NotificationMessageKey, NotificationType
 from app.infra.redis_rate_limiter import RedisRateLimiter
 from app.models.account import Account
 from app.repositories.account import AccountRepository
@@ -106,13 +106,19 @@ def _notification_service(db: AsyncSession = Depends(get_db)) -> NotificationSer
 
 
 async def _notify_security_event(
-    notifications: NotificationService, account: Account, *, title: str, message: str
+    notifications: NotificationService,
+    account: Account,
+    message_key: NotificationMessageKey,
+    message_params: dict[str, object] | None = None,
 ) -> None:
     # The canonical in-app event and optional Telegram outbox entry are
     # persisted in the caller transaction. External Telegram delivery is
     # asynchronous and can never roll back the security mutation.
-    await notifications.emit_notification(
-        account.id, NotificationType.SECURITY_EVENT, title=title, message=message
+    await notifications.emit_semantic_notification(
+        account.id,
+        NotificationType.SECURITY_EVENT,
+        message_key,
+        message_params,
     )
 
 
@@ -283,8 +289,7 @@ async def verify_two_factor(
         await _notify_security_event(
             notifications,
             account,
-            title="Recovery code used",
-            message="A recovery code was used to sign in to your account.",
+            message_key=NotificationMessageKey.SECURITY_RECOVERY_USED,
         )
     return _token_response(token_pair)
 
@@ -401,8 +406,7 @@ async def confirm_two_factor_setup(
         await _notify_security_event(
             notifications,
             account,
-            title="Two-factor authentication enabled",
-            message="Two-factor authentication was enabled on your account.",
+            message_key=NotificationMessageKey.SECURITY_TWO_FACTOR_ENABLED,
         )
         return TwoFactorSetupConfirmResponse(
             enabled_at=record.enabled_at,
@@ -428,8 +432,7 @@ async def confirm_two_factor_setup(
     await _notify_security_event(
         notifications,
         account,
-        title="Two-factor authentication enabled",
-        message="Two-factor authentication was enabled on your account.",
+        message_key=NotificationMessageKey.SECURITY_TWO_FACTOR_ENABLED,
     )
     return TwoFactorSetupConfirmResponse(
         enabled_at=record.enabled_at, recovery_codes=recovery_codes
@@ -483,8 +486,7 @@ async def disable_two_factor(
     await _notify_security_event(
         notifications,
         account,
-        title="Two-factor authentication disabled",
-        message="Two-factor authentication was disabled on your account.",
+        message_key=NotificationMessageKey.SECURITY_TWO_FACTOR_DISABLED,
     )
 
 
@@ -524,8 +526,7 @@ async def regenerate_recovery_codes(
     await _notify_security_event(
         notifications,
         account,
-        title="Recovery codes regenerated",
-        message="New recovery codes were generated. Previous codes no longer work.",
+        message_key=NotificationMessageKey.SECURITY_RECOVERY_REGENERATED,
     )
     return TwoFactorRegenerateResponse(recovery_codes=codes)
 
@@ -572,8 +573,7 @@ async def change_password(
     await _notify_security_event(
         notifications,
         account,
-        title="Password changed",
-        message="Your account password was changed. Other active sessions were signed out.",
+        message_key=NotificationMessageKey.SECURITY_PASSWORD_CHANGED,
     )
 
 
@@ -661,8 +661,8 @@ async def logout_all(
         await _notify_security_event(
             notifications,
             account,
-            title="All other sessions signed out",
-            message=f"{revoked_count} other active session(s) were signed out.",
+            message_key=NotificationMessageKey.SECURITY_LOGOUT_ALL,
+            message_params={"count": revoked_count},
         )
     return LogoutAllResponse(revoked_count=revoked_count)
 
@@ -710,6 +710,5 @@ async def revoke_session(
     await _notify_security_event(
         notifications,
         account,
-        title="Session signed out",
-        message="An active session was signed out from your account security settings.",
+        message_key=NotificationMessageKey.SECURITY_SESSION_REVOKED,
     )
