@@ -351,6 +351,14 @@ class TestWorkerSettings:
         assert expire_stale_deals in WorkerSettings.functions
         assert process_approved_payouts in WorkerSettings.functions
 
+    def test_worker_entrypoint_uses_supported_arq_cli(self):
+        import worker_entrypoint
+
+        with patch("arq.cli.cli") as cli:
+            worker_entrypoint.main()
+
+        cli.assert_called_once_with()
+
     async def test_worker_shutdown_cancels_heartbeat_cleanly(self):
         """Worker shutdown treats heartbeat cancellation as normal lifecycle."""
         from app.workers.arq_settings import shutdown

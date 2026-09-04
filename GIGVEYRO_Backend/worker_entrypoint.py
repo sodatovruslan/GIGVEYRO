@@ -46,7 +46,7 @@ logger = logging.getLogger("worker_entrypoint")
 
 def main() -> None:
     """Start the ARQ worker process."""
-    import arq
+    from arq.cli import cli
 
     logger.info(
         "Starting GIGVEYRO ARQ worker | env=%s | redis=%s",
@@ -55,7 +55,7 @@ def main() -> None:
     )
 
     # ARQ CLI runner
-    arq.run_worker_main()
+    cli()
 
 
 if __name__ == "__main__":
