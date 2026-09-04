@@ -169,6 +169,7 @@ async def _enforce_two_factor_rate_limit(key: str) -> None:
 async def login(
     payload: LoginRequest,
     request: Request,
+    db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(_service),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
@@ -190,10 +191,14 @@ async def login(
             challenge.id,
             settings.TWO_FACTOR_CHALLENGE_EXPIRE_SECONDS,
         )
-        return TwoFactorRequiredResponse(
+        response = TwoFactorRequiredResponse(
             challenge_token=challenge_token,
             expires_in=settings.TWO_FACTOR_CHALLENGE_EXPIRE_SECONDS,
         )
+        # Dependency teardown runs after the response can be sent. Commit the
+        # challenge first so an immediate /2fa/verify request can observe it.
+        await db.commit()
+        return response
 
     if account.role == UserRole.OWNER and settings.OWNER_2FA_REQUIRED:
         # Credentials are valid but this OWNER has no 2FA configured yet and
@@ -221,7 +226,12 @@ async def login(
         actor_account_id=account.id,
         actor_role=account.role.value,
     )
-    return _token_response(token_pair)
+    response = _token_response(token_pair)
+    # A BFF commonly calls /auth/me immediately after receiving these tokens.
+    # Make the backing auth_session visible before the token response leaves
+    # this handler instead of relying on request-dependency teardown timing.
+    await db.commit()
+    return response
 
 
 @router.post("/2fa/verify", response_model=TokenResponse)
@@ -291,7 +301,9 @@ async def verify_two_factor(
             account,
             message_key=NotificationMessageKey.SECURITY_RECOVERY_USED,
         )
-    return _token_response(token_pair)
+    response = _token_response(token_pair)
+    await db.commit()
+    return response
 
 
 @router.get("/2fa/status", response_model=TwoFactorStatusResponse)
@@ -319,6 +331,7 @@ async def two_factor_status(
 async def start_two_factor_setup(
     payload: TwoFactorSetupStartRequest,
     actor: Annotated[TwoFactorSetupActor, Depends(get_two_factor_setup_actor)],
+    db: AsyncSession = Depends(get_db),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
 ) -> TwoFactorSetupStartResponse:
@@ -345,11 +358,13 @@ async def start_two_factor_setup(
         actor_account_id=account.id,
         actor_role=account.role.value,
     )
-    return TwoFactorSetupStartResponse(
+    response = TwoFactorSetupStartResponse(
         otpauth_uri=two_factor_service.build_otpauth_uri(account, secret),
         manual_key=two_factor_service.format_manual_key(secret),
         expires_at=pending.expires_at,
     )
+    await db.commit()
+    return response
 
 
 @router.post("/2fa/setup/confirm", response_model=TwoFactorSetupConfirmResponse)
@@ -357,6 +372,7 @@ async def confirm_two_factor_setup(
     payload: TwoFactorSetupConfirmRequest,
     request: Request,
     actor: Annotated[TwoFactorSetupActor, Depends(get_two_factor_setup_actor)],
+    db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(_service),
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
@@ -408,13 +424,15 @@ async def confirm_two_factor_setup(
             account,
             message_key=NotificationMessageKey.SECURITY_TWO_FACTOR_ENABLED,
         )
-        return TwoFactorSetupConfirmResponse(
+        response = TwoFactorSetupConfirmResponse(
             enabled_at=record.enabled_at,
             recovery_codes=recovery_codes,
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             access_expires_in=token_pair.access_expires_in,
         )
+        await db.commit()
+        return response
 
     current_session_id = _bearer_session_id(request)
     revoked_count = await service.logout_all(
@@ -434,9 +452,11 @@ async def confirm_two_factor_setup(
         account,
         message_key=NotificationMessageKey.SECURITY_TWO_FACTOR_ENABLED,
     )
-    return TwoFactorSetupConfirmResponse(
+    response = TwoFactorSetupConfirmResponse(
         enabled_at=record.enabled_at, recovery_codes=recovery_codes
     )
+    await db.commit()
+    return response
 
 
 @router.post("/2fa/disable", status_code=status.HTTP_204_NO_CONTENT)
@@ -586,6 +606,7 @@ async def read_current_account(account: Account = Depends(get_current_account)) 
 async def refresh_token(
     payload: RefreshTokenRequest,
     request: Request,
+    db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(_service),
     audit: AuditService = Depends(_audit_service),
 ) -> TokenResponse:
@@ -603,6 +624,9 @@ async def refresh_token(
             actor_account_id=exc.account_id,
             audit_metadata={"reason": "reuse_detected"},
         )
+        # Preserve the defensive revocation and its audit record even though
+        # the endpoint deliberately returns an HTTP error.
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="refresh token reuse detected; session revoked",
@@ -613,7 +637,9 @@ async def refresh_token(
             detail="invalid refresh token",
         ) from exc
 
-    return _token_response(token_pair)
+    response = _token_response(token_pair)
+    await db.commit()
+    return response
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
