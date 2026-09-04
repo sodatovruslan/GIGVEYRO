@@ -122,8 +122,8 @@ export function UnmatchedTransfersPanel() {
       {query.data && <Pager offset={offset} limit={PAGE_SIZE} itemCount={query.data.items.length} total={query.data.total} onPage={setOffset} />}
     </div>
     {success && <div className={styles.toast} role="status">{success}</div>}
-    {(detailLoading || detail || detailError) && <div className={styles.modalBackdrop} onMouseDown={closeDetail}><div className={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
-      <h2>{t("unmatchedDetailTitle")}</h2>
+    {(detailLoading || detail || detailError) && <div className={styles.modalBackdrop} onMouseDown={closeDetail}><div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="unmatched-detail-title" onMouseDown={(event) => event.stopPropagation()}>
+      <h2 id="unmatched-detail-title">{t("unmatchedDetailTitle")}</h2>
       {detailLoading ? <p>{t("loading")}</p> : detailError ? <div className={styles.error}>{detailError}</div> : detail && <>
         <div className={styles.intent}>
           <span>{t("correlationStatus")}</span><b>{t(`correlation.${detail.correlation_status}`)}</b><span>{t("reconciliationStatus")}</span><b>{t(`reconciliation.${detail.reconciliation_status}`)}</b>

@@ -304,7 +304,7 @@ export function SecuritySettingsPage() {
 
       {dialog === "password" && (
         <div className={styles.modalBackdrop} onMouseDown={closeDialog}>
-          <div className={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
+          <div className={styles.modal} role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2>{t("passwordTitle")}</h2>
               <button onClick={closeDialog} aria-label={common("cancel")}>×</button>
@@ -382,7 +382,7 @@ export function SecuritySettingsPage() {
 
       {dialog === "enable" && (
         <div className={styles.modalBackdrop} onMouseDown={closeDialog}>
-          <div className={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
+          <div className={styles.modal} role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2>{t("twoFactorTitle")}</h2>
               <button onClick={closeDialog} aria-label={common("cancel")}>×</button>
@@ -427,7 +427,7 @@ export function SecuritySettingsPage() {
                 </div>
                 <div>
                   <p className={styles.meta}>{t("manualKeyLabel")}</p>
-                  <div className={styles.manualKey}>{manualKey}</div>
+                  <div className={styles.manualKey} data-testid="two-factor-manual-key">{manualKey}</div>
                 </div>
                 <label>
                   {t("enterCodeLabel")}
@@ -454,7 +454,7 @@ export function SecuritySettingsPage() {
               <div className={styles.form}>
                 <h2>{t("recoveryCodesTitle")}</h2>
                 <div className={styles.recoveryWarning}>{t("recoveryCodesWarning")}</div>
-                <div className={styles.recoveryGrid}>
+                <div className={styles.recoveryGrid} data-testid="two-factor-recovery-codes">
                   {recoveryCodes.map((item) => <span key={item}>{item}</span>)}
                 </div>
                 <div className={styles.formActions}>
@@ -470,7 +470,7 @@ export function SecuritySettingsPage() {
 
       {dialog === "disable" && (
         <div className={styles.modalBackdrop} onMouseDown={closeDialog}>
-          <div className={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
+          <div className={styles.modal} role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2>{t("disableTitle")}</h2>
               <button onClick={closeDialog} aria-label={common("cancel")}>×</button>
@@ -499,7 +499,7 @@ export function SecuritySettingsPage() {
 
       {dialog === "regenerate" && (
         <div className={styles.modalBackdrop} onMouseDown={closeDialog}>
-          <div className={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
+          <div className={styles.modal} role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2>{t("regenerateTitle")}</h2>
               <button onClick={closeDialog} aria-label={common("cancel")}>×</button>

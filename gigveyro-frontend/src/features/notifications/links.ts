@@ -4,6 +4,9 @@ import type { NotificationItem, UserRole } from "@/lib/api/types";
  * payload fields the backend actually sends - never guessed. */
 export function notificationLink(item: NotificationItem, role: UserRole): string | null {
   const payload = item.payload as Record<string, unknown> | null;
+  if (item.type === "SECURITY_EVENT") {
+    return `/${role}/settings`;
+  }
   if (!payload) return null;
   if ((item.type === "APPEAL_OPENED" || item.type === "APPEAL_RESOLVED") && payload.appeal_id) {
     return `/${role}/appeals`;

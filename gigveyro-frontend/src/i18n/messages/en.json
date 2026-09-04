@@ -371,6 +371,7 @@
     "unmatchedSubtitle": "On-chain transfers the correlation scanner could not safely match to a deposit intent",
     "unmatchedEmpty": "No unmatched transfers",
     "unmatchedDetailTitle": "Transfer details",
+    "reason": "Reason",
     "minAmount": "Min amount",
     "maxAmount": "Max amount",
     "fromAddress": "From address",

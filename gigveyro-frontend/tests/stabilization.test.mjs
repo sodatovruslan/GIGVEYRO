@@ -65,6 +65,13 @@ test("Telegram deep links stay responsive and open safely", async () => {
   assert.doesNotMatch(component, /verification_code/);
 });
 
+test("security notification links use role-owned settings routes", () => {
+  const item = { type: "SECURITY_EVENT", payload: { url: "https://attacker.invalid" } };
+  assert.equal(notificationLink(item, "owner"), "/owner/settings");
+  assert.equal(notificationLink(item, "user"), "/user/settings");
+  assert.equal(notificationLink(item, "merchant"), "/merchant/settings");
+});
+
 test("merchant withdrawal maps structured and backend TRC20 validation to destination", () => {
   const messages = { invalidAmount: "amount", invalidDestination: "destination", invalidTrc20: "trc20", invalidComment: "comment" };
   assert.deepEqual(mapWithdrawalFieldErrors({ message: "validation", issues: [{ loc: ["body", "amount"] }] }, messages), { amount: "amount" });

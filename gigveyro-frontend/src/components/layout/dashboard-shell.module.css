@@ -6,7 +6,7 @@
 .brand small { margin-top: 5px; color: var(--text-muted); font-size: 8px; letter-spacing: .19em; }
 .logo { width: 39px; height: 39px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; color: var(--on-accent); background: linear-gradient(135deg, var(--primary), var(--accent-logo-deep)); box-shadow: 0 0 24px var(--primary-glow); font: 800 19px/1 var(--font-display); }
 .logo img { width: 100%; height: 100%; object-fit: cover; }
-.nav { display: grid; gap: 5px; margin-top: 48px; }
+.nav { min-height: 0; display: grid; flex: 1; align-content: start; gap: 5px; margin-top: 48px; overflow-y: auto; }
 .nav p { padding: 0 12px 9px; color: var(--text-muted); font-size: 9px; font-weight: 700; letter-spacing: .16em; }
 .nav a { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 13px; border-radius: 11px; color: var(--text-secondary); font-size: 13px; font-weight: 500; transition: color var(--transition), background var(--transition); }
 .nav a:hover { color: var(--text); background: var(--surface-action); }
@@ -14,7 +14,7 @@
 .nav a.active::before { content: ""; position: absolute; left: -17px; width: 3px; height: 22px; border-radius: 0 4px 4px 0; background: var(--primary); box-shadow: 0 0 14px var(--primary); }
 .glyph { width: 21px; color: inherit; font-size: 19px; text-align: center; }
 .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; margin-left: auto; padding: 0 5px; border-radius: 999px; color: var(--on-accent); background: var(--primary); font-size: 9px; font-weight: 700; }
-.profile { display: grid; grid-template-columns: 36px 1fr 30px; align-items: center; gap: 10px; margin-top: auto; padding: 12px 9px 0; border-top: 1px solid var(--border); }
+.profile { display: grid; flex-shrink: 0; grid-template-columns: 36px 1fr 30px; align-items: center; gap: 10px; margin-top: auto; padding: 12px 9px 0; border-top: 1px solid var(--border); }
 .avatar, .headerUser div { display: grid; place-items: center; border: 1px solid var(--accent-border); border-radius: 11px; color: var(--primary); background: var(--primary-soft); font-weight: 700; }
 .avatar { width: 36px; height: 36px; }
 .profile div:nth-child(2) { min-width: 0; display: grid; }
