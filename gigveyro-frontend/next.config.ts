@@ -1,12 +1,19 @@
 import type { NextConfig } from "next";
 
+const scriptSource = process.env.NODE_ENV === "development"
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'";
+const connectSource = process.env.NODE_ENV === "development"
+  ? "connect-src 'self' https: wss: ws:"
+  : "connect-src 'self' https: wss:";
+
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  scriptSource,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https: wss:",
+  connectSource,
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
