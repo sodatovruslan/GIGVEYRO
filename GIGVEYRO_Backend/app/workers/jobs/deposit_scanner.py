@@ -32,13 +32,16 @@ from app.infra.metrics import (
 from app.infra.redis_client import get_redis
 from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
+from app.repositories.invoice import InvoiceRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.notification import NotificationRepository
+from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.services.deposit import DepositService
 from app.services.notification import NotificationService
 from app.services.provider_factory import get_deposit_provider
+from app.services.realtime import RealtimeEventService
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import WalletService
 from app.workers.distributed_lock import DistributedLock
@@ -126,6 +129,8 @@ async def _run_scan(job_id: str, attempt: int, *, watermark_store: Any | None = 
                 wallet_service=wallet_service,
                 provider=provider,
                 notification_service=notification_service,
+                realtime_service=RealtimeEventService(RealtimeOutboxRepository(session)),
+                invoice_repository=InvoiceRepository(session),
             )
             processed = await service.scan_and_correlate_deposits(
                 min_timestamp_ms=min_timestamp_ms

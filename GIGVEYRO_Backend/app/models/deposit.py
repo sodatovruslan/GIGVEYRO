@@ -30,8 +30,9 @@ from app.models.wallet import MONEY
 
 
 class Deposit(Base):
-    """A USER's intent to deposit USDT/TRC20 to the platform's single
-    shared address, plus the on-chain transaction later matched to it.
+    """A USER's (or, when invoice_id is set, a MERCHANT invoice's) intent
+    to deposit USDT/TRC20 to the platform's single shared address, plus
+    the on-chain transaction later matched to it.
     """
 
     __tablename__ = "deposits"
@@ -54,6 +55,9 @@ class Deposit(Base):
     public_id: Mapped[str] = mapped_column(String(16), unique=True, nullable=False, index=True)
     account_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False, index=True
+    )
+    invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("invoices.id"), unique=True, nullable=True, index=True
     )
 
     network: Mapped[DepositNetwork] = mapped_column(

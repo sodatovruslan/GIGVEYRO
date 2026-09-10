@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.enums.account import UserRole
 from app.models.deal import Deal
 from app.models.deposit import Deposit
+from app.models.invoice import Invoice
 from app.models.payout import PayoutIntent
 from app.models.realtime import RealtimeOutbox
 from app.realtime.broker import RealtimeBroker
@@ -96,6 +97,18 @@ class RealtimeEventService:
                 recipient_account_ids=[str(deposit.account_id)],
                 recipient_roles=[UserRole.OWNER.value],
                 data={"status": deposit.status.value},
+                occurred_at=datetime.now(UTC),
+            )
+        )
+
+    async def enqueue_invoice_updated(self, invoice: Invoice) -> RealtimeOutbox:
+        return await self._repository.create(
+            RealtimeOutbox(
+                event=RealtimeEventName.INVOICE_UPDATED.value,
+                entity_id=invoice.id,
+                recipient_account_ids=[str(invoice.merchant_id)],
+                recipient_roles=[UserRole.OWNER.value],
+                data={"status": invoice.status.value},
                 occurred_at=datetime.now(UTC),
             )
         )

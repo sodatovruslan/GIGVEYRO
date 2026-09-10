@@ -18,6 +18,7 @@ class RealtimeEventName(StrEnum):
     PAYOUT_UPDATED = "payout.updated"
     WITHDRAWAL_UPDATED = "withdrawal.updated"
     DEPOSIT_UPDATED = "deposit.updated"
+    INVOICE_UPDATED = "invoice.updated"
 
 
 class RealtimeEvent(BaseModel):

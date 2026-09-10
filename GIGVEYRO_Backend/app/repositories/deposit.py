@@ -65,6 +65,12 @@ class DepositRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_invoice_id(self, invoice_id: uuid.UUID) -> Deposit | None:
+        result = await self._session.execute(
+            select(Deposit).where(Deposit.invoice_id == invoice_id)
+        )
+        return result.scalar_one_or_none()
+
     async def create(self, deposit: Deposit) -> Deposit:
         self._session.add(deposit)
         await self._session.flush()

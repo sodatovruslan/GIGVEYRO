@@ -14,7 +14,9 @@ from app.api.deals import router as deals_router
 from app.api.deposits import router as deposits_router
 from app.api.fiat_wallets import router as fiat_wallets_router
 from app.api.health import router as health_router
+from app.api.invoices import router as public_invoices_router
 from app.api.merchant.deals import router as merchant_deals_router
+from app.api.merchant.invoices import router as merchant_invoices_router
 from app.api.merchant.wallet import router as merchant_wallet_router
 from app.api.merchant.withdrawals import router as merchant_withdrawals_router
 from app.api.notifications import router as notifications_router
@@ -145,6 +147,8 @@ app.include_router(owner_audit_router)
 app.include_router(wallet_router)
 app.include_router(merchant_wallet_router)
 app.include_router(merchant_withdrawals_router)
+app.include_router(merchant_invoices_router)
+app.include_router(public_invoices_router)
 app.include_router(requisites_router)
 app.include_router(traffic_router)
 app.include_router(merchant_deals_router)

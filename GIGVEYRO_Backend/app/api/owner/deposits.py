@@ -14,6 +14,7 @@ from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.deposit import DepositRepository
+from app.repositories.invoice import InvoiceRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.notification import NotificationRepository
 from app.repositories.realtime import RealtimeOutboxRepository
@@ -63,6 +64,8 @@ def _service(db: AsyncSession = Depends(get_db)) -> DepositService:
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
         audit_service=AuditService(AuditRepository(db)),
+        realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
+        invoice_repository=InvoiceRepository(db),
     )
 
 
@@ -78,6 +81,8 @@ def _reconciliation_service(db: AsyncSession = Depends(get_db)) -> DepositReconc
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
         audit_service=AuditService(AuditRepository(db)),
+        realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
+        invoice_repository=InvoiceRepository(db),
     )
     return DepositReconciliationService(
         repository,

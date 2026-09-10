@@ -538,6 +538,54 @@ class WalletService:
         )
         return await self._ledger.create(entry)
 
+    async def credit_deposit_for_merchant(
+        self, *, merchant_id: uuid.UUID, amount: Decimal, deposit_id: uuid.UUID
+    ) -> LedgerEntry:
+        """Same contract as credit_deposit(), but for an invoice-linked deposit
+        whose account_id is a MERCHANT - credits MerchantWallet, not UserWallet."""
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="deposit",
+            reference_id=deposit_id,
+            entry_type=LedgerEntryType.DEPOSIT_CREDIT,
+        )
+        if existing is not None:
+            return existing
+
+        merchant_wallet = await self._merchant_wallets.get_by_account_id_for_update(merchant_id)
+        if merchant_wallet is None:
+            raise WalletNotFoundError()
+
+        available_before = merchant_wallet.available_balance
+        held_before = merchant_wallet.held_balance
+
+        merchant_wallet.available_balance = available_before + amount
+        await self._merchant_wallets.save(merchant_wallet)
+
+        entry = LedgerEntry(
+            merchant_wallet_id=merchant_wallet.id,
+            account_id=merchant_id,
+            type=LedgerEntryType.DEPOSIT_CREDIT,
+            balance_bucket=BalanceBucket.AVAILABLE,
+            currency=merchant_wallet.currency,
+            amount=amount,
+            available_before=available_before,
+            available_after=merchant_wallet.available_balance,
+            insurance_before=Decimal("0"),
+            insurance_after=Decimal("0"),
+            frozen_before=Decimal("0"),
+            frozen_after=Decimal("0"),
+            held_before=held_before,
+            held_after=merchant_wallet.held_balance,
+            reference_type="deposit",
+            reference_id=deposit_id,
+            description="Credit for confirmed TRC20 invoice deposit",
+            created_by_account_id=None,
+        )
+        return await self._ledger.create(entry)
+
     async def manual_adjust(
         self,
         *,

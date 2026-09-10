@@ -15,14 +15,17 @@ from app.enums.deposit import (
     DepositStatus,
     ReconciliationStatus,
 )
+from app.enums.invoice import InvoiceStatus
 from app.enums.notification import NotificationMessageKey, NotificationType
 from app.models.account import Account
 from app.models.deposit import Deposit, UnmatchedTransfer
 from app.repositories.account import AccountRepository
 from app.repositories.deposit import DepositRepository
+from app.repositories.invoice import InvoiceRepository
 from app.services.audit import AuditService
 from app.services.deposit_provider import CryptoDepositProvider
 from app.services.notification import NotificationService
+from app.services.realtime import RealtimeEventService
 from app.services.wallet import WalletService
 
 logger = logging.getLogger(__name__)
@@ -98,6 +101,8 @@ class DepositService:
         provider: CryptoDepositProvider,
         notification_service: NotificationService | None = None,
         audit_service: AuditService | None = None,
+        realtime_service: RealtimeEventService | None = None,
+        invoice_repository: InvoiceRepository | None = None,
     ):
         self._deposits = deposit_repository
         self._accounts = account_repository
@@ -105,6 +110,8 @@ class DepositService:
         self._provider = provider
         self._notifications = notification_service
         self._audit = audit_service
+        self._realtime = realtime_service
+        self._invoices = invoice_repository
 
     async def _audit_deposit(self, deposit: Deposit, action: str) -> None:
         if self._audit is not None:
@@ -458,11 +465,18 @@ class DepositService:
         return await self._deposits.save(deposit)
 
     async def _credit(self, deposit: Deposit) -> Deposit:
-        await self._wallet_service.credit_deposit(
-            account_id=deposit.account_id,
-            amount=deposit.received_amount,
-            deposit_id=deposit.id,
-        )
+        if deposit.invoice_id is not None:
+            await self._wallet_service.credit_deposit_for_merchant(
+                merchant_id=deposit.account_id,
+                amount=deposit.received_amount,
+                deposit_id=deposit.id,
+            )
+        else:
+            await self._wallet_service.credit_deposit(
+                account_id=deposit.account_id,
+                amount=deposit.received_amount,
+                deposit_id=deposit.id,
+            )
 
         deposit.credited_amount = deposit.received_amount
         transition_deposit(deposit, DepositStatus.CREDITED)
@@ -483,6 +497,26 @@ class DepositService:
             )
 
         await self._audit_deposit(saved, "deposit.credited")
+
+        if self._realtime is not None:
+            await self._realtime.enqueue_deposit_updated(saved)
+
+        if saved.invoice_id is not None and self._invoices is not None:
+            invoice = await self._invoices.get_by_id_for_update(saved.invoice_id)
+            if invoice is not None and invoice.status == InvoiceStatus.PENDING_PAYMENT:
+                invoice.status = InvoiceStatus.PAID
+                invoice.paid_at = datetime.now(UTC)
+                invoice = await self._invoices.save(invoice)
+                if self._audit is not None:
+                    await self._audit.log_action(
+                        action="invoice.paid",
+                        entity_type="invoice",
+                        entity_id=str(invoice.id),
+                        actor_account_id=None,
+                        actor_role="system",
+                    )
+                if self._realtime is not None:
+                    await self._realtime.enqueue_invoice_updated(invoice)
 
         return saved
 

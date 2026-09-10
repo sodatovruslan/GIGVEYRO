@@ -150,6 +150,7 @@ class Settings(BaseSettings):
     USDT_TRC20_DEPOSIT_ADDRESS: str = "TMOCK_GIGVEYRO_DEPOSIT_ADDRESS"
     DEPOSIT_TTL_MINUTES: int = 30
     TRC20_REQUIRED_CONFIRMATIONS: int = 20
+    INVOICE_TTL_MINUTES: int = 30
 
     # TRON / TRC20 Real-shaped Read-Only Provider Settings
     TRONGRID_API_URL: str = "https://api.trongrid.io"

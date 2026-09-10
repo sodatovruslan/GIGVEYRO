@@ -9,8 +9,10 @@ from app.enums.account import UserRole
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.deposit import DepositRepository
+from app.repositories.invoice import InvoiceRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.notification import NotificationRepository
+from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
 from app.schemas.deposit import DepositRead, DepositSimulateTransaction
@@ -23,6 +25,7 @@ from app.services.deposit import (
 )
 from app.services.deposit_provider import MockTRC20DepositProvider
 from app.services.notification import NotificationService
+from app.services.realtime import RealtimeEventService
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import WalletNotFoundError, WalletService
 
@@ -45,6 +48,8 @@ def _service(db: AsyncSession = Depends(get_db)) -> DepositService:
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
         audit_service=AuditService(AuditRepository(db)),
+        realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
+        invoice_repository=InvoiceRepository(db),
     )
 
 

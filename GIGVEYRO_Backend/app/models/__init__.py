@@ -6,6 +6,7 @@ from app.models.deal import Deal
 from app.models.deposit import Deposit, DepositReconciliationAction, UnmatchedTransfer
 from app.models.fees import FeePolicy, FeePolicyComponent, FeeSnapshot, OwnerProfitEntry
 from app.models.fiat_wallet import FiatConversion, FiatLedgerEntry, FiatWalletBalance
+from app.models.invoice import Invoice
 from app.models.ledger import LedgerEntry
 from app.models.merchant_wallet import MerchantWallet
 from app.models.notification import (
@@ -57,6 +58,7 @@ __all__ = [
     "FeePolicyComponent",
     "FeeSnapshot",
     "OwnerProfitEntry",
+    "Invoice",
     "RiskPolicy",
     "TreasurySnapshotRecord",
     "MerchantWallet",
