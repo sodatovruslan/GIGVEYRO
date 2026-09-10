@@ -19,6 +19,8 @@ from app.api.merchant.api_keys import router as merchant_api_keys_router
 from app.api.merchant.deals import router as merchant_deals_router
 from app.api.merchant.fees import router as merchant_fees_router
 from app.api.merchant.invoices import router as merchant_invoices_router
+from app.api.merchant.profile import router as merchant_profile_router
+from app.api.merchant.statistics import router as merchant_statistics_router
 from app.api.merchant.wallet import router as merchant_wallet_router
 from app.api.merchant.webhooks import router as merchant_webhooks_router
 from app.api.merchant.withdrawals import router as merchant_withdrawals_router
@@ -161,6 +163,8 @@ app.include_router(merchant_api_keys_router)
 app.include_router(public_api_invoices_router)
 app.include_router(merchant_webhooks_router)
 app.include_router(merchant_fees_router)
+app.include_router(merchant_statistics_router)
+app.include_router(merchant_profile_router)
 app.include_router(requisites_router)
 app.include_router(traffic_router)
 app.include_router(merchant_deals_router)

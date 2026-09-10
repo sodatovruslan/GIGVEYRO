@@ -1,11 +1,14 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.withdrawal import WithdrawalStatus
 from app.models.withdrawal import MerchantWithdrawal
+
+_MONEY_QUANTUM = Decimal("0.00000001")
 
 
 class WithdrawalRepository:
@@ -99,6 +102,32 @@ class WithdrawalRepository:
         )
         result = await self._session.execute(query)
         return result.scalar_one()
+
+    async def stats_for_merchant(self, merchant_id: uuid.UUID) -> dict[str, int | Decimal]:
+        counts_query = (
+            select(MerchantWithdrawal.status, func.count())
+            .where(MerchantWithdrawal.merchant_id == merchant_id)
+            .group_by(MerchantWithdrawal.status)
+        )
+        counts_result = await self._session.execute(counts_query)
+        counts = {status.value: count for status, count in counts_result.all()}
+
+        volume_query = select(func.coalesce(func.sum(MerchantWithdrawal.amount), 0)).where(
+            MerchantWithdrawal.merchant_id == merchant_id,
+            MerchantWithdrawal.status == WithdrawalStatus.PAID,
+        )
+        volume_result = await self._session.execute(volume_query)
+        paid_volume = volume_result.scalar_one()
+
+        return {
+            "total": sum(counts.values()),
+            "pending": counts.get(WithdrawalStatus.PENDING.value, 0),
+            "approved": counts.get(WithdrawalStatus.APPROVED.value, 0),
+            "paid": counts.get(WithdrawalStatus.PAID.value, 0),
+            "rejected": counts.get(WithdrawalStatus.REJECTED.value, 0),
+            "cancelled": counts.get(WithdrawalStatus.CANCELLED.value, 0),
+            "paid_volume": Decimal(paid_volume).quantize(_MONEY_QUANTUM),
+        }
 
     @staticmethod
     def _filtered(

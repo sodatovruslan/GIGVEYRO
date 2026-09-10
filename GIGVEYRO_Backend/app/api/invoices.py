@@ -6,6 +6,7 @@ from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
 from app.repositories.deposit import DepositRepository
 from app.repositories.invoice import InvoiceRepository
+from app.repositories.merchant_profile import MerchantProfileRepository
 from app.schemas.invoice import PublicInvoiceRead
 from app.services.deposit_provider import MockTRC20DepositProvider
 from app.services.invoice import InvoiceNotFoundError, InvoiceService
@@ -23,6 +24,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> InvoiceService:
 async def get_public_invoice(
     public_id: str,
     request: Request,
+    db: AsyncSession = Depends(get_db),
     service: InvoiceService = Depends(_service),
 ) -> PublicInvoiceRead:
     """Unauthenticated, customer-facing invoice status - used by the payment page."""
@@ -33,8 +35,13 @@ async def get_public_invoice(
         settings.DEFAULT_RATE_LIMIT_WINDOW_SECONDS,
     )
     try:
-        return await service.get_by_public_id(public_id)
+        invoice = await service.get_by_public_id(public_id)
     except InvoiceNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="invoice not found"
         ) from exc
+    profile = await MerchantProfileRepository(db).get_by_merchant_id(invoice.merchant_id)
+    return PublicInvoiceRead(
+        **PublicInvoiceRead.model_validate(invoice).model_dump(exclude={"store_name"}),
+        store_name=profile.store_name if profile else None,
+    )

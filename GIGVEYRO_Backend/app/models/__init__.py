@@ -9,6 +9,7 @@ from app.models.fees import FeePolicy, FeePolicyComponent, FeeSnapshot, OwnerPro
 from app.models.fiat_wallet import FiatConversion, FiatLedgerEntry, FiatWalletBalance
 from app.models.invoice import Invoice
 from app.models.ledger import LedgerEntry
+from app.models.merchant_profile import MerchantProfile
 from app.models.merchant_wallet import MerchantWallet
 from app.models.notification import (
     Notification,
@@ -65,6 +66,7 @@ __all__ = [
     "Invoice",
     "RiskPolicy",
     "TreasurySnapshotRecord",
+    "MerchantProfile",
     "MerchantWallet",
     "Notification",
     "NotificationDelivery",

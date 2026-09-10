@@ -40,7 +40,8 @@ class InvoiceListResponse(BaseModel):
 
 class PublicInvoiceRead(BaseModel):
     """Customer-facing subset shown on the unauthenticated payment page -
-    no merchant identity or internal fields."""
+    no merchant identity or internal fields (store_name is the one
+    merchant-controlled exception, set via the Store Settings page)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,3 +51,4 @@ class PublicInvoiceRead(BaseModel):
     deposit_address: str
     status: InvoiceStatus
     expires_at: datetime
+    store_name: str | None = None
