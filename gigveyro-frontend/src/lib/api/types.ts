@@ -624,6 +624,7 @@ export type ApiKeyStatus = "active" | "revoked";
 
 export interface ApiKey {
   id: string;
+  merchant_id: string;
   label: string;
   key_prefix: string;
   status: ApiKeyStatus;
