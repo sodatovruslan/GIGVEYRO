@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
     DEFAULT_RATE_LIMIT_REQUESTS: int = 100
     DEFAULT_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    FINANCIAL_MUTATION_RATE_LIMIT_REQUESTS: int = 10
+    FINANCIAL_MUTATION_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    API_KEY_AUTH_RATE_LIMIT_REQUESTS: int = 30
+    API_KEY_AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
     # Telegram is an optional, read-only communication channel. It never authorizes finance.
     TELEGRAM_BOT_ENABLED: bool = False

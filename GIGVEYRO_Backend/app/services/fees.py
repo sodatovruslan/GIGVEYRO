@@ -110,6 +110,13 @@ class FeePolicyService:
     async def active(self, *, lock: bool = False) -> FeePolicy:
         return await self._fees.active_policy(lock=lock)
 
+    async def for_merchant(self) -> FeePolicyComponent:
+        """Read-only: the MERCHANT fee component of the active policy, so a
+        merchant can see what fee terms would apply. Not an enforcement
+        path - see ENFORCED_FEE_TYPES for what's actually charged today."""
+        policy = await self.active()
+        return policy_component(policy, FeeType.MERCHANT)
+
     async def policy(self, policy_id: uuid.UUID) -> FeePolicy:
         policy = await self._fees.policy_by_id(policy_id)
         if policy is None:

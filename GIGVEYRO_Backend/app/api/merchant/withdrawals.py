@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_account, require_roles
+from app.core.config import settings
+from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
 from app.enums.account import UserRole
 from app.enums.withdrawal import WithdrawalStatus
@@ -64,6 +66,11 @@ async def create_withdrawal(
     merchant: Account = Depends(get_current_account),
     service: WithdrawalService = Depends(_service),
 ) -> MerchantWithdrawalRead:
+    await enforce_rate_limit(
+        f"withdrawal_create:{merchant.id}",
+        settings.FINANCIAL_MUTATION_RATE_LIMIT_REQUESTS,
+        settings.FINANCIAL_MUTATION_RATE_LIMIT_WINDOW_SECONDS,
+    )
     try:
         return await service.create_withdrawal(
             merchant,

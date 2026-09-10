@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_merchant_via_api_key
+from app.core.config import settings
+from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
 from app.models.account import Account
 from app.repositories.deposit import DepositRepository
@@ -27,6 +29,11 @@ async def create_invoice_via_api(
     merchant: Account = Depends(get_merchant_via_api_key),
     service: InvoiceService = Depends(_service),
 ) -> InvoiceRead:
+    await enforce_rate_limit(
+        f"api_invoice_create:{merchant.id}",
+        settings.FINANCIAL_MUTATION_RATE_LIMIT_REQUESTS,
+        settings.FINANCIAL_MUTATION_RATE_LIMIT_WINDOW_SECONDS,
+    )
     return await service.create_invoice(
         merchant,
         amount=payload.amount,

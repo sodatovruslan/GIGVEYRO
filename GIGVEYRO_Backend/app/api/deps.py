@@ -3,10 +3,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.core.rate_limit import enforce_rate_limit
 from app.core.security import TokenError, TokenType, decode_token
 from app.db.session import get_db
 from app.enums.account import UserRole
@@ -77,6 +79,7 @@ async def get_current_account(
 
 
 async def get_merchant_via_api_key(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> Account:
@@ -89,6 +92,13 @@ async def get_merchant_via_api_key(
     )
     if credentials is None:
         raise unauthorized
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    await enforce_rate_limit(
+        f"api_key_auth:{client_ip}",
+        settings.API_KEY_AUTH_RATE_LIMIT_REQUESTS,
+        settings.API_KEY_AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    )
 
     api_key = await ApiKeyService(ApiKeyRepository(db)).authenticate(credentials.credentials)
     if api_key is None or api_key.status != ApiKeyStatus.ACTIVE:
