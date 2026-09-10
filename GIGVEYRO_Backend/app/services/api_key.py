@@ -50,6 +50,20 @@ class ApiKeyService:
         api_key = await self._keys.get_by_id_for_update(key_id)
         if api_key is None or api_key.merchant_id != merchant_id:
             raise ApiKeyNotFoundError()
+        return await self._revoke(api_key)
+
+    async def revoke_as_owner(self, key_id: uuid.UUID) -> ApiKey:
+        api_key = await self._keys.get_by_id_for_update(key_id)
+        if api_key is None:
+            raise ApiKeyNotFoundError()
+        return await self._revoke(api_key)
+
+    async def list_all(self, *, limit: int, offset: int) -> tuple[list[ApiKey], int]:
+        items = await self._keys.list_all(limit=limit, offset=offset)
+        total = await self._keys.count_all()
+        return items, total
+
+    async def _revoke(self, api_key: ApiKey) -> ApiKey:
         if api_key.status == ApiKeyStatus.REVOKED:
             raise ApiKeyAlreadyRevokedError("this key is already revoked")
         api_key.status = ApiKeyStatus.REVOKED

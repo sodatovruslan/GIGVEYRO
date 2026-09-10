@@ -14,6 +14,7 @@ class ApiKeyRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    merchant_id: uuid.UUID
     label: str
     key_prefix: str
     status: ApiKeyStatus

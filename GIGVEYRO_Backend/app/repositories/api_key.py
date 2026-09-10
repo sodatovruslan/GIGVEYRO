@@ -52,3 +52,12 @@ class ApiKeyRepository:
             select(func.count()).select_from(ApiKey).where(ApiKey.merchant_id == merchant_id)
         )
         return result.scalar_one()
+
+    async def list_all(self, *, limit: int, offset: int) -> list[ApiKey]:
+        query = select(ApiKey).order_by(ApiKey.created_at.desc()).limit(limit).offset(offset)
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
+    async def count_all(self) -> int:
+        result = await self._session.execute(select(func.count()).select_from(ApiKey))
+        return result.scalar_one()

@@ -27,6 +27,7 @@ from app.api.merchant.withdrawals import router as merchant_withdrawals_router
 from app.api.notifications import router as notifications_router
 from app.api.owner.accounts import router as owner_accounts_router
 from app.api.owner.analytics import router as owner_analytics_router
+from app.api.owner.api_keys import router as owner_api_keys_router
 from app.api.owner.appeals import router as owner_appeals_router
 from app.api.owner.audit import router as owner_audit_router
 from app.api.owner.deals import router as owner_deals_router
@@ -165,6 +166,7 @@ app.include_router(merchant_webhooks_router)
 app.include_router(merchant_fees_router)
 app.include_router(merchant_statistics_router)
 app.include_router(merchant_profile_router)
+app.include_router(owner_api_keys_router)
 app.include_router(requisites_router)
 app.include_router(traffic_router)
 app.include_router(merchant_deals_router)
