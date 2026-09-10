@@ -493,6 +493,112 @@ class WalletService:
         )
         return await self._ledger.create(entry)
 
+    async def hold_for_user_withdrawal(
+        self, *, user_id: uuid.UUID, amount: Decimal, withdrawal_id: uuid.UUID
+    ) -> LedgerEntry:
+        """Same contract as hold_for_withdrawal(), but reserves from a
+        UserWallet's frozen_balance bucket (the same bucket freeze_for_deal
+        uses) instead of a MerchantWallet's held_balance."""
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            entry_type=LedgerEntryType.WITHDRAWAL_HOLD,
+        )
+        if existing is not None:
+            return existing
+
+        wallet = await self._wallets.get_by_account_id_for_update(user_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        available_before = wallet.available_balance
+        insurance_before = wallet.insurance_balance
+        frozen_before = wallet.frozen_balance
+
+        if available_before < amount:
+            raise InsufficientBalanceError("insufficient available balance for withdrawal")
+
+        wallet.available_balance = available_before - amount
+        wallet.frozen_balance = frozen_before + amount
+        await self._wallets.save(wallet)
+
+        entry = LedgerEntry(
+            wallet_id=wallet.id,
+            account_id=user_id,
+            type=LedgerEntryType.WITHDRAWAL_HOLD,
+            balance_bucket=BalanceBucket.FROZEN,
+            currency=wallet.currency,
+            amount=amount,
+            available_before=available_before,
+            available_after=wallet.available_balance,
+            insurance_before=insurance_before,
+            insurance_after=wallet.insurance_balance,
+            frozen_before=frozen_before,
+            frozen_after=wallet.frozen_balance,
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            description="Hold balance for withdrawal request",
+            created_by_account_id=user_id,
+        )
+        return await self._ledger.create(entry)
+
+    async def release_for_user_withdrawal(
+        self,
+        *,
+        user_id: uuid.UUID,
+        amount: Decimal,
+        withdrawal_id: uuid.UUID,
+        actor_id: uuid.UUID,
+    ) -> LedgerEntry:
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            entry_type=LedgerEntryType.WITHDRAWAL_RELEASE,
+        )
+        if existing is not None:
+            return existing
+
+        wallet = await self._wallets.get_by_account_id_for_update(user_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        available_before = wallet.available_balance
+        insurance_before = wallet.insurance_balance
+        frozen_before = wallet.frozen_balance
+
+        if frozen_before < amount:
+            raise InsufficientBalanceError("insufficient frozen balance to release withdrawal")
+
+        wallet.frozen_balance = frozen_before - amount
+        wallet.available_balance = available_before + amount
+        await self._wallets.save(wallet)
+
+        entry = LedgerEntry(
+            wallet_id=wallet.id,
+            account_id=user_id,
+            type=LedgerEntryType.WITHDRAWAL_RELEASE,
+            balance_bucket=BalanceBucket.AVAILABLE,
+            currency=wallet.currency,
+            amount=amount,
+            available_before=available_before,
+            available_after=wallet.available_balance,
+            insurance_before=insurance_before,
+            insurance_after=wallet.insurance_balance,
+            frozen_before=frozen_before,
+            frozen_after=wallet.frozen_balance,
+            reference_type="withdrawal",
+            reference_id=withdrawal_id,
+            description="Release frozen balance for rejected/cancelled withdrawal",
+            created_by_account_id=actor_id,
+        )
+        return await self._ledger.create(entry)
+
     async def credit_deposit(
         self, *, account_id: uuid.UUID, amount: Decimal, deposit_id: uuid.UUID
     ) -> LedgerEntry:
