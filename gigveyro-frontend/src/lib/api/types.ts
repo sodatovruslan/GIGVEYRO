@@ -616,6 +616,40 @@ export interface ApiKeyCreated extends ApiKey {
   raw_key: string;
 }
 
+export type WebhookStatus = "active" | "disabled";
+
+export interface Webhook {
+  id: string;
+  merchant_id: string;
+  url: string;
+  event_types: string[];
+  status: WebhookStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookCreated extends Webhook {
+  secret: string;
+}
+
+export type WebhookDeliveryStatus = "pending" | "success" | "failed";
+
+export interface WebhookDelivery {
+  id: string;
+  webhook_id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  max_attempts: number;
+  next_attempt_at: string | null;
+  last_response_status: number | null;
+  last_response_snippet: string | null;
+  last_error: string | null;
+  created_at: string;
+  delivered_at: string | null;
+}
+
 export interface PublicInvoice {
   public_id: string;
   amount: string;
