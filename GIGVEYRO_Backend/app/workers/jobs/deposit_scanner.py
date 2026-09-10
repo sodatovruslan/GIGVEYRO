@@ -38,12 +38,14 @@ from app.repositories.notification import NotificationRepository
 from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
+from app.repositories.webhook import WebhookDeliveryRepository, WebhookRepository
 from app.services.deposit import DepositService
 from app.services.notification import NotificationService
 from app.services.provider_factory import get_deposit_provider
 from app.services.realtime import RealtimeEventService
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import WalletService
+from app.services.webhook import WebhookService
 from app.workers.distributed_lock import DistributedLock
 
 logger = logging.getLogger(__name__)
@@ -131,6 +133,9 @@ async def _run_scan(job_id: str, attempt: int, *, watermark_store: Any | None = 
                 notification_service=notification_service,
                 realtime_service=RealtimeEventService(RealtimeOutboxRepository(session)),
                 invoice_repository=InvoiceRepository(session),
+                webhook_service=WebhookService(
+                    WebhookRepository(session), WebhookDeliveryRepository(session)
+                ),
             )
             processed = await service.scan_and_correlate_deposits(
                 min_timestamp_ms=min_timestamp_ms

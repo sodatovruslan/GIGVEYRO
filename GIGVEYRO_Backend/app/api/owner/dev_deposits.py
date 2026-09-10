@@ -15,6 +15,7 @@ from app.repositories.notification import NotificationRepository
 from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
+from app.repositories.webhook import WebhookDeliveryRepository, WebhookRepository
 from app.schemas.deposit import DepositRead, DepositSimulateTransaction
 from app.services.audit import AuditService
 from app.services.deposit import (
@@ -28,6 +29,7 @@ from app.services.notification import NotificationService
 from app.services.realtime import RealtimeEventService
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import WalletNotFoundError, WalletService
+from app.services.webhook import WebhookService
 
 router = APIRouter(
     prefix="/owner/dev/deposits",
@@ -50,6 +52,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DepositService:
         audit_service=AuditService(AuditRepository(db)),
         realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
         invoice_repository=InvoiceRepository(db),
+        webhook_service=WebhookService(WebhookRepository(db), WebhookDeliveryRepository(db)),
     )
 
 

@@ -36,6 +36,7 @@ from app.models.two_factor import (
     TwoFactorRecoveryCode,
 )
 from app.models.wallet import UserWallet
+from app.models.webhook import Webhook, WebhookDelivery
 from app.models.withdrawal import MerchantWithdrawal
 
 __all__ = [
@@ -80,5 +81,7 @@ __all__ = [
     "TelegramLinkToken",
     "UserTrafficSettings",
     "UserWallet",
+    "Webhook",
+    "WebhookDelivery",
     "MerchantWithdrawal",
 ]

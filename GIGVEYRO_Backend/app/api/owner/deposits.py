@@ -20,6 +20,7 @@ from app.repositories.notification import NotificationRepository
 from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.wallet import WalletRepository
+from app.repositories.webhook import WebhookDeliveryRepository, WebhookRepository
 from app.schemas.deposit import (
     DepositCandidateRead,
     DepositListResponse,
@@ -44,6 +45,7 @@ from app.services.notification import NotificationService
 from app.services.realtime import RealtimeEventService
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.wallet import WalletService
+from app.services.webhook import WebhookService
 
 router = APIRouter(
     prefix="/owner/deposits",
@@ -66,6 +68,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DepositService:
         audit_service=AuditService(AuditRepository(db)),
         realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
         invoice_repository=InvoiceRepository(db),
+        webhook_service=WebhookService(WebhookRepository(db), WebhookDeliveryRepository(db)),
     )
 
 
@@ -83,6 +86,7 @@ def _reconciliation_service(db: AsyncSession = Depends(get_db)) -> DepositReconc
         audit_service=AuditService(AuditRepository(db)),
         realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
         invoice_repository=InvoiceRepository(db),
+        webhook_service=WebhookService(WebhookRepository(db), WebhookDeliveryRepository(db)),
     )
     return DepositReconciliationService(
         repository,

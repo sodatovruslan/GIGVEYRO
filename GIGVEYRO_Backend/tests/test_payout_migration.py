@@ -46,7 +46,7 @@ async def test_payout_migration_roundtrip_on_disposable_database():
             url.set(drivername="postgresql").render_as_string(hide_password=False)
         )
         try:
-            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0031"
+            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0032"
             assert (
                 await connection.fetchval(
                     "SELECT count(*) FROM payout_policies WHERE status='active'"

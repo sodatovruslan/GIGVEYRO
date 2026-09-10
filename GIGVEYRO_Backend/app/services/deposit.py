@@ -17,6 +17,7 @@ from app.enums.deposit import (
 )
 from app.enums.invoice import InvoiceStatus
 from app.enums.notification import NotificationMessageKey, NotificationType
+from app.enums.webhook import WebhookEventType
 from app.models.account import Account
 from app.models.deposit import Deposit, UnmatchedTransfer
 from app.repositories.account import AccountRepository
@@ -27,6 +28,7 @@ from app.services.deposit_provider import CryptoDepositProvider
 from app.services.notification import NotificationService
 from app.services.realtime import RealtimeEventService
 from app.services.wallet import WalletService
+from app.services.webhook import WebhookService
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +105,7 @@ class DepositService:
         audit_service: AuditService | None = None,
         realtime_service: RealtimeEventService | None = None,
         invoice_repository: InvoiceRepository | None = None,
+        webhook_service: WebhookService | None = None,
     ):
         self._deposits = deposit_repository
         self._accounts = account_repository
@@ -112,6 +115,7 @@ class DepositService:
         self._audit = audit_service
         self._realtime = realtime_service
         self._invoices = invoice_repository
+        self._webhooks = webhook_service
 
     async def _audit_deposit(self, deposit: Deposit, action: str) -> None:
         if self._audit is not None:
@@ -517,6 +521,18 @@ class DepositService:
                     )
                 if self._realtime is not None:
                     await self._realtime.enqueue_invoice_updated(invoice)
+                if self._webhooks is not None:
+                    await self._webhooks.enqueue_delivery(
+                        invoice.merchant_id,
+                        WebhookEventType.INVOICE_PAID.value,
+                        {
+                            "invoice_id": str(invoice.id),
+                            "public_id": invoice.public_id,
+                            "amount": str(invoice.amount),
+                            "external_reference": invoice.external_reference,
+                            "paid_at": invoice.paid_at.isoformat(),
+                        },
+                    )
 
         return saved
 
