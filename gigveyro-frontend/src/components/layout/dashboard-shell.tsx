@@ -15,7 +15,7 @@ import { SystemHealthIndicator } from "@/features/health/system-health-indicator
 
 import styles from "./dashboard-shell.module.css";
 
-type NavigationKey = "overview"|"home"|"accounts"|"deals"|"deposits"|"funding"|"withdrawals"|"payouts"|"appeals"|"notifications"|"analytics"|"fees"|"treasury"|"integrations"|"audit"|"wallet"|"requisites"|"settings"|"invoices";
+type NavigationKey = "overview"|"home"|"accounts"|"deals"|"deposits"|"funding"|"withdrawals"|"payouts"|"appeals"|"notifications"|"analytics"|"fees"|"treasury"|"integrations"|"audit"|"wallet"|"requisites"|"settings"|"invoices"|"apiKeys";
 interface NavigationItem { href: string; label: NavigationKey; glyph: string }
 
 const navigation: Record<UserRole, NavigationItem[]> = {
@@ -26,7 +26,7 @@ const navigation: Record<UserRole, NavigationItem[]> = {
     { href: "/user", label: "home", glyph: "◇" }, { href: "/user/wallet", label: "wallet", glyph: "₮" }, { href: "/user/deposits", label: "funding", glyph: "↓" }, { href: "/user/requisites", label: "requisites", glyph: "▣" }, { href: "/user/deals", label: "deals", glyph: "⇄" }, { href: "/user/appeals", label: "appeals", glyph: "!" }, { href: "/user/notifications", label: "notifications", glyph: "○" }, { href: "/user/settings", label: "settings", glyph: "⚙" },
   ],
   merchant: [
-    { href: "/merchant", label: "home", glyph: "◇" }, { href: "/merchant/wallet", label: "wallet", glyph: "₮" }, { href: "/merchant/invoices", label: "invoices", glyph: "▤" }, { href: "/merchant/deals", label: "deals", glyph: "⇄" }, { href: "/merchant/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/merchant/appeals", label: "appeals", glyph: "!" }, { href: "/merchant/notifications", label: "notifications", glyph: "○" }, { href: "/merchant/settings", label: "settings", glyph: "⚙" },
+    { href: "/merchant", label: "home", glyph: "◇" }, { href: "/merchant/wallet", label: "wallet", glyph: "₮" }, { href: "/merchant/invoices", label: "invoices", glyph: "▤" }, { href: "/merchant/deals", label: "deals", glyph: "⇄" }, { href: "/merchant/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/merchant/api-keys", label: "apiKeys", glyph: "⚿" }, { href: "/merchant/appeals", label: "appeals", glyph: "!" }, { href: "/merchant/notifications", label: "notifications", glyph: "○" }, { href: "/merchant/settings", label: "settings", glyph: "⚙" },
   ],
 };
 

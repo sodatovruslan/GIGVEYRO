@@ -600,6 +600,22 @@ export interface Invoice {
   updated_at: string;
 }
 
+export type ApiKeyStatus = "active" | "revoked";
+
+export interface ApiKey {
+  id: string;
+  label: string;
+  key_prefix: string;
+  status: ApiKeyStatus;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  raw_key: string;
+}
+
 export interface PublicInvoice {
   public_id: string;
   amount: string;
