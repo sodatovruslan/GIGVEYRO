@@ -12,6 +12,7 @@ export const realtimeEventNames = [
   "payout.updated",
   "withdrawal.updated",
   "deposit.updated",
+  "invoice.updated",
 ] as const;
 
 export type RealtimeEventName = (typeof realtimeEventNames)[number];
@@ -24,11 +25,17 @@ const merchantFunds = ["merchant-dashboard-wallet", "merchant-wallet", "merchant
 const ownerPayouts = ["owner-payouts:*", "owner-payout:*"];
 const ownerWithdrawals = ["owner-withdrawals:*", "owner-withdrawal:*"];
 const merchantWithdrawals = ["merchant-withdrawals:*", "merchant-withdrawal:*"];
+const merchantInvoices = ["merchant-invoices:*", "merchant-invoice:*"];
 
 export function queryKeysForRealtimeEvent(event: RealtimeEventName, role: UserRole) {
   if (event === "deposit.updated") {
     if (role === "owner") return ["deposits:*", "unmatched-transfers:*", "owner-summary", "owner-activity"];
     if (role === "user") return ["deposits:*", ...userFunds];
+    return [];
+  }
+  if (event === "invoice.updated") {
+    if (role === "merchant") return [...merchantInvoices, ...merchantFunds];
+    if (role === "owner") return ["owner-summary", "owner-activity"];
     return [];
   }
   if (event === "payout.updated") {

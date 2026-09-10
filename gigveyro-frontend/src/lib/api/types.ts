@@ -581,6 +581,33 @@ export interface DepositReconciliationResult {
 }
 
 export type DepositStatus = "waiting" | "detected" | "confirming" | "confirmed" | "credited" | "expired" | "failed" | "amount_mismatch";
+
+export type InvoiceStatus = "pending_payment" | "paid" | "expired" | "cancelled";
+
+export interface Invoice {
+  id: string;
+  public_id: string;
+  merchant_id: string;
+  amount: string;
+  description: string | null;
+  external_reference: string | null;
+  deposit_address: string;
+  status: InvoiceStatus;
+  expires_at: string;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicInvoice {
+  public_id: string;
+  amount: string;
+  description: string | null;
+  deposit_address: string;
+  status: InvoiceStatus;
+  expires_at: string;
+}
 export interface Deposit {
   id: string;
   public_id: string;

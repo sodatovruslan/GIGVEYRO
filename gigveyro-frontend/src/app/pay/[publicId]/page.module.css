@@ -1,0 +1,16 @@
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg)}
+.card{width:100%;max-width:440px;padding:32px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card-bg);box-shadow:var(--shadow)}
+.eyebrow{display:block;margin-bottom:8px;color:var(--text-muted);font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.card h1{margin:0 0 24px;font-size:20px;color:var(--text)}
+.amount{padding:20px;margin-bottom:20px;text-align:center;border-radius:var(--radius);background:var(--warning-soft)}
+.amount strong{display:block;font-size:28px;color:var(--text)}
+.amount span{color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.row{margin-bottom:16px}
+.row span{display:block;margin-bottom:6px;color:var(--text-muted);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.address{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.address code{overflow-wrap:anywhere;font-size:12px;color:var(--text)}
+.status{display:inline-flex;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase}
+.pending_payment{color:var(--warning-text);background:var(--warning-soft)}
+.paid{color:var(--success-text);background:var(--success-soft-strong)}
+.expired,.cancelled{color:var(--danger-text);background:var(--danger-soft-strong)}
+.state{padding:40px 0;text-align:center;color:var(--text-muted)}

@@ -94,6 +94,7 @@
     "deals": "Deals",
     "deposits": "Deposits",
     "funding": "Add funds",
+    "invoices": "Invoices",
     "withdrawals": "Withdrawals",
     "payouts": "Payout control",
     "appeals": "Appeals",
@@ -455,6 +456,41 @@
       "destination": "Check the destination details.",
       "trc20": "Invalid TRC20 address.",
       "comment": "Check the comment length."
+    }
+  },
+  "invoices": {
+    "eyebrow": "PAYMENT ACCEPTANCE",
+    "merchantTitle": "Invoices",
+    "merchantSubtitle": "Request a USDT payment from a customer",
+    "create": "Create invoice",
+    "newTitle": "New invoice",
+    "loading": "Loading invoices…",
+    "empty": "No invoices yet",
+    "amount": "Amount",
+    "description": "Description",
+    "externalReference": "Order reference",
+    "cancelAction": "Cancel",
+    "createFailed": "Failed to create invoice.",
+    "cancelFailed": "Failed to cancel invoice.",
+    "notCancellable": "This invoice can no longer be cancelled.",
+    "detailTitle": "Invoice details",
+    "paymentLink": "Payment link",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied",
+    "validation": { "amount": "Enter a valid positive amount." },
+    "pay": {
+      "title": "Pay invoice",
+      "subtitle": "Send exactly the amount below to the address to complete this payment",
+      "amountLabel": "Amount to send",
+      "addressLabel": "USDT TRC20 address",
+      "statusLabel": "Status",
+      "expiresLabel": "Expires",
+      "waiting": "Waiting for payment…",
+      "notFound": "This invoice does not exist or has expired.",
+      "loading": "Loading invoice…",
+      "copyAddress": "Copy address",
+      "copied": "Address copied",
+      "copyFailed": "Could not copy the address."
     }
   },
   "appeals": {
@@ -954,6 +990,12 @@
       "expired": "Expired",
       "failed": "Failed",
       "amount_mismatch": "Amount mismatch"
+    },
+    "invoice": {
+      "pending_payment": "Awaiting payment",
+      "paid": "Paid",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
     },
     "ledger": {
       "owner_allocation": "Owner allocation",

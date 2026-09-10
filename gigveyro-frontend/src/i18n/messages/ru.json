@@ -94,6 +94,7 @@
     "deals": "Сделки",
     "deposits": "Депозиты",
     "funding": "Пополнение",
+    "invoices": "Счета",
     "withdrawals": "Выводы",
     "payouts": "Контроль выплат",
     "appeals": "Апелляции",
@@ -455,6 +456,41 @@
       "destination": "Проверьте реквизиты назначения.",
       "trc20": "Некорректный TRC20-адрес.",
       "comment": "Проверьте длину комментария."
+    }
+  },
+  "invoices": {
+    "eyebrow": "ПРИЁМ ПЛАТЕЖЕЙ",
+    "merchantTitle": "Счета",
+    "merchantSubtitle": "Запросить оплату USDT от клиента",
+    "create": "Создать счёт",
+    "newTitle": "Новый счёт",
+    "loading": "Загружаем счета…",
+    "empty": "Счетов пока нет",
+    "amount": "Сумма",
+    "description": "Описание",
+    "externalReference": "Номер заказа",
+    "cancelAction": "Отменить",
+    "createFailed": "Не удалось создать счёт.",
+    "cancelFailed": "Не удалось отменить счёт.",
+    "notCancellable": "Этот счёт больше нельзя отменить.",
+    "detailTitle": "Детали счёта",
+    "paymentLink": "Ссылка на оплату",
+    "copyLink": "Скопировать ссылку",
+    "linkCopied": "Ссылка скопирована",
+    "validation": { "amount": "Укажите корректную положительную сумму." },
+    "pay": {
+      "title": "Оплата счёта",
+      "subtitle": "Отправьте точную сумму на указанный адрес, чтобы завершить оплату",
+      "amountLabel": "Сумма к оплате",
+      "addressLabel": "Адрес USDT TRC20",
+      "statusLabel": "Статус",
+      "expiresLabel": "Действителен до",
+      "waiting": "Ожидаем оплату…",
+      "notFound": "Такого счёта не существует или срок его действия истёк.",
+      "loading": "Загружаем счёт…",
+      "copyAddress": "Скопировать адрес",
+      "copied": "Адрес скопирован",
+      "copyFailed": "Не удалось скопировать адрес."
     }
   },
   "appeals": {
@@ -954,6 +990,12 @@
       "expired": "Истёк",
       "failed": "Ошибка",
       "amount_mismatch": "Сумма не совпала"
+    },
+    "invoice": {
+      "pending_payment": "Ожидает оплаты",
+      "paid": "Оплачен",
+      "expired": "Истёк",
+      "cancelled": "Отменён"
     },
     "ledger": {
       "owner_allocation": "Выделение OWNER",
