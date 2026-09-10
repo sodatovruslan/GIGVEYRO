@@ -502,7 +502,40 @@
       "copyAddress": "Скопировать адрес",
       "copied": "Адрес скопирован",
       "copyFailed": "Не удалось скопировать адрес."
-    }
+    },
+    "storeName": "Название магазина"
+  },
+  "merchantStatistics": {
+    "eyebrow": "ПОКАЗАТЕЛИ",
+    "title": "Статистика",
+    "subtitle": "Объём счетов и выплат вашего бизнеса",
+    "loading": "Загружаем статистику…",
+    "invoicesTitle": "Счета",
+    "withdrawalsTitle": "Выплаты",
+    "total": "Всего",
+    "pendingPayment": "Ожидает оплаты",
+    "paid": "Оплачено",
+    "expired": "Истекло",
+    "cancelled": "Отменено",
+    "pending": "Ожидает",
+    "approved": "Одобрено",
+    "rejected": "Отклонено",
+    "paidVolume": "Оплаченный объём",
+    "reportsTitle": "Отчёты",
+    "reportsSubtitle": "Экспортируйте счета в CSV",
+    "exportCsv": "Экспорт счетов (CSV)",
+    "exportFailed": "Не удалось экспортировать счета."
+  },
+  "storeSettings": {
+    "title": "Настройки магазина",
+    "subtitle": "Отображаются клиенту на странице оплаты счёта",
+    "storeName": "Название магазина",
+    "description": "Описание",
+    "supportContact": "Контакт поддержки",
+    "save": "Сохранить",
+    "saved": "Сохранено",
+    "saveFailed": "Не удалось сохранить настройки магазина.",
+    "loading": "Загружаем настройки магазина…"
   },
   "apiKeys": {
     "eyebrow": "ИНТЕГРАЦИЯ",

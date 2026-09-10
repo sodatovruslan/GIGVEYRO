@@ -502,7 +502,40 @@
       "copyAddress": "Copy address",
       "copied": "Address copied",
       "copyFailed": "Could not copy the address."
-    }
+    },
+    "storeName": "Store name"
+  },
+  "merchantStatistics": {
+    "eyebrow": "PERFORMANCE",
+    "title": "Statistics",
+    "subtitle": "Invoice and payout volume for your business",
+    "loading": "Loading statistics…",
+    "invoicesTitle": "Invoices",
+    "withdrawalsTitle": "Payouts",
+    "total": "Total",
+    "pendingPayment": "Awaiting payment",
+    "paid": "Paid",
+    "expired": "Expired",
+    "cancelled": "Cancelled",
+    "pending": "Pending",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "paidVolume": "Paid volume",
+    "reportsTitle": "Reports",
+    "reportsSubtitle": "Export your invoices as CSV",
+    "exportCsv": "Export invoices (CSV)",
+    "exportFailed": "Failed to export invoices."
+  },
+  "storeSettings": {
+    "title": "Store settings",
+    "subtitle": "Shown to customers on the invoice payment page",
+    "storeName": "Store name",
+    "description": "Description",
+    "supportContact": "Support contact",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Failed to save store settings.",
+    "loading": "Loading store settings…"
   },
   "apiKeys": {
     "eyebrow": "INTEGRATION",

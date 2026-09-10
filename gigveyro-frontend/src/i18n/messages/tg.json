@@ -502,7 +502,40 @@
       "copyAddress": "Нусхабардории суроға",
       "copied": "Суроға нусхабардорӣ шуд",
       "copyFailed": "Суроға нусхабардорӣ нашуд."
-    }
+    },
+    "storeName": "Номи мағоза"
+  },
+  "merchantStatistics": {
+    "eyebrow": "НИШОНДИҲАНДАҲО",
+    "title": "Омор",
+    "subtitle": "Ҳаҷми ҳисобҳо ва пардохтҳои бизнеси шумо",
+    "loading": "Омор бор шуда истодааст…",
+    "invoicesTitle": "Ҳисобҳо",
+    "withdrawalsTitle": "Пардохтҳо",
+    "total": "Ҳамагӣ",
+    "pendingPayment": "Интизори пардохт",
+    "paid": "Пардохт шуд",
+    "expired": "Мӯҳлаташ гузашт",
+    "cancelled": "Бекор шуд",
+    "pending": "Интизор",
+    "approved": "Тасдиқ шуд",
+    "rejected": "Рад шуд",
+    "paidVolume": "Ҳаҷми пардохтшуда",
+    "reportsTitle": "Ҳисоботҳо",
+    "reportsSubtitle": "Ҳисобҳоро ба CSV содир кунед",
+    "exportCsv": "Содироти ҳисобҳо (CSV)",
+    "exportFailed": "Содироти ҳисобҳо ба амал наомад."
+  },
+  "storeSettings": {
+    "title": "Танзимоти мағоза",
+    "subtitle": "Ба мизоҷ дар саҳифаи пардохти ҳисоб нишон дода мешавад",
+    "storeName": "Номи мағоза",
+    "description": "Тавсиф",
+    "supportContact": "Тамоси дастгирӣ",
+    "save": "Захира кардан",
+    "saved": "Захира шуд",
+    "saveFailed": "Танзимоти мағоза захира нашуд.",
+    "loading": "Танзимоти мағоза бор шуда истодааст…"
   },
   "apiKeys": {
     "eyebrow": "ЯКҶОЯСОЗӢ",

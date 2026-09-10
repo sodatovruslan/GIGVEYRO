@@ -677,6 +677,41 @@ export interface PublicInvoice {
   deposit_address: string;
   status: InvoiceStatus;
   expires_at: string;
+  store_name: string | null;
+}
+
+export interface MerchantInvoiceStats {
+  total: number;
+  pending_payment: number;
+  paid: number;
+  expired: number;
+  cancelled: number;
+  paid_volume: string;
+}
+
+export interface MerchantWithdrawalStats {
+  total: number;
+  pending: number;
+  approved: number;
+  paid: number;
+  rejected: number;
+  cancelled: number;
+  paid_volume: string;
+}
+
+export interface MerchantStatistics {
+  invoices: MerchantInvoiceStats;
+  withdrawals: MerchantWithdrawalStats;
+}
+
+export interface MerchantProfile {
+  id: string;
+  merchant_id: string;
+  store_name: string | null;
+  description: string | null;
+  support_contact: string | null;
+  created_at: string;
+  updated_at: string;
 }
 export interface Deposit {
   id: string;
