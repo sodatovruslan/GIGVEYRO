@@ -258,7 +258,10 @@
     "noOperations": "Операций пока нет",
     "loadingOperations": "Загрузка операций…",
     "balanceAfter": "Баланс после",
-    "availableAfter": "Доступно после"
+    "availableAfter": "Доступно после",
+    "feeTitle": "Ваша комиссия",
+    "feeNotCharged": "Сейчас не взимается",
+    "feePercent": "{percent}% + {fixed} USDT за выплату"
   },
   "requisites": {
     "eyebrow": "ПЛАТЁЖНЫЕ ДАННЫЕ",

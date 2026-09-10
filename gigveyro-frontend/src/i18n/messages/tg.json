@@ -258,7 +258,10 @@
     "noOperations": "Ҳоло амалиёт нест",
     "loadingOperations": "Амалиёт бор шуда истодааст…",
     "balanceAfter": "Тавозун баъд аз амал",
-    "availableAfter": "Дастрас баъд аз амал"
+    "availableAfter": "Дастрас баъд аз амал",
+    "feeTitle": "Комиссияи шумо",
+    "feeNotCharged": "Ҳозир гирифта намешавад",
+    "feePercent": "{percent}% + {fixed} USDT барои ҳар пардохт"
   },
   "requisites": {
     "eyebrow": "МАЪЛУМОТИ ПАРДОХТ",

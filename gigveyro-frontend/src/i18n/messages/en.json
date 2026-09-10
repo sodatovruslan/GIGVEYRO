@@ -258,7 +258,10 @@
     "noOperations": "No operations yet",
     "loadingOperations": "Loading operations…",
     "balanceAfter": "Balance after",
-    "availableAfter": "Available after"
+    "availableAfter": "Available after",
+    "feeTitle": "Your fee",
+    "feeNotCharged": "Not currently charged",
+    "feePercent": "{percent}% + {fixed} USDT per payout"
   },
   "requisites": {
     "eyebrow": "PAYMENT DETAILS",
