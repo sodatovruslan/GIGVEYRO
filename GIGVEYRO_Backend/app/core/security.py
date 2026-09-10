@@ -94,6 +94,12 @@ def hash_recovery_code(code: str) -> str:
     return _sha256_hex(code.strip().upper())
 
 
+def hash_api_key(raw_key: str) -> str:
+    # Merchant API keys are shown to the caller exactly once at creation -
+    # only this hash is persisted, same rationale as hash_refresh_token.
+    return _sha256_hex(raw_key)
+
+
 def create_two_factor_challenge_token(
     subject: uuid.UUID, role: str, challenge_id: uuid.UUID, expires_seconds: int
 ) -> str:

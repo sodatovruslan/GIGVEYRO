@@ -10,9 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import TokenError, TokenType, decode_token
 from app.db.session import get_db
 from app.enums.account import UserRole
+from app.enums.api_key import ApiKeyStatus
 from app.models.account import Account
 from app.repositories.account import AccountRepository
+from app.repositories.api_key import ApiKeyRepository
 from app.repositories.auth_session import AuthSessionRepository
+from app.services.api_key import ApiKeyService
 
 # auto_error=False so a missing token is reported as our own 401, matching
 # every other authentication failure instead of FastAPI's default 403.
@@ -70,6 +73,30 @@ async def get_current_account(
             detail="could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return account
+
+
+async def get_merchant_via_api_key(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Account:
+    """Authenticates the public invoice API using a merchant-issued API key
+    (Authorization: Bearer <key>) instead of a session access token."""
+    unauthorized = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="invalid or missing API key",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if credentials is None:
+        raise unauthorized
+
+    api_key = await ApiKeyService(ApiKeyRepository(db)).authenticate(credentials.credentials)
+    if api_key is None or api_key.status != ApiKeyStatus.ACTIVE:
+        raise unauthorized
+
+    account = await AccountRepository(db).get_by_id(api_key.merchant_id)
+    if account is None or not account.is_active or account.role != UserRole.MERCHANT:
+        raise unauthorized
     return account
 
 

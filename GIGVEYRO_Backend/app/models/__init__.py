@@ -1,4 +1,5 @@
 from app.models.account import Account
+from app.models.api_key import ApiKey
 from app.models.appeal import DealAppeal
 from app.models.audit import AuditLog
 from app.models.auth_session import AuthSession
@@ -38,6 +39,7 @@ from app.models.wallet import UserWallet
 from app.models.withdrawal import MerchantWithdrawal
 
 __all__ = [
+    "ApiKey",
     "AccountTwoFactor",
     "PendingTwoFactorSetup",
     "TwoFactorChallenge",
