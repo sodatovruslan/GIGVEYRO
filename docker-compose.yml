@@ -124,28 +124,20 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # The trailing backslashes matter: this block's lines are indented
+    # One physical line, deliberately: this block's lines are indented
     # *more* than its first line ("sh -c \""), so YAML preserves their
-    # newlines instead of folding them to spaces. Without a line-continuing
-    # backslash, `uvicorn app.main:app` ends up a complete statement on its
-    # own and every `--flag` line below runs (and fails) as a separate,
-    # unreachable command - uvicorn silently starts with NONE of these
-    # flags and its default host of 127.0.0.1, unreachable from any other
-    # container (nginx, worker) despite passing its own loopback
-    # healthcheck. Verified against the running container: without the
-    # backslashes, /proc/1/cmdline showed bare `uvicorn app.main:app`.
-    command: >
-      sh -c "
-        echo 'Starting backend...' &&
-        uvicorn app.main:app \
-          --host 0.0.0.0 \
-          --port 8000 \
-          --workers $${WEB_CONCURRENCY:-1} \
-          --proxy-headers \
-          --forwarded-allow-ips $${FORWARDED_ALLOW_IPS:-127.0.0.1} \
-          --log-level $${LOG_LEVEL:-info} \
-          --no-access-log
-      "
+    # newlines instead of folding them to spaces - `uvicorn app.main:app`
+    # ended up a complete statement on its own and every `--flag` line
+    # after it ran as a separate, failing, unreachable command. uvicorn
+    # silently started with NONE of these flags and its default host of
+    # 127.0.0.1: unreachable from any other container (nginx, worker)
+    # despite passing its own loopback healthcheck. Verified against the
+    # running container via /proc/1/cmdline. A trailing backslash before
+    # the newline did not fix it (still absent from the resolved
+    # command per `docker compose config`/`docker inspect`), so this
+    # collapses the whole thing to one line to remove the ambiguity
+    # entirely rather than depend on exactly how YAML folds it.
+    command: sh -c "echo 'Starting backend...' && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers $${WEB_CONCURRENCY:-1} --proxy-headers --forwarded-allow-ips $${FORWARDED_ALLOW_IPS:-127.0.0.1} --log-level $${LOG_LEVEL:-info} --no-access-log"
 
   # ── Background Worker (ARQ) ──────────────────────────────────
   worker:
@@ -182,11 +174,10 @@ services:
     # report unhealthy forever regardless of whether the worker is fine.
     healthcheck:
       disable: true
-    command: >
-      sh -c "
-        echo 'Starting ARQ worker...' &&
-        python worker_entrypoint.py
-      "
+    # One physical line - see the backend service's command for why:
+    # a multi-line "sh -c" block here silently drops anything after the
+    # first statement that isn't joined with && on the same line.
+    command: sh -c "echo 'Starting ARQ worker...' && python worker_entrypoint.py"
 
   # ── Frontend (Next.js) ───────────────────────────────────────
   frontend:
