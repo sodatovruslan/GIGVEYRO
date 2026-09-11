@@ -166,6 +166,12 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
+    # The image's own HEALTHCHECK (curl localhost:8000/health/live) is
+    # baked in for the backend/migrate use of this same image, but the
+    # worker process never binds port 8000 - inherited unmodified it would
+    # report unhealthy forever regardless of whether the worker is fine.
+    healthcheck:
+      disable: true
     command: >
       sh -c "
         echo 'Starting ARQ worker...' &&
