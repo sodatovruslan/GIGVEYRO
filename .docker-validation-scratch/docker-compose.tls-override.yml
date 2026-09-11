@@ -1,0 +1,13 @@
+# Runtime-validation-only override: adds TLS to the nginx service so the
+# HTTP->HTTPS boundary, Secure cookies, and HSTS can be exercised for real.
+# Not committed. Applied with: docker compose -f docker-compose.yml -f <this> up
+name: gigveyro
+
+services:
+  nginx:
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./.docker-validation-scratch/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.docker-validation-scratch/certs:/etc/nginx/certs:ro
