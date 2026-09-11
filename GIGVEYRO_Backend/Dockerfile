@@ -8,6 +8,11 @@ FROM python:3.11-slim AS deps
 
 WORKDIR /build
 
+# Use HTTPS for the Debian package mirror - some network paths corrupt
+# plain-HTTP apt downloads (proxies/MITM boxes tamper with unencrypted
+# traffic), which apt only surfaces as a confusing size-mismatch error.
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/*.sources
+
 # Install build tools needed for native extensions (e.g. asyncpg, argon2-cffi)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -25,6 +30,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 FROM python:3.11-slim AS runner
 
 # Runtime deps only (no build tools)
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/*.sources
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq5 \
