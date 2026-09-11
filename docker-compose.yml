@@ -62,6 +62,7 @@ services:
 
   # One-shot migration gate. Run only after the documented backup/precheck.
   migrate:
+    image: gigveyro-backend:local
     build:
       context: ./GIGVEYRO_Backend
       dockerfile: Dockerfile
@@ -86,6 +87,7 @@ services:
 
   # ── Backend (FastAPI) ────────────────────────────────────────
   backend:
+    image: gigveyro-backend:local
     build:
       context: ./GIGVEYRO_Backend
       dockerfile: Dockerfile
@@ -137,6 +139,7 @@ services:
 
   # ── Background Worker (ARQ) ──────────────────────────────────
   worker:
+    image: gigveyro-backend:local
     build:
       context: ./GIGVEYRO_Backend
       dockerfile: Dockerfile
