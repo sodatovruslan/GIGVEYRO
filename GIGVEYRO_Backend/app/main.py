@@ -50,7 +50,12 @@ from app.api.traffic import router as traffic_router
 from app.api.user_withdrawals import router as user_withdrawals_router
 from app.api.wallet import router as wallet_router
 from app.core.config import settings
-from app.core.middleware import RateLimitMiddleware, RequestIDMiddleware, SecurityHeadersMiddleware
+from app.core.middleware import (
+    HealthCheckBypassMiddleware,
+    RateLimitMiddleware,
+    RequestIDMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.db.session import AsyncSessionLocal
 from app.infra.logging_config import configure_logging
 from app.infra.metrics import setup_metrics
@@ -134,6 +139,10 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=settings.ALLOWED_HOSTS,
 )
+# Outermost middleware - runs before the Host check above, so an
+# orchestrator's loopback healthcheck can't be rejected for a Host header
+# ALLOWED_HOSTS is deliberately forbidden from ever containing.
+app.add_middleware(HealthCheckBypassMiddleware)
 
 app.include_router(health_router)
 app.include_router(auth_router)

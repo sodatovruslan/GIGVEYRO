@@ -14,6 +14,21 @@ from app.infra.redis_rate_limiter import RedisRateLimiter
 _SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 
 
+class HealthCheckBypassMiddleware(BaseHTTPMiddleware):
+    """Orchestrator/Docker healthchecks reach this process over loopback and
+    send `Host: localhost`, which will never match a production
+    ALLOWED_HOSTS entry (and ALLOWED_HOSTS is intentionally forbidden from
+    containing "localhost" - see validate_production_settings). Liveness
+    exposes no state, so answer it before TrustedHostMiddleware's Host
+    check runs instead of weakening ALLOWED_HOSTS for real traffic.
+    Registered as the outermost middleware so it runs first."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        if request.url.path == "/health/live":
+            return JSONResponse({"status": "alive"})
+        return await call_next(request)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
