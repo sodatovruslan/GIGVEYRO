@@ -189,7 +189,9 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      # 127.0.0.1, not localhost: BusyBox wget resolves "localhost" to ::1
+      # first with no IPv4 fallback, and the server only binds IPv4.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -211,7 +213,10 @@ services:
       frontend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health/live"]
+      # 127.0.0.1, not localhost: BusyBox wget resolves "localhost" to ::1
+      # first with no IPv4 fallback, and nginx's listen directive here is
+      # IPv4-only.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health/live"]
       interval: 15s
       timeout: 5s
       retries: 5

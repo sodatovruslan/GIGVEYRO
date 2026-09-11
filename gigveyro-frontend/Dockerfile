@@ -61,8 +61,12 @@ USER nextjs
 
 EXPOSE 3000
 
+# 127.0.0.1, not localhost: BusyBox wget resolves "localhost" to ::1 first
+# and, unlike curl, does not fall back to IPv4 - the server above only
+# binds IPv4, so a hostname-based URL here gets a permanent connection
+# refused despite the server being reachable and healthy.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
-    CMD wget -qO- http://localhost:3000/ 2>/dev/null || exit 1
+    CMD wget -qO- http://127.0.0.1:3000/ 2>/dev/null || exit 1
 
 # Server-side variables such as BACKEND_API_URL are injected at runtime.
 # NEXT_PUBLIC_* values are build-time constants; production realtime defaults
