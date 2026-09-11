@@ -11,7 +11,11 @@ WORKDIR /app
 
 # Install dependencies only (cache layer)
 COPY package.json package-lock.json ./
-RUN npm ci --frozen-lockfile
+# The sanity check after npm ci matters: under a flaky network, npm can hit
+# "Exit handler never called!" and still return exit code 0 with an
+# incomplete node_modules, which otherwise only surfaces two stages later as
+# a confusing "next: not found" in the builder stage.
+RUN npm ci --frozen-lockfile && test -x node_modules/.bin/next
 
 # ---------- Stage 2: builder ----------
 FROM node:20-alpine AS builder
