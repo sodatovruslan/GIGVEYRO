@@ -17,7 +17,7 @@ test("every auth mutation BFF route validates the request Origin", async () => {
     const content = await source(path);
     assert.match(
       content,
-      /origin\s*&&\s*origin\s*!==\s*request\.nextUrl\.origin/,
+      /isTrustedOrigin\(request\)/,
       `${path} is missing Origin validation`,
     );
     assert.match(content, /status:\s*403/, `${path} should reject a mismatched Origin with 403`);

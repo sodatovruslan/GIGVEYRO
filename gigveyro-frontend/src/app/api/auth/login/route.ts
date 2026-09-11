@@ -2,10 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import type { Account, LoginInput, TokenResponse, TwoFactorRequiredResponse } from "@/lib/api/types";
 import { ACCESS_COOKIE, authCookieOptions, backendFetch, REFRESH_COOKIE } from "@/lib/server/backend";
+import { isTrustedOrigin } from "@/lib/server/origin";
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
+  if (!isTrustedOrigin(request)) {
     return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
   }
   const payload = (await request.json().catch(() => null)) as LoginInput | null;

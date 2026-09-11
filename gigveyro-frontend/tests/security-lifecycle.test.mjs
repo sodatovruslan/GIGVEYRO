@@ -49,11 +49,17 @@ test("security mutations stay behind same-origin cookie BFF without JS token per
   const api = await source("src/lib/api/security.ts");
   const client = await source("src/lib/api/client.ts");
   const proxy = await source("src/app/api/backend/[...path]/route.ts");
+  const origin = await source("src/lib/server/origin.ts");
 
   assert.match(client, /fetch\(`\/api\/backend/);
   assert.match(client, /credentials: "same-origin"/);
-  assert.match(proxy, /origin !== request\.nextUrl\.origin/);
+  assert.match(proxy, /isTrustedOrigin\(request\)/);
   assert.match(proxy, /request\.cookies\.get\(ACCESS_COOKIE\)/);
+  // The origin check must trust X-Forwarded-Proto/Host, not nextUrl.origin -
+  // behind TLS-terminating nginx that always reflects "http" and rejects
+  // every legitimate browser request.
+  assert.match(origin, /x-forwarded-proto/);
+  assert.match(origin, /origin === `\$\{protocol\}:\/\/\$\{host\}`/);
   assert.doesNotMatch(api + client, /localStorage|sessionStorage|refresh_token|access_token/);
 });
 

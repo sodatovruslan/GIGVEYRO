@@ -2,12 +2,12 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import type { Account, TokenResponse } from "@/lib/api/types";
 import { ACCESS_COOKIE, authCookieOptions, backendFetch, REFRESH_COOKIE } from "@/lib/server/backend";
+import { isTrustedOrigin } from "@/lib/server/origin";
 
 interface VerifyInput { challenge_token: string; code: string }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
+  if (!isTrustedOrigin(request)) {
     return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
   }
   const payload = (await request.json().catch(() => null)) as VerifyInput | null;

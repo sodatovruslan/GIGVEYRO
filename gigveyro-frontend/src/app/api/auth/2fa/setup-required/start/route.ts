@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import type { TwoFactorSetupStart } from "@/lib/api/types";
 import { backendFetch } from "@/lib/server/backend";
+import { isTrustedOrigin } from "@/lib/server/origin";
 
 interface StartInput { setup_token: string }
 
@@ -14,8 +15,7 @@ interface StartInput { setup_token: string }
 // access, so passing it through server-side here carries the same risk
 // profile as the existing 2FA challenge_token flow.
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
+  if (!isTrustedOrigin(request)) {
     return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
   }
   const payload = (await request.json().catch(() => null)) as StartInput | null;

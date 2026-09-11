@@ -7,6 +7,7 @@ import {
   REFRESH_COOKIE,
   refreshTokens,
 } from "@/lib/server/backend";
+import { isTrustedOrigin } from "@/lib/server/origin";
 
 interface RouteContext { params: Promise<{ path: string[] }> }
 
@@ -18,11 +19,8 @@ async function forward(request: NextRequest, context: RouteContext) {
   if (path[0] === "auth" && (path[1] === "login" || path[1] === "refresh")) {
     return NextResponse.json({ detail: "Route is not available through the API proxy" }, { status: 404 });
   }
-  if (!["GET", "HEAD"].includes(request.method)) {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== request.nextUrl.origin) {
-      return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
-    }
+  if (!["GET", "HEAD"].includes(request.method) && !isTrustedOrigin(request)) {
+    return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
   }
   const pathname = `/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
