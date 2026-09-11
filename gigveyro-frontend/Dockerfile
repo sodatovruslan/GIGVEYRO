@@ -41,6 +41,13 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 # Runtime port — override via env
 ENV PORT=3000
+# Docker sets HOSTNAME to the container ID for every container, and the
+# Next.js standalone server binds to process.env.HOSTNAME if it's set -
+# so without this override it silently listens only on the container's
+# own address, refusing connections on localhost (breaks the
+# HEALTHCHECK below) and is not reliably reachable from other
+# containers such as nginx either.
+ENV HOSTNAME="0.0.0.0"
 
 RUN addgroup --system --gid 1001 nextjs \
     && adduser --system --uid 1001 nextjs
