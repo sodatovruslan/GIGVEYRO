@@ -64,6 +64,7 @@ from app.services.auth import (
     TokenPair,
     TokenReuseError,
 )
+from app.services.login_protection import AccountLoginGuard
 from app.services.notification import NotificationService
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.two_factor import (
@@ -80,6 +81,7 @@ from app.services.two_factor import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _two_factor_rate_limiter = RedisRateLimiter()
+_login_guard = AccountLoginGuard()
 
 
 def _service(db: AsyncSession = Depends(get_db)) -> AuthService:
@@ -174,13 +176,28 @@ async def login(
     two_factor_service: TwoFactorService = Depends(_two_factor_service),
     audit: AuditService = Depends(_audit_service),
 ) -> TokenResponse | TwoFactorRequiredResponse | TwoFactorSetupRequiredResponse:
+    locked_for = await _login_guard.is_locked(payload.username)
+    if locked_for is not None:
+        # Same 429 shape as the IP limiter, regardless of whether this
+        # username belongs to a real account - a distinguishable response
+        # here would let an attacker use lockout state itself to enumerate
+        # valid usernames.
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too many failed attempts, try again later",
+            headers={"Retry-After": str(locked_for)},
+        )
+
     try:
         account = await service.authenticate(payload.username, payload.password)
     except AuthenticationError as exc:
+        await _login_guard.record_failure(payload.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid username or password",
         ) from exc
+
+    await _login_guard.reset(payload.username)
 
     two_factor = await two_factor_service.get_status(account.id)
     if two_factor is not None:

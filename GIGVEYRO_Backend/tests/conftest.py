@@ -60,6 +60,7 @@ from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
 from app.services.deal import generate_public_id
 from app.services.deposit import generate_deposit_public_id
+from app.services.login_protection import in_memory_account_login_guard
 
 
 async def _create_test_database() -> None:
@@ -100,8 +101,10 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
     in_memory_rate_limiter._hits.clear()
+    in_memory_account_login_guard._state.clear()
     yield
     in_memory_rate_limiter._hits.clear()
+    in_memory_account_login_guard._state.clear()
 
 
 # Test-only DNS map for app.core.url_safety - keeps webhook SSRF-safety

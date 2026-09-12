@@ -51,6 +51,16 @@ class Settings(BaseSettings):
     # Rate Limiting Settings
     LOGIN_RATE_LIMIT_REQUESTS: int = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
+
+    # Per-account login brute-force protection, in addition to the per-IP
+    # limiter above - rotating IPs must not let an attacker keep guessing
+    # passwords against one specific account. Progressive/bounded so a
+    # burst of wrong guesses against an account can never lock it out
+    # permanently (see app/services/login_protection.py).
+    LOGIN_ACCOUNT_FAIL_WINDOW_SECONDS: int = 900
+    LOGIN_ACCOUNT_LOCK_THRESHOLD: int = 5
+    LOGIN_ACCOUNT_LOCK_BASE_SECONDS: int = 30
+    LOGIN_ACCOUNT_LOCK_MAX_SECONDS: int = 3600
     DEFAULT_RATE_LIMIT_REQUESTS: int = 100
     DEFAULT_RATE_LIMIT_WINDOW_SECONDS: int = 60
     FINANCIAL_MUTATION_RATE_LIMIT_REQUESTS: int = 10
