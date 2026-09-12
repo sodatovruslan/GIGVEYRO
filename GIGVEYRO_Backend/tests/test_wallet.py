@@ -75,7 +75,11 @@ async def test_owner_allocates_to_user(client, make_account, make_wallet, db_ses
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/allocate",
-        json={"amount": "500.00", "description": "initial funding"},
+        json={
+            "amount": "500.00",
+            "description": "initial funding",
+            "idempotency_key": "alloc-1",
+        },
         headers=_auth_headers(owner),
     )
 
@@ -106,7 +110,7 @@ async def test_allocate_rejects_zero_amount(client, make_account, make_wallet):
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/allocate",
-        json={"amount": "0"},
+        json={"amount": "0", "idempotency_key": "alloc-zero"},
         headers=_auth_headers(owner),
     )
 
@@ -120,11 +124,30 @@ async def test_allocate_rejects_negative_amount(client, make_account, make_walle
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/allocate",
-        json={"amount": "-10"},
+        json={"amount": "-10", "idempotency_key": "alloc-neg"},
         headers=_auth_headers(owner),
     )
 
     assert response.status_code == 422
+
+
+async def test_allocate_requires_idempotency_key(client, make_account, make_wallet):
+    owner = await make_account(role=UserRole.OWNER)
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user)
+
+    response = await client.post(
+        f"/owner/accounts/{user.id}/wallet/allocate",
+        json={"amount": "100"},
+        headers=_auth_headers(owner),
+    )
+
+    assert response.status_code == 422
+
+    ledger_resp = await client.get(
+        f"/owner/accounts/{user.id}/wallet/ledger", headers=_auth_headers(owner)
+    )
+    assert ledger_resp.json()["total"] == 0
 
 
 async def test_allocate_rejects_merchant_target(client, make_account):
@@ -133,7 +156,7 @@ async def test_allocate_rejects_merchant_target(client, make_account):
 
     response = await client.post(
         f"/owner/accounts/{merchant.id}/wallet/allocate",
-        json={"amount": "100"},
+        json={"amount": "100", "idempotency_key": "alloc-merchant"},
         headers=_auth_headers(owner),
     )
 
@@ -146,7 +169,7 @@ async def test_allocate_rejects_owner_target(client, make_account):
 
     response = await client.post(
         f"/owner/accounts/{other_owner.id}/wallet/allocate",
-        json={"amount": "100"},
+        json={"amount": "100", "idempotency_key": "alloc-owner"},
         headers=_auth_headers(owner),
     )
 
@@ -160,7 +183,7 @@ async def test_allocate_rejects_inactive_user(client, make_account, make_wallet)
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/allocate",
-        json={"amount": "100"},
+        json={"amount": "100", "idempotency_key": "alloc-inactive"},
         headers=_auth_headers(owner),
     )
 
@@ -172,7 +195,7 @@ async def test_allocate_nonexistent_account_returns_404(client, make_account):
 
     response = await client.post(
         f"/owner/accounts/{uuid.uuid4()}/wallet/allocate",
-        json={"amount": "100"},
+        json={"amount": "100", "idempotency_key": "alloc-missing"},
         headers=_auth_headers(owner),
     )
 
@@ -186,11 +209,73 @@ async def test_allocate_rejected_for_non_owner(client, make_account, make_wallet
 
     response = await client.post(
         f"/owner/accounts/{target.id}/wallet/allocate",
-        json={"amount": "100"},
+        json={"amount": "100", "idempotency_key": "alloc-forbidden"},
         headers=_auth_headers(user_actor),
     )
 
     assert response.status_code == 403
+
+
+# ---- IDEMPOTENCY (H3 security fix) ---------------------------------------
+
+
+async def test_allocate_same_idempotency_key_does_not_double_apply(
+    client, make_account, make_wallet
+):
+    owner = await make_account(role=UserRole.OWNER)
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user)
+
+    payload = {"amount": "100.00", "idempotency_key": "retry-key-1"}
+
+    first = await client.post(
+        f"/owner/accounts/{user.id}/wallet/allocate", json=payload, headers=_auth_headers(owner)
+    )
+    second = await client.post(
+        f"/owner/accounts/{user.id}/wallet/allocate", json=payload, headers=_auth_headers(owner)
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    # Retrying the exact same logical operation returns the same ledger entry.
+    assert first.json() == second.json()
+
+    ledger_resp = await client.get(
+        f"/owner/accounts/{user.id}/wallet/ledger", headers=_auth_headers(owner)
+    )
+    ledger_body = ledger_resp.json()
+    assert ledger_body["total"] == 1
+
+    wallet_resp = await client.get(
+        f"/owner/accounts/{user.id}/wallet", headers=_auth_headers(owner)
+    )
+    assert wallet_resp.json()["available_balance"] == "100.00000000"
+
+
+async def test_allocate_different_idempotency_keys_are_independent(
+    client, make_account, make_wallet
+):
+    owner = await make_account(role=UserRole.OWNER)
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user)
+
+    for key in ("key-a", "key-b"):
+        response = await client.post(
+            f"/owner/accounts/{user.id}/wallet/allocate",
+            json={"amount": "50.00", "idempotency_key": key},
+            headers=_auth_headers(owner),
+        )
+        assert response.status_code == 200
+
+    ledger_resp = await client.get(
+        f"/owner/accounts/{user.id}/wallet/ledger", headers=_auth_headers(owner)
+    )
+    assert ledger_resp.json()["total"] == 2
+
+    wallet_resp = await client.get(
+        f"/owner/accounts/{user.id}/wallet", headers=_auth_headers(owner)
+    )
+    assert wallet_resp.json()["available_balance"] == "100.00000000"
 
 
 # ---- INSURANCE ----------------------------------------------------------
@@ -203,7 +288,11 @@ async def test_insurance_increase(client, make_account, make_wallet):
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/insurance",
-        json={"amount": "100.00", "description": "insurance deposit"},
+        json={
+            "amount": "100.00",
+            "description": "insurance deposit",
+            "idempotency_key": "ins-inc-1",
+        },
         headers=_auth_headers(owner),
     )
 
@@ -218,7 +307,7 @@ async def test_insurance_decrease(client, make_account, make_wallet):
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/insurance",
-        json={"amount": "-40.00"},
+        json={"amount": "-40.00", "idempotency_key": "ins-dec-1"},
         headers=_auth_headers(owner),
     )
 
@@ -233,11 +322,25 @@ async def test_insurance_decrease_below_zero_rejected(client, make_account, make
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/insurance",
-        json={"amount": "-100.00"},
+        json={"amount": "-100.00", "idempotency_key": "ins-dec-neg"},
         headers=_auth_headers(owner),
     )
 
     assert response.status_code == 409
+
+
+async def test_insurance_requires_idempotency_key(client, make_account, make_wallet):
+    owner = await make_account(role=UserRole.OWNER)
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user)
+
+    response = await client.post(
+        f"/owner/accounts/{user.id}/wallet/insurance",
+        json={"amount": "100.00"},
+        headers=_auth_headers(owner),
+    )
+
+    assert response.status_code == 422
 
 
 async def test_insurance_ledger_entries_have_correct_snapshots(client, make_account, make_wallet):
@@ -247,12 +350,12 @@ async def test_insurance_ledger_entries_have_correct_snapshots(client, make_acco
 
     await client.post(
         f"/owner/accounts/{user.id}/wallet/insurance",
-        json={"amount": "100.00"},
+        json={"amount": "100.00", "idempotency_key": "ins-snap-1"},
         headers=_auth_headers(owner),
     )
     await client.post(
         f"/owner/accounts/{user.id}/wallet/insurance",
-        json={"amount": "-40.00"},
+        json={"amount": "-40.00", "idempotency_key": "ins-snap-2"},
         headers=_auth_headers(owner),
     )
 
@@ -279,7 +382,7 @@ async def test_manual_adjust_increase(client, make_account, make_wallet):
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/adjust",
-        json={"amount": "50.00", "reason": "bonus"},
+        json={"amount": "50.00", "reason": "bonus", "idempotency_key": "adj-inc-1"},
         headers=_auth_headers(owner),
     )
 
@@ -294,7 +397,7 @@ async def test_manual_adjust_decrease(client, make_account, make_wallet):
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/adjust",
-        json={"amount": "-20.00", "reason": "correction"},
+        json={"amount": "-20.00", "reason": "correction", "idempotency_key": "adj-dec-1"},
         headers=_auth_headers(owner),
     )
 
@@ -309,7 +412,7 @@ async def test_manual_adjust_below_zero_rejected(client, make_account, make_wall
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/adjust",
-        json={"amount": "-20.00", "reason": "correction"},
+        json={"amount": "-20.00", "reason": "correction", "idempotency_key": "adj-dec-neg"},
         headers=_auth_headers(owner),
     )
 
@@ -323,7 +426,21 @@ async def test_manual_adjust_requires_reason(client, make_account, make_wallet):
 
     response = await client.post(
         f"/owner/accounts/{user.id}/wallet/adjust",
-        json={"amount": "10.00", "reason": ""},
+        json={"amount": "10.00", "reason": "", "idempotency_key": "adj-no-reason"},
+        headers=_auth_headers(owner),
+    )
+
+    assert response.status_code == 422
+
+
+async def test_manual_adjust_requires_idempotency_key(client, make_account, make_wallet):
+    owner = await make_account(role=UserRole.OWNER)
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user, available=Decimal("100"))
+
+    response = await client.post(
+        f"/owner/accounts/{user.id}/wallet/adjust",
+        json={"amount": "10.00", "reason": "bonus"},
         headers=_auth_headers(owner),
     )
 
@@ -350,7 +467,7 @@ async def test_user_gets_own_ledger(client, make_account, make_wallet, db_sessio
 
     await client.post(
         f"/owner/accounts/{user.id}/wallet/allocate",
-        json={"amount": "77.00"},
+        json={"amount": "77.00", "idempotency_key": "own-ledger-1"},
         headers=_auth_headers(owner),
     )
 

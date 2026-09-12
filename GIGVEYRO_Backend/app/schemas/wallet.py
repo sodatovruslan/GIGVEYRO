@@ -16,16 +16,16 @@ class WalletRead(BaseModel):
 class AllocateRequest(BaseModel):
     amount: Money = Field(gt=0)
     description: str | None = Field(default=None, max_length=500)
-    idempotency_key: str | None = Field(default=None, max_length=255)
+    idempotency_key: str = Field(min_length=1, max_length=255)
 
 
 class InsuranceAdjustRequest(BaseModel):
     amount: Money = Field(description="Positive to increase, negative to decrease")
     description: str | None = Field(default=None, max_length=500)
-    idempotency_key: str | None = Field(default=None, max_length=255)
+    idempotency_key: str = Field(min_length=1, max_length=255)
 
 
 class ManualAdjustRequest(BaseModel):
     amount: Money = Field(description="Positive to credit, negative to debit")
     reason: str = Field(min_length=1, max_length=500)
-    idempotency_key: str | None = Field(default=None, max_length=255)
+    idempotency_key: str = Field(min_length=1, max_length=255)

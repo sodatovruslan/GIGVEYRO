@@ -12,6 +12,10 @@ class LedgerRepository:
     def __init__(self, session: AsyncSession):
         self._session = session
 
+    @property
+    def session(self) -> AsyncSession:
+        return self._session
+
     async def create(self, entry: LedgerEntry) -> LedgerEntry:
         self._session.add(entry)
         await self._session.flush()

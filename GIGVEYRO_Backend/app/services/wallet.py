@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from sqlalchemy.exc import IntegrityError
+
 from app.enums.account import UserRole
 from app.enums.wallet import BalanceBucket, Currency, LedgerEntryType
 from app.models.account import Account
@@ -107,7 +109,7 @@ class WalletService:
         target_account_id: uuid.UUID,
         amount: Decimal,
         description: str | None,
-        idempotency_key: str | None,
+        idempotency_key: str,
     ) -> LedgerEntry:
         return await self._apply_bucket_change(
             actor=actor,
@@ -127,7 +129,7 @@ class WalletService:
         target_account_id: uuid.UUID,
         amount: Decimal,
         description: str | None,
-        idempotency_key: str | None,
+        idempotency_key: str,
     ) -> LedgerEntry:
         return await self._apply_bucket_change(
             actor=actor,
@@ -699,7 +701,7 @@ class WalletService:
         target_account_id: uuid.UUID,
         amount: Decimal,
         reason: str,
-        idempotency_key: str | None,
+        idempotency_key: str,
     ) -> LedgerEntry:
         return await self._apply_bucket_change(
             actor=actor,
@@ -722,8 +724,10 @@ class WalletService:
         amount: Decimal,
         require_positive: bool,
         description: str | None,
-        idempotency_key: str | None,
+        idempotency_key: str,
     ) -> LedgerEntry:
+        if not idempotency_key:
+            raise InvalidAmountError("idempotency_key is required")
         if not amount.is_finite() or amount == 0:
             raise InvalidAmountError("amount must be a non-zero, finite number")
         if require_positive and amount <= 0:
@@ -735,16 +739,18 @@ class WalletService:
         if not target.is_active:
             raise InactiveAccountError("cannot modify the wallet of an inactive account")
 
+        # Row lock serializes concurrent requests targeting the same wallet:
+        # a second caller blocks here until the first commits, so its own
+        # dedupe lookup below always sees the first request's committed row.
         wallet = await self._wallets.get_by_account_id_for_update(target_account_id)
         if wallet is None:
             raise WalletNotFoundError()
 
-        if idempotency_key is not None:
-            existing = await self._ledger.get_by_wallet_and_idempotency_key(
-                wallet.id, idempotency_key
-            )
-            if existing is not None:
-                return existing
+        existing = await self._ledger.get_by_wallet_and_idempotency_key(
+            wallet.id, idempotency_key
+        )
+        if existing is not None:
+            return existing
 
         available_before = wallet.available_balance
         insurance_before = wallet.insurance_balance
@@ -782,4 +788,22 @@ class WalletService:
             idempotency_key=idempotency_key,
             created_by_account_id=actor.id,
         )
-        return await self._ledger.create(entry)
+        # The wallet row lock already serializes concurrent requests for the
+        # same (wallet, idempotency_key), but the unique constraint on
+        # ledger_entries(wallet_id, idempotency_key) is the real guarantee -
+        # a SAVEPOINT lets a conflict there be handled as "already applied"
+        # instead of aborting the whole request transaction.
+        session = self._ledger.session
+        try:
+            async with session.begin_nested():
+                session.add(entry)
+                await session.flush()
+        except IntegrityError:
+            existing = await self._ledger.get_by_wallet_and_idempotency_key(
+                wallet.id, idempotency_key
+            )
+            if existing is not None:
+                return existing
+            raise
+        await session.refresh(entry)
+        return entry
