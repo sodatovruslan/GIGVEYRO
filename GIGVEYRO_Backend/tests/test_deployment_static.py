@@ -57,6 +57,11 @@ def test_images_and_env_templates_do_not_bake_runtime_secrets():
     assert "BYBIT_WRITE_ENABLED=false" in production
 
 
+def test_dockerignore_excludes_local_password_helper():
+    dockerignore = (ROOT / "GIGVEYRO_Backend" / ".dockerignore").read_text(encoding="utf-8")
+    assert "reset_owner_password.py" in dockerignore
+
+
 def test_restore_requires_exact_target_confirmation():
     restore = (ROOT / "scripts" / "restore_db.sh").read_text(encoding="utf-8")
     assert 'RESTORE_CONFIRM_TARGET="${RESTORE_CONFIRM_TARGET:-}"' in restore

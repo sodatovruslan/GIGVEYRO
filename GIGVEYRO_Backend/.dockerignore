@@ -32,6 +32,9 @@ env/
 .git/
 .gitignore
 
+# Local-only operator helper scripts - never ship in an image
+reset_owner_password.py
+
 # OS
 .DS_Store
 Thumbs.db
