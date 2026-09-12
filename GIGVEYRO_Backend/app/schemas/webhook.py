@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.url_safety import UnsafeWebhookURLError, validate_webhook_url_syntax
 from app.enums.webhook import WebhookDeliveryStatus, WebhookEventType, WebhookStatus
 
 _ALLOWED_EVENT_TYPES = {member.value for member in WebhookEventType}
@@ -17,9 +18,14 @@ def _validate_event_types(value: list[str]) -> list[str]:
 
 
 def _validate_url(value: str) -> str:
-    if not value.startswith(("https://", "http://")):
-        raise ValueError("url must start with http:// or https://")
-    return value
+    # Structural check only (https:// + hostname present) - no network I/O
+    # is possible from a Pydantic validator. The real SSRF-safety check
+    # (DNS resolution + private-address rejection) runs in WebhookService,
+    # and again immediately before every delivery attempt.
+    try:
+        return validate_webhook_url_syntax(value)
+    except UnsafeWebhookURLError as exc:
+        raise ValueError(str(exc)) from exc
 
 
 class WebhookCreate(BaseModel):

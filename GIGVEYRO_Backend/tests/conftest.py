@@ -104,6 +104,47 @@ def reset_rate_limiter():
     in_memory_rate_limiter._hits.clear()
 
 
+# Test-only DNS map for app.core.url_safety - keeps webhook SSRF-safety
+# tests offline/deterministic instead of depending on real DNS resolution.
+# A literal IP address as "hostname" resolves to itself (matching real
+# getaddrinfo behavior for numeric hosts), covering every private/loopback/
+# link-local/etc test case without needing an entry here. Named entries
+# cover the "a hostname resolves to a private address" cases that a plain
+# IP literal can't exercise.
+_TEST_DNS_MAP: dict[str, list[str]] = {
+    "example.com": ["93.184.216.34"],
+    "public-webhook.test": ["1.1.1.1"],
+    "also-public-webhook.test": ["8.8.8.8"],
+    "internal-service.test": ["10.0.0.5"],
+    "metadata.test": ["169.254.169.254"],
+    "mixed-address.test": ["8.8.4.4", "10.0.0.9"],
+    "rebind.test": ["1.0.0.1"],
+}
+
+
+@pytest.fixture(autouse=True)
+def fake_dns_for_webhook_safety(monkeypatch):
+    import socket as socket_module
+
+    from app.core import url_safety
+
+    async def _fake_getaddrinfo(hostname: str, port: int):
+        try:
+            import ipaddress
+
+            ipaddress.ip_address(hostname.split("%", 1)[0])
+            ips = [hostname]
+        except ValueError:
+            ips = _TEST_DNS_MAP.get(hostname)
+            if ips is None:
+                raise socket_module.gaierror(f"no test DNS entry for host: {hostname}")
+        return [
+            (socket_module.AF_INET, socket_module.SOCK_STREAM, 6, "", (ip, port)) for ip in ips
+        ]
+
+    monkeypatch.setattr(url_safety, "_getaddrinfo", _fake_getaddrinfo)
+
+
 @pytest.fixture
 async def db_session():
     async with engine.connect() as connection:

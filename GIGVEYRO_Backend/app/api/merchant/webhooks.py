@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_account, require_roles
+from app.core.url_safety import UnsafeWebhookURLError
 from app.db.session import get_db
 from app.enums.account import UserRole
 from app.models.account import Account
@@ -33,15 +34,22 @@ def _not_found() -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="webhook not found")
 
 
+def _unsafe_url(exc: UnsafeWebhookURLError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
+
+
 @router.post("", response_model=WebhookCreated, status_code=status.HTTP_201_CREATED)
 async def create_webhook(
     payload: WebhookCreate,
     merchant: Account = Depends(get_current_account),
     service: WebhookService = Depends(_service),
 ) -> WebhookCreated:
-    webhook, secret = await service.create(
-        merchant, url=payload.url, event_types=payload.event_types
-    )
+    try:
+        webhook, secret = await service.create(
+            merchant, url=payload.url, event_types=payload.event_types
+        )
+    except UnsafeWebhookURLError as exc:
+        raise _unsafe_url(exc) from exc
     return WebhookCreated(**WebhookRead.model_validate(webhook).model_dump(), secret=secret)
 
 
@@ -85,6 +93,8 @@ async def update_webhook(
         )
     except WebhookNotFoundError as exc:
         raise _not_found() from exc
+    except UnsafeWebhookURLError as exc:
+        raise _unsafe_url(exc) from exc
 
 
 @router.get("/{webhook_id}/deliveries", response_model=WebhookDeliveryListResponse)

@@ -31,8 +31,10 @@ class _FakeClient:
         self._exc = exc
         self.calls: list[dict] = []
 
-    async def post(self, url, *, content, headers):
-        self.calls.append({"url": url, "content": content, "headers": headers})
+    async def post(self, url, *, content, headers, extensions=None):
+        self.calls.append(
+            {"url": url, "content": content, "headers": headers, "extensions": extensions}
+        )
         if self._exc is not None:
             raise self._exc
         return self._response
@@ -120,6 +122,75 @@ async def test_network_error_schedules_retry(db_session, make_account):
     assert delivery.status == WebhookDeliveryStatus.PENDING
     assert delivery.attempts == 1
     assert "boom" in delivery.last_error
+
+
+# ---- SSRF PROTECTION AT DELIVERY TIME (H2 security fix) ------------------
+
+
+async def test_delivery_connects_to_pinned_ip_not_the_hostname(db_session, make_account):
+    """The actual outbound request must target the resolved, validated IP -
+    not let httpx re-resolve DNS itself, which would reopen the rebinding
+    window between validation and connection."""
+    merchant = await make_account(role=UserRole.MERCHANT)
+    webhook, _raw, delivery, webhook_repo, delivery_repo, service = (
+        await _make_webhook_and_delivery(db_session, merchant)
+    )
+    client = _FakeClient(response=_FakeResponse(200))
+
+    await _deliver_one(client, webhook_repo, service, delivery_repo, delivery)
+
+    call = client.calls[0]
+    assert "93.184.216.34" in call["url"]
+    assert "example.com" not in call["url"]
+    assert call["headers"]["Host"] == "example.com"
+    assert call["extensions"] == {"sni_hostname": "example.com"}
+    assert delivery.status == WebhookDeliveryStatus.SUCCESS
+
+
+async def test_delivery_rejects_webhook_that_now_resolves_to_a_private_address(
+    db_session, make_account
+):
+    """Simulates DNS rebinding: the webhook's URL was safe when created, but
+    by the time the worker attempts delivery it resolves somewhere private.
+    The worker must re-validate on every attempt, not just trust the URL
+    because it passed validation once at creation time."""
+    merchant = await make_account(role=UserRole.MERCHANT)
+    webhook, _raw, delivery, webhook_repo, delivery_repo, service = (
+        await _make_webhook_and_delivery(db_session, merchant)
+    )
+    # Bypass service.update's own validation to simulate the URL now
+    # resolving to a private address (rebinding), not a config change.
+    webhook.url = "https://internal-service.test/hook"
+    await webhook_repo.save(webhook)
+    client = _FakeClient(response=_FakeResponse(200))
+
+    await _deliver_one(client, webhook_repo, service, delivery_repo, delivery)
+
+    assert client.calls == [], "must never connect once re-validation fails"
+    assert delivery.status == WebhookDeliveryStatus.PENDING
+    assert "safety validation" in delivery.last_error
+
+
+async def test_delivery_does_not_follow_redirect_to_private_address(db_session, make_account):
+    import httpx
+
+    merchant = await make_account(role=UserRole.MERCHANT)
+    webhook, _raw, delivery, webhook_repo, delivery_repo, service = (
+        await _make_webhook_and_delivery(db_session, merchant)
+    )
+
+    def _redirect_to_internal(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"Location": "https://internal-service.test/steal"})
+
+    transport = httpx.MockTransport(_redirect_to_internal)
+    async with httpx.AsyncClient(transport=transport, follow_redirects=False) as real_client:
+        await _deliver_one(real_client, webhook_repo, service, delivery_repo, delivery)
+
+    # The 302 is treated as a failed delivery attempt (not 2xx) - it is
+    # never followed, so the internal target is never contacted.
+    assert delivery.last_response_status == 302
+    assert delivery.status == WebhookDeliveryStatus.PENDING
+    assert delivery.next_attempt_at is not None
 
 
 async def test_invoice_paid_enqueues_webhook_delivery(

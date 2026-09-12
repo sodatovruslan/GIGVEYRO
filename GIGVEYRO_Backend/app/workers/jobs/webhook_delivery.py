@@ -25,6 +25,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.url_safety import UnsafeWebhookURLError, build_pinned_request_target
 from app.db.session import AsyncSessionLocal
 from app.enums.webhook import WebhookDeliveryStatus, WebhookStatus
 from app.infra.metrics import record_worker_failure, record_worker_success
@@ -107,7 +108,12 @@ async def _process_batch(session: AsyncSession) -> int:
         return 0
 
     processed = 0
-    async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS) as client:
+    # follow_redirects is explicitly False (also httpx's default): a 3xx
+    # from an otherwise-public, validated host must not be able to redirect
+    # this trusted worker into an internal/private address.
+    async with httpx.AsyncClient(
+        timeout=_REQUEST_TIMEOUT_SECONDS, follow_redirects=False
+    ) as client:
         for delivery in deliveries:
             await _deliver_one(client, webhook_repo, service, delivery_repo, delivery)
             processed += 1
@@ -137,13 +143,31 @@ async def _deliver_one(
     signature = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
 
     try:
+        # Re-validated and re-resolved on every single attempt, not just at
+        # webhook creation time - an attacker who fully controls their own
+        # DNS record could otherwise point it at a private address after
+        # the fact (DNS rebinding). The request is then pinned to the exact
+        # address just checked so this trusted worker's own DNS lookup
+        # can't be a second, unchecked decision point.
+        pinned_url, extra_headers, extensions = await build_pinned_request_target(webhook.url)
+    except UnsafeWebhookURLError as exc:
+        delivery.last_error = f"webhook url failed safety validation: {exc}"[
+            :_ERROR_SNIPPET_MAX_CHARS
+        ]
+        _schedule_retry_or_fail(delivery)
+        await delivery_repo.save(delivery)
+        return
+
+    try:
         response = await client.post(
-            webhook.url,
+            pinned_url,
             content=body,
             headers={
                 "Content-Type": "application/json",
                 _SIGNATURE_HEADER: f"sha256={signature}",
+                **extra_headers,
             },
+            extensions=extensions,
         )
         delivery.last_response_status = response.status_code
         delivery.last_response_snippet = response.text[:_RESPONSE_SNIPPET_MAX_CHARS]

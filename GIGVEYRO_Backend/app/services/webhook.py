@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 
 from app.core.totp_crypto import decrypt_totp_secret, encrypt_totp_secret
+from app.core.url_safety import resolve_public_address
 from app.enums.webhook import WebhookDeliveryStatus, WebhookStatus
 from app.models.account import Account
 from app.models.webhook import Webhook, WebhookDelivery
@@ -27,6 +28,10 @@ class WebhookService:
     async def create(
         self, merchant: Account, *, url: str, event_types: list[str]
     ) -> tuple[Webhook, str]:
+        # Raises UnsafeWebhookURLError (a ValueError subclass) if the host
+        # resolves to a private/loopback/link-local/etc address - the
+        # route maps that to a 422 for the merchant.
+        await resolve_public_address(url)
         raw_secret = generate_webhook_secret()
         webhook = Webhook(
             merchant_id=merchant.id,
@@ -64,6 +69,7 @@ class WebhookService:
         if webhook is None or webhook.merchant_id != merchant_id:
             raise WebhookNotFoundError()
         if url is not None:
+            await resolve_public_address(url)
             webhook.url = url
         if status is not None:
             webhook.status = status
