@@ -7,3 +7,5 @@ __pycache__/
 .idea/
 .vscode/
 .aider*
+nginx/certs/
+nginx/acme-challenge/
