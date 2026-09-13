@@ -40,6 +40,13 @@ export default function OwnerUserWithdrawalsPage() {
     finally { setBusyId(null); }
   }
 
+  async function markPaid(id: string) {
+    setError(""); setBusyId(id);
+    try { await ownerUserWithdrawalsApi.markPaid(id, null); await query.refetch(); }
+    catch (reason) { setError(localizeError(reason)); }
+    finally { setBusyId(null); }
+  }
+
   return <section>
     <div className={styles.contentHeader} style={{ padding: 0, border: 0, marginBottom: 27 }}>
       <PageHeading eyebrow={t("eyebrow")} title={t("ownerUserTitle")} text={t("ownerUserSubtitle")} />
@@ -56,10 +63,13 @@ export default function OwnerUserWithdrawalsPage() {
               <td>{labels.destination(item.destination_type)}<br />{item.destination}</td>
               <td>{item.amount} {item.currency.toUpperCase()}</td>
               <td>{labels.withdrawal(item.status)}</td>
-              <td>{item.status === "pending" && <>
-                <button disabled={busyId === item.id} onClick={() => void approve(item.id)}>{t("approve")}</button>{" "}
-                <button className={styles.negative} disabled={busyId === item.id} onClick={() => void reject(item.id)}>{t("reject")}</button>
-              </>}</td>
+              <td>
+                {item.status === "pending" && <>
+                  <button disabled={busyId === item.id} onClick={() => void approve(item.id)}>{t("approve")}</button>{" "}
+                  <button className={styles.negative} disabled={busyId === item.id} onClick={() => void reject(item.id)}>{t("reject")}</button>
+                </>}
+                {item.status === "approved" && <button disabled={busyId === item.id} onClick={() => void markPaid(item.id)}>{t("markPaid")}</button>}
+              </td>
             </tr>)}
           </tbody></table></div>}
       {query.data && <Pager offset={offset} limit={PAGE_SIZE} itemCount={query.data.items.length} total={query.data.total} onPage={setOffset} />}

@@ -13,6 +13,7 @@ from app.models.user_withdrawal import UserWithdrawal
 from app.repositories.account import AccountRepository
 from app.repositories.user_withdrawal import UserWithdrawalRepository
 from app.services.notification import NotificationService
+from app.services.realtime import RealtimeEventService
 from app.services.risk import RiskGuard
 from app.services.wallet import WalletService
 from app.services.withdrawal import (
@@ -36,12 +37,14 @@ class UserWithdrawalService:
         account_repository: AccountRepository,
         notification_service: NotificationService | None = None,
         risk_guard: RiskGuard | None = None,
+        realtime_service: RealtimeEventService | None = None,
     ):
         self._withdrawals = withdrawal_repository
         self._wallet_service = wallet_service
         self._accounts = account_repository
         self._notifications = notification_service
         self._risk_guard = risk_guard
+        self._realtime = realtime_service
 
     async def _notify_status_changed(self, withdrawal: UserWithdrawal) -> None:
         if self._notifications is None:
@@ -60,6 +63,10 @@ class UserWithdrawalService:
             payload={"withdrawal_id": str(withdrawal.id), "status": withdrawal.status.value},
             dedupe_key=f"user_withdrawal_status:{withdrawal.id}:{withdrawal.status.value}",
         )
+
+    async def _realtime_notify(self, withdrawal: UserWithdrawal) -> None:
+        if self._realtime is not None:
+            await self._realtime.enqueue_user_withdrawal_updated(withdrawal)
 
     async def create_withdrawal(
         self,
@@ -142,6 +149,7 @@ class UserWithdrawalService:
         transition_withdrawal(withdrawal, WithdrawalStatus.CANCELLED, actor_id=user_id)
         saved = await self._withdrawals.save(withdrawal)
         await self._notify_status_changed(saved)
+        await self._realtime_notify(saved)
         return saved
 
     async def get_for_user(
@@ -182,6 +190,7 @@ class UserWithdrawalService:
         transition_withdrawal(withdrawal, WithdrawalStatus.APPROVED, actor_id=owner_id)
         saved = await self._withdrawals.save(withdrawal)
         await self._notify_status_changed(saved)
+        await self._realtime_notify(saved)
         return saved
 
     async def reject_by_owner(
@@ -212,6 +221,7 @@ class UserWithdrawalService:
         transition_withdrawal(withdrawal, WithdrawalStatus.REJECTED, actor_id=owner_id)
         saved = await self._withdrawals.save(withdrawal)
         await self._notify_status_changed(saved)
+        await self._realtime_notify(saved)
         return saved
 
     async def mark_paid_by_owner(
@@ -229,10 +239,21 @@ class UserWithdrawalService:
                 f"cannot mark paid withdrawal in status {withdrawal.status}"
             )
 
-        raise InvalidWithdrawalTransitionError(
-            "direct mark-paid is disabled; controlled payout execution is not yet "
-            "available for USER withdrawals"
+        if comment:
+            withdrawal.owner_comment = comment
+
+        await self._wallet_service.pay_for_user_withdrawal(
+            user_id=withdrawal.user_id,
+            amount=withdrawal.amount,
+            withdrawal_id=withdrawal.id,
+            actor_id=owner_id,
         )
+
+        transition_withdrawal(withdrawal, WithdrawalStatus.PAID, actor_id=owner_id)
+        saved = await self._withdrawals.save(withdrawal)
+        await self._notify_status_changed(saved)
+        await self._realtime_notify(saved)
+        return saved
 
     async def get_for_owner(self, withdrawal_id: uuid.UUID) -> UserWithdrawal:
         withdrawal = await self._withdrawals.get_by_id(withdrawal_id)

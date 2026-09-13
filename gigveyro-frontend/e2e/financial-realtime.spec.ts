@@ -135,6 +135,112 @@ test("merchant withdrawal is isolated and owner sees safe pending state", async 
   await ownerContext.close();
 });
 
+test("user withdrawal completes end to end: create, approve, mark paid", async ({ browser }) => {
+  const userContext = await browser.newContext();
+  const ownerContext = await browser.newContext();
+  const user = await userContext.newPage();
+  const owner = await ownerContext.newPage();
+  await login(user, personas.userA);
+  await login(owner, personas.owner);
+
+  // Fund the user deterministically regardless of prior test state/order.
+  const depositResponse = await user.request.post("/api/backend/deposits", { data: { amount: "77" } });
+  expect(depositResponse.status()).toBe(201);
+  const deposit = await depositResponse.json();
+  const txHash = `e2e-withdrawal-fund-${Date.now()}`;
+  const credit = await owner.request.post(`/api/backend/owner/dev/deposits/${deposit.id}/simulate`, {
+    data: { tx_hash: txHash, amount: "77", confirmations: 20, network: "TRC20", asset: "USDT", destination_address: deposit.deposit_address },
+  });
+  expect(credit.status()).toBe(200);
+  const before = await (await user.request.get("/api/backend/wallet")).json();
+
+  const createdResponse = await user.request.post("/api/backend/withdrawals", {
+    data: { amount: "30", destination_type: "usdt_trc20_address", destination: `T${"e2e".padEnd(33, "a")}`, comment: "E2E full lifecycle" },
+  });
+  expect(createdResponse.status()).toBe(201);
+  const withdrawal = await createdResponse.json();
+  expect(withdrawal.status).toBe("pending");
+
+  const afterHold = await (await user.request.get("/api/backend/wallet")).json();
+  expect(Number(before.available_balance) - Number(afterHold.available_balance)).toBe(30);
+  expect(Number(afterHold.frozen_balance)).toBe(30);
+
+  const approveResponse = await owner.request.post(`/api/backend/owner/user-withdrawals/${withdrawal.id}/approve`);
+  expect(approveResponse.status()).toBe(200);
+  expect((await approveResponse.json()).status).toBe("approved");
+
+  // The old dead-end: this used to return 409 CONTROLLED_PAYOUT_REQUIRED
+  // forever, leaving the user's funds frozen with no way out.
+  const paidResponse = await owner.request.post(`/api/backend/owner/user-withdrawals/${withdrawal.id}/mark-paid`);
+  expect(paidResponse.status()).toBe(200);
+  expect((await paidResponse.json()).status).toBe("paid");
+
+  const afterPaid = await (await user.request.get("/api/backend/wallet")).json();
+  expect(Number(afterPaid.frozen_balance)).toBe(0);
+  expect(Number(afterPaid.available_balance)).toBe(Number(afterHold.available_balance));
+
+  const userView = await (await user.request.get(`/api/backend/withdrawals/${withdrawal.id}`)).json();
+  expect(userView.status).toBe("paid");
+  const ownerView = await (await owner.request.get(`/api/backend/owner/user-withdrawals/${withdrawal.id}`)).json();
+  expect(ownerView.status).toBe("paid");
+
+  await user.goto("/user/withdrawals");
+  await expect(user.getByText(withdrawal.public_id)).toBeVisible();
+
+  await userContext.close();
+  await ownerContext.close();
+});
+
+test("user withdrawal rejected by owner returns funds", async ({ browser }) => {
+  const userContext = await browser.newContext();
+  const ownerContext = await browser.newContext();
+  const user = await userContext.newPage();
+  const owner = await ownerContext.newPage();
+  await login(user, personas.userA);
+  await login(owner, personas.owner);
+
+  const before = await (await user.request.get("/api/backend/wallet")).json();
+  const createdResponse = await user.request.post("/api/backend/withdrawals", {
+    data: { amount: "5", destination_type: "usdt_trc20_address", destination: `T${"e2e".padEnd(33, "b")}` },
+  });
+  expect(createdResponse.status()).toBe(201);
+  const withdrawal = await createdResponse.json();
+
+  const rejectResponse = await owner.request.post(`/api/backend/owner/user-withdrawals/${withdrawal.id}/reject`);
+  expect(rejectResponse.status()).toBe(200);
+  expect((await rejectResponse.json()).status).toBe("rejected");
+
+  const after = await (await user.request.get("/api/backend/wallet")).json();
+  expect(after.available_balance).toBe(before.available_balance);
+  expect(Number(after.frozen_balance)).toBe(0);
+
+  await userContext.close();
+  await ownerContext.close();
+});
+
+test("user cancels own pending withdrawal and funds are released", async ({ browser }) => {
+  const userContext = await browser.newContext();
+  const user = await userContext.newPage();
+  await login(user, personas.userA);
+
+  const before = await (await user.request.get("/api/backend/wallet")).json();
+  const createdResponse = await user.request.post("/api/backend/withdrawals", {
+    data: { amount: "5", destination_type: "usdt_trc20_address", destination: `T${"e2e".padEnd(33, "c")}` },
+  });
+  expect(createdResponse.status()).toBe(201);
+  const withdrawal = await createdResponse.json();
+
+  const cancelResponse = await user.request.post(`/api/backend/withdrawals/${withdrawal.id}/cancel`);
+  expect(cancelResponse.status()).toBe(200);
+  expect((await cancelResponse.json()).status).toBe("cancelled");
+
+  const after = await (await user.request.get("/api/backend/wallet")).json();
+  expect(after.available_balance).toBe(before.available_balance);
+  expect(Number(after.frozen_balance)).toBe(0);
+
+  await userContext.close();
+});
+
 test("merchant critical routes render without owner navigation", async ({ page }) => {
   await login(page, personas.merchantA);
   for (const route of ["/merchant", "/merchant/wallet", "/merchant/deals", "/merchant/withdrawals", "/merchant/appeals", "/merchant/notifications", "/merchant/settings"]) {

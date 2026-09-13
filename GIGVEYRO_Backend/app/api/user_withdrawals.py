@@ -13,6 +13,7 @@ from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.notification import NotificationRepository
+from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.risk import RiskRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.user_withdrawal import UserWithdrawalRepository
@@ -23,6 +24,7 @@ from app.schemas.user_withdrawal import (
     UserWithdrawalRead,
 )
 from app.services.notification import NotificationService
+from app.services.realtime import RealtimeEventService
 from app.services.risk import RiskBlockedError, RiskGuard
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.user_withdrawal import (
@@ -52,6 +54,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> UserWithdrawalService:
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
         risk_guard=RiskGuard(RiskRepository(db)),
+        realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
     )
 
 

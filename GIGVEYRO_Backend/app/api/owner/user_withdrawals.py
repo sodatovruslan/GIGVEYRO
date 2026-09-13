@@ -13,6 +13,7 @@ from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.notification import NotificationRepository
+from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.telegram import TelegramLinkRepository
 from app.repositories.user_withdrawal import UserWithdrawalRepository
 from app.repositories.wallet import WalletRepository
@@ -23,6 +24,7 @@ from app.schemas.user_withdrawal import (
 )
 from app.services.audit import AuditService
 from app.services.notification import NotificationService
+from app.services.realtime import RealtimeEventService
 from app.services.telegram_provider import MockTelegramProvider
 from app.services.user_withdrawal import (
     InvalidWithdrawalTransitionError,
@@ -48,6 +50,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> UserWithdrawalService:
         notification_service=NotificationService(
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()
         ),
+        realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
     )
 
 
@@ -148,8 +151,25 @@ async def reject_withdrawal(
 @router.post("/{withdrawal_id}/mark-paid", response_model=UserWithdrawalRead)
 async def mark_paid_withdrawal(
     withdrawal_id: uuid.UUID,
+    payload: OwnerUserWithdrawalAction | None = None,
+    owner: Account = Depends(get_current_account),
+    service: UserWithdrawalService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
 ) -> UserWithdrawalRead:
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail={"code": "CONTROLLED_PAYOUT_REQUIRED"},
+    comment = payload.comment if payload else None
+    try:
+        withdrawal = await service.mark_paid_by_owner(owner.id, withdrawal_id, comment)
+    except WithdrawalNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="withdrawal not found"
+        ) from exc
+    except (InvalidWithdrawalTransitionError, InsufficientBalanceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await audit.log_action(
+        action="user_withdrawal.mark_paid",
+        entity_type="user_withdrawal",
+        entity_id=str(withdrawal_id),
+        actor_account_id=owner.id,
+        actor_role=owner.role.value,
     )
+    return withdrawal

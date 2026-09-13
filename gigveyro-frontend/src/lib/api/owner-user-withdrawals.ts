@@ -14,4 +14,5 @@ export const ownerUserWithdrawalsApi = {
   get: (id: string) => apiFetch<UserWithdrawal>(`/owner/user-withdrawals/${id}`),
   approve: (id: string, comment: string | null) => apiFetch<UserWithdrawal>(`/owner/user-withdrawals/${id}/approve`, { method: "POST", body: { comment } }),
   reject: (id: string, comment: string | null) => apiFetch<UserWithdrawal>(`/owner/user-withdrawals/${id}/reject`, { method: "POST", body: { comment } }),
+  markPaid: (id: string, comment: string | null) => apiFetch<UserWithdrawal>(`/owner/user-withdrawals/${id}/mark-paid`, { method: "POST", body: { comment } }),
 };
