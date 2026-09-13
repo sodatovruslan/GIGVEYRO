@@ -117,3 +117,23 @@ class WebhookDeliveryRepository:
             .where(WebhookDelivery.webhook_id == webhook_id)
         )
         return result.scalar_one()
+
+    async def list_for_invoice(
+        self, merchant_id: uuid.UUID, invoice_id: uuid.UUID
+    ) -> list[WebhookDelivery]:
+        """Deliveries carry no invoice_id column - the only linkage is the
+        JSONB payload set at enqueue time (see deposit.py::_credit). Scoping
+        the join by Webhook.merchant_id (not just filtering the invoice_id)
+        is what keeps this tenant-safe: a delivery can only be returned if
+        it belongs to a webhook owned by the requesting merchant."""
+        query = (
+            select(WebhookDelivery)
+            .join(Webhook, WebhookDelivery.webhook_id == Webhook.id)
+            .where(
+                Webhook.merchant_id == merchant_id,
+                WebhookDelivery.payload["invoice_id"].astext == str(invoice_id),
+            )
+            .order_by(WebhookDelivery.created_at.asc())
+        )
+        result = await self._session.execute(query)
+        return list(result.scalars().all())

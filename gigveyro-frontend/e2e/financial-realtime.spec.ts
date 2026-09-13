@@ -241,6 +241,90 @@ test("user cancels own pending withdrawal and funds are released", async ({ brow
   await userContext.close();
 });
 
+test("merchant views a paid invoice's full timeline: deposit, balance credit, and webhook delivery", async ({ browser }) => {
+  const merchantContext = await browser.newContext();
+  const ownerContext = await browser.newContext();
+  const merchant = await merchantContext.newPage();
+  const owner = await ownerContext.newPage();
+  await login(merchant, personas.merchantA);
+  await login(owner, personas.owner);
+
+  const webhookResponse = await merchant.request.post("/api/backend/merchant/webhooks", {
+    data: { url: "https://example.com/e2e-timeline-hook", event_types: ["invoice.paid"] },
+  });
+  expect(webhookResponse.status()).toBe(201);
+
+  const createdResponse = await merchant.request.post("/api/backend/merchant/invoices", { data: { amount: "17" } });
+  expect(createdResponse.status()).toBe(201);
+  const invoice = await createdResponse.json();
+
+  const freshTimelineResponse = await merchant.request.get(`/api/backend/merchant/invoices/${invoice.id}/timeline`);
+  expect(freshTimelineResponse.status()).toBe(200);
+  const freshTimeline = await freshTimelineResponse.json();
+  expect(freshTimeline.events.map((event: { type: string }) => event.type)).toEqual(["invoice.created"]);
+  expect(freshTimeline.webhook_deliveries).toEqual([]);
+
+  // The dev-simulate route only accepts a deposit id, and the merchant API
+  // never exposes one directly - resolve it the same way an owner would,
+  // through their own deposit oversight list, scoped to this merchant's
+  // single still-WAITING deposit right after invoice creation.
+  const ownerDeposits = await (
+    await owner.request.get(`/api/backend/owner/deposits?account_id=${invoice.merchant_id}&status=waiting&limit=5`)
+  ).json();
+  const linkedDeposit = ownerDeposits.items.find((item: { expected_amount: string }) => item.expected_amount === "17.00000000");
+  expect(linkedDeposit).toBeTruthy();
+
+  const txHash = `e2e-invoice-timeline-${Date.now()}`;
+  const credited = await owner.request.post(`/api/backend/owner/dev/deposits/${linkedDeposit.id}/simulate`, {
+    data: { tx_hash: txHash, amount: "17", confirmations: 20, network: "TRC20", asset: "USDT", destination_address: linkedDeposit.deposit_address },
+  });
+  expect(credited.status()).toBe(200);
+  expect((await credited.json()).status).toBe("credited");
+
+  const paidTimelineResponse = await merchant.request.get(`/api/backend/merchant/invoices/${invoice.id}/timeline`);
+  expect(paidTimelineResponse.status()).toBe(200);
+  const paidTimeline = await paidTimelineResponse.json();
+  const eventTypes = paidTimeline.events.map((event: { type: string }) => event.type);
+  for (const expected of ["invoice.created", "deposit.detected", "deposit.confirmed", "deposit.credited", "invoice.balance_credited", "invoice.paid"]) {
+    expect(eventTypes).toContain(expected);
+  }
+  expect(paidTimeline.deposit.tx_hash).toBe(txHash);
+  expect(paidTimeline.ledger_entry.amount).toBe("17.00000000");
+  expect(paidTimeline.webhook_deliveries).toHaveLength(1);
+  expect(paidTimeline.webhook_deliveries[0].event_type).toBe("invoice.paid");
+
+  await merchant.goto("/merchant/invoices");
+  await merchant.getByText(invoice.public_id).click();
+  // The tx hash appears twice (the deposit.detected event and the deposit
+  // summary block) - either instance proves the timeline actually rendered.
+  await expect(merchant.getByText(txHash).first()).toBeVisible();
+
+  await merchantContext.close();
+  await ownerContext.close();
+});
+
+test("merchant cannot view another merchant's invoice timeline", async ({ browser }) => {
+  const merchantAContext = await browser.newContext();
+  const merchantBContext = await browser.newContext();
+  const merchantA = await merchantAContext.newPage();
+  const merchantB = await merchantBContext.newPage();
+  await login(merchantA, personas.merchantA);
+  await login(merchantB, personas.merchantB);
+
+  const createdResponse = await merchantA.request.post("/api/backend/merchant/invoices", { data: { amount: "3" } });
+  expect(createdResponse.status()).toBe(201);
+  const invoice = await createdResponse.json();
+
+  const ownTimeline = await merchantA.request.get(`/api/backend/merchant/invoices/${invoice.id}/timeline`);
+  expect(ownTimeline.status()).toBe(200);
+
+  const crossTenantAttempt = await merchantB.request.get(`/api/backend/merchant/invoices/${invoice.id}/timeline`);
+  expect(crossTenantAttempt.status()).toBe(404);
+
+  await merchantAContext.close();
+  await merchantBContext.close();
+});
+
 test("merchant critical routes render without owner navigation", async ({ page }) => {
   await login(page, personas.merchantA);
   for (const route of ["/merchant", "/merchant/wallet", "/merchant/deals", "/merchant/withdrawals", "/merchant/appeals", "/merchant/notifications", "/merchant/settings"]) {

@@ -503,7 +503,34 @@
       "copied": "Address copied",
       "copyFailed": "Could not copy the address."
     },
-    "storeName": "Store name"
+    "storeName": "Store name",
+    "timeline": {
+      "title": "Timeline",
+      "empty": "No events yet",
+      "events": {
+        "invoice_created": "Invoice created",
+        "deposit_detected": "Payment detected on-chain",
+        "deposit_confirmed": "Payment confirmed",
+        "deposit_credited": "Deposit credited",
+        "deposit_failed": "Deposit failed",
+        "invoice_balance_credited": "Merchant balance credited",
+        "invoice_paid": "Invoice paid",
+        "invoice_cancelled": "Invoice cancelled",
+        "webhook_pending": "Webhook delivery pending",
+        "webhook_success": "Webhook delivered",
+        "webhook_failed": "Webhook delivery failed"
+      },
+      "balanceCredited": "Merchant balance credited: {amount} USDT",
+      "attemptCount": "Attempt {attempts} of {max}",
+      "depositTitle": "Deposit",
+      "depositTxHash": "Transaction hash",
+      "depositConfirmations": "Confirmations",
+      "depositReceived": "Received amount",
+      "ledgerTitle": "Balance",
+      "webhooksTitle": "Webhook deliveries",
+      "webhooksEmpty": "No webhook deliveries for this invoice",
+      "webhookStatus": "Status"
+    }
   },
   "merchantStatistics": {
     "eyebrow": "PERFORMANCE",

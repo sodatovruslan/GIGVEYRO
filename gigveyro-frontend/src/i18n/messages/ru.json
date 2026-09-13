@@ -503,7 +503,34 @@
       "copied": "Адрес скопирован",
       "copyFailed": "Не удалось скопировать адрес."
     },
-    "storeName": "Название магазина"
+    "storeName": "Название магазина",
+    "timeline": {
+      "title": "Хронология",
+      "empty": "Событий пока нет",
+      "events": {
+        "invoice_created": "Счёт создан",
+        "deposit_detected": "Платёж обнаружен в блокчейне",
+        "deposit_confirmed": "Платёж подтверждён",
+        "deposit_credited": "Депозит зачислен",
+        "deposit_failed": "Депозит не прошёл",
+        "invoice_balance_credited": "Баланс мерчанта пополнен",
+        "invoice_paid": "Счёт оплачен",
+        "invoice_cancelled": "Счёт отменён",
+        "webhook_pending": "Отправка вебхука ожидается",
+        "webhook_success": "Вебхук доставлен",
+        "webhook_failed": "Доставка вебхука не удалась"
+      },
+      "balanceCredited": "Баланс мерчанта пополнен: {amount} USDT",
+      "attemptCount": "Попытка {attempts} из {max}",
+      "depositTitle": "Депозит",
+      "depositTxHash": "Хеш транзакции",
+      "depositConfirmations": "Подтверждения",
+      "depositReceived": "Полученная сумма",
+      "ledgerTitle": "Баланс",
+      "webhooksTitle": "Доставки вебхуков",
+      "webhooksEmpty": "Для этого счёта нет доставок вебхуков",
+      "webhookStatus": "Статус"
+    }
   },
   "merchantStatistics": {
     "eyebrow": "ПОКАЗАТЕЛИ",

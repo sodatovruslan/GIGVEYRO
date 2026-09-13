@@ -503,7 +503,34 @@
       "copied": "Суроға нусхабардорӣ шуд",
       "copyFailed": "Суроға нусхабардорӣ нашуд."
     },
-    "storeName": "Номи мағоза"
+    "storeName": "Номи мағоза",
+    "timeline": {
+      "title": "Хронология",
+      "empty": "Ҳоло рӯйдоде нест",
+      "events": {
+        "invoice_created": "Ҳисоб эҷод шуд",
+        "deposit_detected": "Пардохт дар блокчейн ошкор шуд",
+        "deposit_confirmed": "Пардохт тасдиқ шуд",
+        "deposit_credited": "Депозит гузаронида шуд",
+        "deposit_failed": "Депозит иҷро нашуд",
+        "invoice_balance_credited": "Баланси мерчант пур карда шуд",
+        "invoice_paid": "Ҳисоб пардохт шуд",
+        "invoice_cancelled": "Ҳисоб бекор шуд",
+        "webhook_pending": "Ирсоли webhook интизор аст",
+        "webhook_success": "Webhook расонида шуд",
+        "webhook_failed": "Ирсоли webhook ноком шуд"
+      },
+      "balanceCredited": "Баланси мерчант пур карда шуд: {amount} USDT",
+      "attemptCount": "Кӯшиши {attempts} аз {max}",
+      "depositTitle": "Депозит",
+      "depositTxHash": "Ҳеши транзаксия",
+      "depositConfirmations": "Тасдиқҳо",
+      "depositReceived": "Маблағи гирифташуда",
+      "ledgerTitle": "Баланс",
+      "webhooksTitle": "Ирсолҳои webhook",
+      "webhooksEmpty": "Барои ин ҳисоб ирсоли webhook вуҷуд надорад",
+      "webhookStatus": "Ҳолат"
+    }
   },
   "merchantStatistics": {
     "eyebrow": "НИШОНДИҲАНДАҲО",

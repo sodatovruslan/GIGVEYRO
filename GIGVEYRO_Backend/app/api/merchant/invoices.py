@@ -12,7 +12,10 @@ from app.enums.invoice import InvoiceStatus
 from app.models.account import Account
 from app.repositories.deposit import DepositRepository
 from app.repositories.invoice import InvoiceRepository
+from app.repositories.ledger import LedgerRepository
+from app.repositories.webhook import WebhookDeliveryRepository
 from app.schemas.invoice import InvoiceCreate, InvoiceListResponse, InvoiceRead
+from app.schemas.invoice_timeline import InvoiceTimelineRead
 from app.services.deposit_provider import MockTRC20DepositProvider
 from app.services.invoice import (
     InvoiceNotAllowedError,
@@ -20,6 +23,7 @@ from app.services.invoice import (
     InvoiceNotFoundError,
     InvoiceService,
 )
+from app.services.invoice_timeline import InvoiceTimelineService
 
 router = APIRouter(
     prefix="/merchant/invoices",
@@ -31,6 +35,15 @@ router = APIRouter(
 def _service(db: AsyncSession = Depends(get_db)) -> InvoiceService:
     return InvoiceService(
         InvoiceRepository(db), DepositRepository(db), MockTRC20DepositProvider()
+    )
+
+
+def _timeline_service(db: AsyncSession = Depends(get_db)) -> InvoiceTimelineService:
+    return InvoiceTimelineService(
+        InvoiceRepository(db),
+        DepositRepository(db),
+        LedgerRepository(db),
+        WebhookDeliveryRepository(db),
     )
 
 
@@ -80,6 +93,18 @@ async def get_invoice(
     merchant: Account = Depends(get_current_account),
     service: InvoiceService = Depends(_service),
 ) -> InvoiceRead:
+    try:
+        return await service.get_for_merchant(merchant.id, invoice_id)
+    except InvoiceNotFoundError as exc:
+        raise _not_found() from exc
+
+
+@router.get("/{invoice_id}/timeline", response_model=InvoiceTimelineRead)
+async def get_invoice_timeline(
+    invoice_id: uuid.UUID,
+    merchant: Account = Depends(get_current_account),
+    service: InvoiceTimelineService = Depends(_timeline_service),
+) -> InvoiceTimelineRead:
     try:
         return await service.get_for_merchant(merchant.id, invoice_id)
     except InvoiceNotFoundError as exc:

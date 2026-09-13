@@ -9,10 +9,11 @@ import { useEnumLabels } from "@/features/i18n/use-enum-labels";
 import { useLocalizedError } from "@/features/i18n/use-localized-error";
 import { isInvoiceNotCancellable, mapInvoiceFieldErrors, type InvoiceFieldErrors } from "@/features/invoices/validation";
 import { invoicesApi } from "@/lib/api/invoices";
-import type { Invoice } from "@/lib/api/types";
+import type { Invoice, InvoiceTimeline } from "@/lib/api/types";
 import { useApiQuery } from "@/lib/hooks/use-api-query";
 import { Pager } from "@/components/ui/pager";
 import { InvoiceDetailGrid } from "@/components/invoices/invoice-detail";
+import { InvoiceTimelineSection } from "@/components/invoices/invoice-timeline";
 import { queryInvalidation } from "@/lib/query/invalidation";
 
 import styles from "../../user/user.module.css";
@@ -43,22 +44,27 @@ export default function MerchantInvoicesPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [timeline, setTimeline] = useState<InvoiceTimeline | null>(null);
 
   useEffect(() => {
     const id = detail?.id;
     if (!id) return;
     return queryInvalidation.subscribe(`merchant-invoice:${id}`, () => {
       void invoicesApi.get(id).then(setDetail).catch((reason) => setDetailError(localizeError(reason)));
+      void invoicesApi.timeline(id).then(setTimeline).catch(() => undefined);
     });
   }, [detail?.id, localizeError]);
 
   async function openDetail(id: string) {
-    setDetail(null); setDetailError(""); setDetailLoading(true); setLinkCopied(false);
+    setDetail(null); setDetailError(""); setDetailLoading(true); setLinkCopied(false); setTimeline(null);
     try { setDetail(await invoicesApi.get(id)); }
     catch (reason) { setDetailError(localizeError(reason)); }
     finally { setDetailLoading(false); }
+    // Best-effort: the timeline is a read-only supplement to the invoice
+    // detail above, never a hard requirement for the detail view to work.
+    void invoicesApi.timeline(id).then(setTimeline).catch(() => undefined);
   }
-  function closeDetail() { setDetail(null); setDetailError(""); }
+  function closeDetail() { setDetail(null); setDetailError(""); setTimeline(null); }
 
   async function create(event: FormEvent) {
     event.preventDefault(); setSaving(true); setError(""); setFieldErrors({});
@@ -123,7 +129,10 @@ export default function MerchantInvoicesPage() {
       <div style={{ padding: "0 24px 24px" }}>
         {detailLoading ? <p>{t("loading")}</p>
           : detailError ? <div className={styles.formError}>{detailError}</div>
-          : detail && <InvoiceDetailGrid invoice={detail} paymentLink={paymentLink(detail.public_id)} onCopyLink={() => void copyLink(detail.public_id)} linkCopied={linkCopied} />}
+          : detail && <>
+            <InvoiceDetailGrid invoice={detail} paymentLink={paymentLink(detail.public_id)} onCopyLink={() => void copyLink(detail.public_id)} linkCopied={linkCopied} />
+            {timeline && <InvoiceTimelineSection timeline={timeline} />}
+          </>}
       </div>
     </div></div>}
   </section>;

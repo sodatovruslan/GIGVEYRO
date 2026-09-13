@@ -671,6 +671,55 @@ export interface WebhookDelivery {
   delivered_at: string | null;
 }
 
+export interface TimelineDeposit {
+  public_id: string;
+  status: DepositStatus;
+  expected_amount: string;
+  received_amount: string | null;
+  credited_amount: string | null;
+  tx_hash: string | null;
+  confirmations: number;
+  required_confirmations: number;
+  detected_at: string | null;
+  confirmed_at: string | null;
+  credited_at: string | null;
+  failed_at: string | null;
+}
+
+export interface TimelineLedgerEntry {
+  type: string;
+  amount: string;
+  currency: string;
+  created_at: string;
+}
+
+export interface TimelineWebhookDelivery {
+  webhook_id: string;
+  event_type: string;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  max_attempts: number;
+  last_response_status: number | null;
+  last_error: string | null;
+  next_attempt_at: string | null;
+  created_at: string;
+  delivered_at: string | null;
+}
+
+export interface TimelineEvent {
+  type: string;
+  at: string;
+  data: Record<string, unknown>;
+}
+
+export interface InvoiceTimeline {
+  invoice: Invoice;
+  deposit: TimelineDeposit | null;
+  ledger_entry: TimelineLedgerEntry | null;
+  webhook_deliveries: TimelineWebhookDelivery[];
+  events: TimelineEvent[];
+}
+
 export interface PublicInvoice {
   public_id: string;
   amount: string;
