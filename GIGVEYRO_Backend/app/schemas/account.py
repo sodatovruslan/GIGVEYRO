@@ -20,5 +20,6 @@ class AccountRead(AccountBase):
     id: uuid.UUID
     is_active: bool
     is_verified: bool
+    team_lead_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime

@@ -28,6 +28,10 @@ class OwnerCreationNotAllowedError(Exception):
     """Raised when attempting to create an OWNER through account management."""
 
 
+class InvalidTeamAssignmentError(Exception):
+    """Raised when assigning a USER to a Team Lead fails validation."""
+
+
 class AccountService:
     def __init__(
         self,
@@ -89,6 +93,11 @@ class AccountService:
         elif role == UserRole.MERCHANT:
             if self._wallet_service is not None:
                 await self._wallet_service.create_wallet_for_merchant(created)
+        elif role == UserRole.TEAM_LEAD:
+            # Team Lead profit (see WalletService.credit_team_lead_profit)
+            # lives in the same UserWallet shape as a USER's own balance.
+            if self._wallet_service is not None:
+                await self._wallet_service.create_wallet_for_user(created)
 
         return created
 
@@ -168,6 +177,27 @@ class AccountService:
 
         if self._auth_sessions is not None:
             await self._auth_sessions.revoke_all_for_account(account_id, reason="password_reset")
+
+    async def assign_team_lead(
+        self, user_account_id: uuid.UUID, team_lead_id: uuid.UUID | None
+    ) -> Account:
+        """OWNER assigns/reassigns a USER to a TEAM_LEAD (None = unassign).
+        Team membership is USER-only - a MERCHANT/TEAM_LEAD/OWNER account
+        can never be a team member, and the target must be a real, active
+        TEAM_LEAD account."""
+        account = await self._repository.get_by_id(user_account_id)
+        if account is None or account.role != UserRole.USER:
+            raise InvalidTeamAssignmentError("only USER accounts can be assigned to a team")
+
+        if team_lead_id is not None:
+            lead = await self._repository.get_by_id(team_lead_id)
+            if lead is None or lead.role != UserRole.TEAM_LEAD:
+                raise InvalidTeamAssignmentError("target account is not a TEAM_LEAD")
+            if not lead.is_active:
+                raise InvalidTeamAssignmentError("target TEAM_LEAD account is not active")
+
+        account.team_lead_id = team_lead_id
+        return await self._repository.update(account)
 
     async def _get_manageable_or_none(self, account_id: uuid.UUID) -> Account | None:
         account = await self._repository.get_by_id(account_id)

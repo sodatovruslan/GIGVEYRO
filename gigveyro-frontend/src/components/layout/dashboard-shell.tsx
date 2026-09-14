@@ -15,18 +15,21 @@ import { SystemHealthIndicator } from "@/features/health/system-health-indicator
 
 import styles from "./dashboard-shell.module.css";
 
-type NavigationKey = "overview"|"home"|"accounts"|"deals"|"deposits"|"funding"|"withdrawals"|"payouts"|"appeals"|"notifications"|"analytics"|"fees"|"treasury"|"integrations"|"audit"|"wallet"|"requisites"|"settings"|"invoices"|"apiKeys"|"webhooks"|"userWithdrawals";
+type NavigationKey = "overview"|"home"|"accounts"|"deals"|"deposits"|"funding"|"withdrawals"|"payouts"|"appeals"|"notifications"|"analytics"|"fees"|"treasury"|"integrations"|"audit"|"wallet"|"requisites"|"settings"|"invoices"|"apiKeys"|"webhooks"|"userWithdrawals"|"teamLeadWithdrawals"|"team"|"profit";
 interface NavigationItem { href: string; label: NavigationKey; glyph: string }
 
 const navigation: Record<UserRole, NavigationItem[]> = {
   owner: [
-    { href: "/owner", label: "overview", glyph: "◇" }, { href: "/owner/accounts", label: "accounts", glyph: "◎" }, { href: "/owner/deals", label: "deals", glyph: "⇄" }, { href: "/owner/deposits", label: "deposits", glyph: "↓" }, { href: "/owner/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/owner/user-withdrawals", label: "userWithdrawals", glyph: "↥" }, { href: "/owner/payouts", label: "payouts", glyph: "⇒" }, { href: "/owner/appeals", label: "appeals", glyph: "!" }, { href: "/owner/notifications", label: "notifications", glyph: "○" }, { href: "/owner/analytics", label: "analytics", glyph: "⌁" }, { href: "/owner/fees", label: "fees", glyph: "%" }, { href: "/owner/treasury", label: "treasury", glyph: "#" }, { href: "/owner/integrations", label: "integrations", glyph: "⌘" }, { href: "/owner/api-keys", label: "apiKeys", glyph: "⚿" }, { href: "/owner/audit", label: "audit", glyph: "≡" }, { href: "/owner/settings", label: "settings", glyph: "⚙" },
+    { href: "/owner", label: "overview", glyph: "◇" }, { href: "/owner/accounts", label: "accounts", glyph: "◎" }, { href: "/owner/deals", label: "deals", glyph: "⇄" }, { href: "/owner/deposits", label: "deposits", glyph: "↓" }, { href: "/owner/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/owner/user-withdrawals", label: "userWithdrawals", glyph: "↥" }, { href: "/owner/team-lead-withdrawals", label: "teamLeadWithdrawals", glyph: "☖" }, { href: "/owner/payouts", label: "payouts", glyph: "⇒" }, { href: "/owner/appeals", label: "appeals", glyph: "!" }, { href: "/owner/notifications", label: "notifications", glyph: "○" }, { href: "/owner/analytics", label: "analytics", glyph: "⌁" }, { href: "/owner/fees", label: "fees", glyph: "%" }, { href: "/owner/treasury", label: "treasury", glyph: "#" }, { href: "/owner/integrations", label: "integrations", glyph: "⌘" }, { href: "/owner/api-keys", label: "apiKeys", glyph: "⚿" }, { href: "/owner/audit", label: "audit", glyph: "≡" }, { href: "/owner/settings", label: "settings", glyph: "⚙" },
   ],
   user: [
     { href: "/user", label: "home", glyph: "◇" }, { href: "/user/wallet", label: "wallet", glyph: "₮" }, { href: "/user/deposits", label: "funding", glyph: "↓" }, { href: "/user/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/user/requisites", label: "requisites", glyph: "▣" }, { href: "/user/deals", label: "deals", glyph: "⇄" }, { href: "/user/appeals", label: "appeals", glyph: "!" }, { href: "/user/notifications", label: "notifications", glyph: "○" }, { href: "/user/settings", label: "settings", glyph: "⚙" },
   ],
   merchant: [
     { href: "/merchant", label: "home", glyph: "◇" }, { href: "/merchant/wallet", label: "wallet", glyph: "₮" }, { href: "/merchant/invoices", label: "invoices", glyph: "▤" }, { href: "/merchant/deals", label: "deals", glyph: "⇄" }, { href: "/merchant/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/merchant/api-keys", label: "apiKeys", glyph: "⚿" }, { href: "/merchant/webhooks", label: "webhooks", glyph: "⇋" }, { href: "/merchant/statistics", label: "analytics", glyph: "⌁" }, { href: "/merchant/appeals", label: "appeals", glyph: "!" }, { href: "/merchant/notifications", label: "notifications", glyph: "○" }, { href: "/merchant/settings", label: "settings", glyph: "⚙" },
+  ],
+  team_lead: [
+    { href: "/team_lead", label: "home", glyph: "◇" }, { href: "/team_lead/team", label: "team", glyph: "◎" }, { href: "/team_lead/profit", label: "profit", glyph: "₮" }, { href: "/team_lead/withdrawals", label: "withdrawals", glyph: "↗" }, { href: "/team_lead/settings", label: "settings", glyph: "⚙" },
   ],
 };
 

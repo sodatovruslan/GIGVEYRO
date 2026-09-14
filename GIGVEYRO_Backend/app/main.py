@@ -37,6 +37,7 @@ from app.api.owner.fiat_wallets import router as owner_fiat_wallets_router
 from app.api.owner.integrations import router as owner_integrations_router
 from app.api.owner.payouts import router as owner_payouts_router
 from app.api.owner.requisites import router as owner_requisites_router
+from app.api.owner.team_lead_withdrawals import router as owner_team_lead_withdrawals_router
 from app.api.owner.traffic import router as owner_traffic_router
 from app.api.owner.treasury import router as owner_treasury_router
 from app.api.owner.user_withdrawals import router as owner_user_withdrawals_router
@@ -45,6 +46,8 @@ from app.api.owner.withdrawals import router as owner_withdrawals_router
 from app.api.public_api_invoices import router as public_api_invoices_router
 from app.api.realtime import router as realtime_router
 from app.api.requisites import router as requisites_router
+from app.api.team_lead.cabinet import router as team_lead_cabinet_router
+from app.api.team_lead.withdrawals import router as team_lead_withdrawals_router
 from app.api.telegram import router as telegram_router
 from app.api.traffic import router as traffic_router
 from app.api.user_withdrawals import router as user_withdrawals_router
@@ -155,6 +158,7 @@ app.include_router(owner_deals_router)
 app.include_router(owner_deposits_router)
 app.include_router(owner_withdrawals_router)
 app.include_router(owner_user_withdrawals_router)
+app.include_router(owner_team_lead_withdrawals_router)
 app.include_router(owner_appeals_router)
 app.include_router(owner_analytics_router)
 app.include_router(owner_integrations_router)
@@ -165,6 +169,8 @@ app.include_router(owner_treasury_router)
 app.include_router(owner_audit_router)
 app.include_router(wallet_router)
 app.include_router(user_withdrawals_router)
+app.include_router(team_lead_cabinet_router)
+app.include_router(team_lead_withdrawals_router)
 app.include_router(merchant_wallet_router)
 app.include_router(merchant_withdrawals_router)
 app.include_router(merchant_invoices_router)

@@ -99,6 +99,9 @@
     "webhooks": "Вебхуки",
     "withdrawals": "Выводы",
     "userWithdrawals": "Выводы юзеров",
+    "teamLeadWithdrawals": "Выводы тимлидов",
+    "team": "Команда",
+    "profit": "Прибыль",
     "payouts": "Контроль выплат",
     "appeals": "Апелляции",
     "notifications": "Уведомления",
@@ -117,7 +120,8 @@
   "roles": {
     "owner": "Владелец",
     "user": "Пользователь",
-    "merchant": "Мерчант"
+    "merchant": "Мерчант",
+    "team_lead": "Тимлид"
   },
   "header": {
     "checking": "Проверяем систему…",
@@ -135,6 +139,13 @@
     "merchantEyebrow": "КАБИНЕТ МЕРЧАНТА",
     "merchantTitle": "Кабинет мерчанта",
     "merchantSubtitle": "Контроль расчётов, сделок и вывода средств",
+    "teamLeadEyebrow": "КАБИНЕТ ТИМЛИДА",
+    "teamLeadTitle": "Панель команды",
+    "teamLeadSubtitle": "Ваша команда, активность по сделкам и начисленная прибыль",
+    "teamSize": "Размер команды",
+    "teamDeals": "Сделки команды",
+    "teamLeadDealsText": "Сделки, завершённые USER-аккаунтами вашей команды.",
+    "dealCount": "{count} сделок",
     "users": "Пользователи",
     "merchants": "Мерчанты",
     "deals": "Сделки",
@@ -207,6 +218,10 @@
     "finance": "ФИНАНСЫ",
     "userWallet": "Кошелёк пользователя",
     "merchantWallet": "Кошелёк мерчанта",
+    "teamLeadWallet": "Кошелёк тимлида",
+    "teamLeadEyebrow": "КОМАНДА",
+    "assignedTeamLead": "Назначенный тимлид",
+    "noTeamLead": "Тимлид не назначен",
     "allocate": "Выделить баланс",
     "insurance": "Insurance",
     "adjust": "Корректировка",
@@ -240,6 +255,7 @@
     "onboardingNext": "Следующие шаги",
     "userOnboarding": "Передайте пользователю логин и начальный пароль по согласованному защищённому каналу.",
     "merchantOnboarding": "Передайте мерчанту логин и начальный пароль по согласованному защищённому каналу.",
+    "teamLeadOnboarding": "Передайте тимлиду логин и начальный пароль по согласованному защищённому каналу.",
     "passwordNotShownAgain": "В целях безопасности начальный пароль после создания не отображается и не может быть восстановлен.",
     "securitySetupInstruction": "Попросите войти, изменить начальный пароль в Настройках и при необходимости подключить там Telegram.",
     "done": "Готово",
@@ -1084,7 +1100,8 @@
     "role": {
       "owner": "Владелец",
       "user": "Пользователь",
-      "merchant": "Мерчант"
+      "merchant": "Мерчант",
+      "team_lead": "Тимлид"
     },
     "deal": {
       "created": "Создана",
@@ -1230,5 +1247,26 @@
     "sessionCreated": "Вход выполнен: {date}",
     "revokeSession": "Завершить",
     "revokeSessionLabel": "Завершить эту сессию"
+  },
+  "teamLead": {
+    "eyebrow": "ТИМЛИД",
+    "teamTitle": "Команда",
+    "teamSubtitle": "USER-аккаунты, назначенные вам",
+    "teamEmpty": "В команде пока никого нет",
+    "memberActive": "Активен",
+    "memberInactive": "Заблокирован",
+    "joined": "Дата назначения",
+    "username": "Логин",
+    "fullName": "Полное имя",
+    "loading": "Загрузка…",
+    "profitTitle": "Прибыль",
+    "profitSubtitle": "Ваша начисленная прибыль от завершённых сделок команды",
+    "profitAvailable": "Доступная прибыль",
+    "profitPending": "В процессе вывода",
+    "profitEmpty": "Начислений пока нет",
+    "withdrawalTitle": "Вывод",
+    "withdrawalSubtitle": "Вывод вашей доступной прибыли",
+    "ownerWithdrawalsTitle": "Выводы тимлидов",
+    "ownerWithdrawalsSubtitle": "Проверка и подтверждение заявок на вывод тимлидов"
   }
 }

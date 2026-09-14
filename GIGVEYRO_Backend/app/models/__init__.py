@@ -28,6 +28,7 @@ from app.models.payout import (
 )
 from app.models.realtime import RealtimeOutbox
 from app.models.risk import RiskPolicy, TreasurySnapshotRecord
+from app.models.team_lead_withdrawal import TeamLeadWithdrawal
 from app.models.telegram import TelegramAccountLink, TelegramLinkToken
 from app.models.traffic import UserTrafficSettings
 from app.models.two_factor import (
@@ -80,6 +81,7 @@ __all__ = [
     "PayoutEvent",
     "PayoutNetwork",
     "RealtimeOutbox",
+    "TeamLeadWithdrawal",
     "TelegramAccountLink",
     "TelegramLinkToken",
     "UserTrafficSettings",

@@ -30,6 +30,38 @@ class AccountRepository:
         result = await self._session.execute(select(Account).where(Account.role == role))
         return result.scalars().first()
 
+    async def list_team_members(
+        self, team_lead_id: uuid.UUID, *, is_active: bool | None, search: str | None,
+        limit: int, offset: int,
+    ) -> list[Account]:
+        query = self._team_filtered(select(Account), team_lead_id, is_active=is_active, search=search)
+        query = query.order_by(Account.created_at.desc()).limit(limit).offset(offset)
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
+    async def count_team_members(
+        self, team_lead_id: uuid.UUID, *, is_active: bool | None, search: str | None
+    ) -> int:
+        query = self._team_filtered(
+            select(func.count()).select_from(Account), team_lead_id, is_active=is_active, search=search
+        )
+        result = await self._session.execute(query)
+        return result.scalar_one()
+
+    @staticmethod
+    def _team_filtered(
+        query: Select, team_lead_id: uuid.UUID, *, is_active: bool | None, search: str | None
+    ) -> Select:
+        query = query.where(Account.role == UserRole.USER, Account.team_lead_id == team_lead_id)
+        if is_active is not None:
+            query = query.where(Account.is_active == is_active)
+        if search:
+            pattern = f"%{search}%"
+            query = query.where(
+                or_(Account.username.ilike(pattern), Account.full_name.ilike(pattern))
+            )
+        return query
+
     async def exists_by_username(self, username: str) -> bool:
         return await self.get_by_username(username) is not None
 

@@ -40,6 +40,11 @@ class LedgerEntryType(StrEnum):
     # deal amount from frozen - see DealService.complete_deal.
     DEAL_USER_PROFIT = "deal_user_profit"
 
+    # Team Lead cabinet: 1.5% of a completed deal, funded separately by
+    # OWNER (not deducted from the Deal's own 100% split above) - credited
+    # to the assigned Team Lead's own UserWallet.
+    TEAM_LEAD_PROFIT = "team_lead_profit"
+
     # Used since Stage 8's confirmed TRC20 deposit credit.
     DEPOSIT_CREDIT = "deposit_credit"
 

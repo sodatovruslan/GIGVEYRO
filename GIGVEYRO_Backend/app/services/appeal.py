@@ -15,9 +15,11 @@ from app.realtime.contracts import RealtimeEventName
 from app.repositories.appeal import AppealRepository
 from app.repositories.deal import DealRepository
 from app.repositories.fees import FeeRepository
+from app.repositories.account import AccountRepository
 from app.services.deal import (
     DealNotFoundError,
     compute_deal_settlement_split,
+    credit_team_lead_profit_if_assigned,
     record_deal_owner_profit,
     transition_deal,
 )
@@ -69,6 +71,7 @@ class AppealService:
         deal_repository: DealRepository,
         wallet_service: WalletService,
         fee_repository: FeeRepository,
+        account_repository: AccountRepository,
         realtime_service: RealtimeEventService | None = None,
         notification_service: NotificationService | None = None,
     ):
@@ -76,6 +79,7 @@ class AppealService:
         self._deals = deal_repository
         self._wallet_service = wallet_service
         self._fees = fee_repository
+        self._accounts = account_repository
         self._realtime = realtime_service
         self._notifications = notification_service
 
@@ -258,9 +262,13 @@ class AppealService:
                 merchant_amount=merchant_amount,
                 owner_profit=owner_profit,
             )
+            team_lead_profit = await credit_team_lead_profit_if_assigned(
+                self._wallet_service, self._accounts, deal, actor_id=owner_id
+            )
             deal.merchant_settlement_amount = merchant_amount
             deal.user_profit_amount = user_profit
             deal.owner_profit_amount = owner_profit
+            deal.team_lead_profit_amount = team_lead_profit
             transition_deal(deal, DealStatus.COMPLETED)
         elif resolution == AppealResolution.RELEASE_TO_USER:
             await self._wallet_service.release_for_deal(

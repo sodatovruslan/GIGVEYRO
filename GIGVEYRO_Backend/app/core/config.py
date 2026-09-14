@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     DEAL_USER_PROFIT_PERCENT: Decimal = Decimal("0.10")
     DEAL_OWNER_PROFIT_PERCENT: Decimal = Decimal("0.07")
 
+    # Team Lead cabinet - confirmed business rule: 1.5% of each completed
+    # Deal made by a USER assigned to a Team Lead, funded separately by
+    # OWNER (does not reduce the Deal split above).
+    TEAM_LEAD_PROFIT_PERCENT: Decimal = Decimal("0.015")
+
     # Security & CORS Settings
     CORS_ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "test"]

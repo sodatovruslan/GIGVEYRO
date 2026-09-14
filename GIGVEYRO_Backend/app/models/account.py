@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,6 +36,14 @@ class Account(Base):
     )
     is_verified: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
+    )
+    # Team Lead cabinet: which TEAM_LEAD account this USER is assigned to
+    # (NULL = unassigned). Only ever set on USER-role accounts; Owner
+    # assigns/reassigns via PATCH /owner/accounts/{id}/team-lead. Not
+    # enforced by a DB constraint (role-crossing FK checks aren't
+    # expressible in Postgres) - validated in AccountService.
+    team_lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

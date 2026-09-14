@@ -94,6 +94,11 @@ class Deal(Base):
     merchant_settlement_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     user_profit_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
     owner_profit_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
+    # Team Lead cabinet: 1.5% credited separately by OWNER when the
+    # accepting USER is assigned to a Team Lead - NULL when unassigned or
+    # not yet settled. Funded outside the 100% Deal split above (not
+    # subtracted from merchant/user/owner amounts).
+    team_lead_profit_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True

@@ -55,7 +55,11 @@ export async function login(page: Page, username: string, credential = password)
     ]);
     expect(verifyResponse.status(), await verifyResponse.text()).toBe(200);
   }
-  await expect(page).toHaveURL(new RegExp(`/${username === personas.owner ? "owner" : username.includes("merchant") ? "merchant" : "user"}$`));
+  const expectedPath = username === personas.owner ? "owner"
+    : username.includes("team_lead") ? "team_lead"
+    : username.includes("merchant") ? "merchant"
+    : "user";
+  await expect(page).toHaveURL(new RegExp(`/${expectedPath}$`));
 }
 
 export async function expectNoRuntimeError(page: Page) {

@@ -24,12 +24,14 @@ from app.schemas.owner_account import (
     AccountListResponse,
     OwnerAccountCreate,
     OwnerAccountUpdate,
+    OwnerAssignTeamLead,
     OwnerPasswordReset,
 )
 from app.services.account import (
     AccountNotFoundError,
     AccountService,
     DuplicateAccountError,
+    InvalidTeamAssignmentError,
     OwnerCreationNotAllowedError,
 )
 from app.services.audit import AuditService
@@ -235,6 +237,33 @@ async def unblock_account(
         return account
     except AccountNotFoundError as exc:
         raise _not_found() from exc
+
+
+@router.post("/{account_id}/team-lead", response_model=AccountRead)
+async def assign_team_lead(
+    account_id: uuid.UUID,
+    payload: OwnerAssignTeamLead,
+    actor: Account = Depends(get_current_account),
+    service: AccountService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
+) -> AccountRead:
+    """Assigns (or, with team_lead_id=null, unassigns) the USER at
+    account_id to a TEAM_LEAD. Team Lead cabinet: this is the only way a
+    USER ever enters a team - Team Lead itself has no self-service way to
+    add members."""
+    try:
+        account = await service.assign_team_lead(account_id, payload.team_lead_id)
+        await audit.log_action(
+            action="account.assign_team_lead",
+            entity_type="account",
+            entity_id=str(account_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+            audit_metadata={"team_lead_id": str(payload.team_lead_id) if payload.team_lead_id else None},
+        )
+        return account
+    except InvalidTeamAssignmentError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/{account_id}/reset-password", status_code=status.HTTP_204_NO_CONTENT)

@@ -57,10 +57,27 @@ class WalletService:
 
     async def get_wallet_for_account(self, account_id: uuid.UUID) -> UserWallet:
         account = await self._accounts.get_by_id(account_id)
-        if account is None or account.role != UserRole.USER:
+        if account is None or account.role not in (UserRole.USER, UserRole.TEAM_LEAD):
             raise WalletNotFoundError()
 
         wallet = await self._wallets.get_by_account_id(account_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+        return wallet
+
+    async def get_wallet_for_account_for_update(self, account_id: uuid.UUID) -> UserWallet:
+        """Same as get_wallet_for_account, but row-locked. Callers that will
+        immediately insert a row referencing this wallet (an FK check takes
+        its own ShareLock) and then separately hold/mutate it must acquire
+        this lock FIRST - taking the weaker FK ShareLock before the
+        FOR UPDATE lock is exactly the classic ordering that deadlocks two
+        concurrent callers against each other (each holds the other's
+        needed lock). See TeamLeadWithdrawalService.create_withdrawal."""
+        account = await self._accounts.get_by_id(account_id)
+        if account is None or account.role not in (UserRole.USER, UserRole.TEAM_LEAD):
+            raise WalletNotFoundError()
+
+        wallet = await self._wallets.get_by_account_id_for_update(account_id)
         if wallet is None:
             raise WalletNotFoundError()
         return wallet
@@ -86,7 +103,11 @@ class WalletService:
         offset: int,
     ) -> tuple[list[LedgerEntry], int]:
         account = await self._accounts.get_by_id(account_id)
-        if account is None or account.role not in (UserRole.USER, UserRole.MERCHANT):
+        if account is None or account.role not in (
+            UserRole.USER,
+            UserRole.MERCHANT,
+            UserRole.TEAM_LEAD,
+        ):
             raise WalletNotFoundError()
 
         items = await self._ledger.list_for_account(
@@ -388,6 +409,61 @@ class WalletService:
             profit_entry = await self._ledger.create(profit_entry)
 
         return user_entry, merchant_entry, profit_entry
+
+    async def credit_team_lead_profit(
+        self,
+        *,
+        team_lead_account_id: uuid.UUID,
+        amount: Decimal,
+        deal_id: uuid.UUID,
+        actor_id: uuid.UUID | None = None,
+    ) -> LedgerEntry:
+        """Credits a TEAM_LEAD's own UserWallet with their 1.5% share of a
+        completed deal. Deliberately separate from settle_deal() above -
+        this money is funded by OWNER independently (per the confirmed
+        business rule) and must never alter the Deal's own 100% split
+        (merchant/user/owner amounts). Reference is the deal, not a
+        team-lead-specific entity, since that's the actual event that
+        earned it."""
+        if not amount.is_finite() or amount <= 0:
+            raise InvalidAmountError("amount must be a positive, finite number")
+
+        existing = await self._ledger.get_by_reference(
+            reference_type="deal", reference_id=deal_id, entry_type=LedgerEntryType.TEAM_LEAD_PROFIT
+        )
+        if existing is not None:
+            return existing
+
+        wallet = await self._wallets.get_by_account_id_for_update(team_lead_account_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        available_before = wallet.available_balance
+        insurance_before = wallet.insurance_balance
+        frozen_before = wallet.frozen_balance
+
+        wallet.available_balance = available_before + amount
+        await self._wallets.save(wallet)
+
+        entry = LedgerEntry(
+            wallet_id=wallet.id,
+            account_id=team_lead_account_id,
+            type=LedgerEntryType.TEAM_LEAD_PROFIT,
+            balance_bucket=BalanceBucket.AVAILABLE,
+            currency=wallet.currency,
+            amount=amount,
+            available_before=available_before,
+            available_after=wallet.available_balance,
+            insurance_before=insurance_before,
+            insurance_after=wallet.insurance_balance,
+            frozen_before=frozen_before,
+            frozen_after=wallet.frozen_balance,
+            reference_type="deal",
+            reference_id=deal_id,
+            description="Team lead profit share from completed deal",
+            created_by_account_id=actor_id,
+        )
+        return await self._ledger.create(entry)
 
     # -- STAGE 10 WITHDRAWAL WALLET MUTATIONS ---------------------------
 

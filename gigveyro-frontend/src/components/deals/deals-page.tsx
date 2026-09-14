@@ -15,7 +15,7 @@ import { useApiQuery } from "@/lib/hooks/use-api-query";
 
 import styles from "./deals-page.module.css";
 
-export function DealsPage({ role }: { role: UserRole }) {
+export function DealsPage({ role }: { role: Exclude<UserRole, "team_lead"> }) {
   const t = useTranslations("deals");
   const common = useTranslations("common");
   const format = useAppFormat();

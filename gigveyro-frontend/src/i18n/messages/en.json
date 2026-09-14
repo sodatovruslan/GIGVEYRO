@@ -99,6 +99,9 @@
     "webhooks": "Webhooks",
     "withdrawals": "Withdrawals",
     "userWithdrawals": "User withdrawals",
+    "teamLeadWithdrawals": "Team lead withdrawals",
+    "team": "Team",
+    "profit": "Profit",
     "payouts": "Payout control",
     "appeals": "Appeals",
     "notifications": "Notifications",
@@ -117,7 +120,8 @@
   "roles": {
     "owner": "Owner",
     "user": "User",
-    "merchant": "Merchant"
+    "merchant": "Merchant",
+    "team_lead": "Team Lead"
   },
   "header": {
     "checking": "Checking system…",
@@ -135,6 +139,13 @@
     "merchantEyebrow": "MERCHANT WORKSPACE",
     "merchantTitle": "Merchant dashboard",
     "merchantSubtitle": "Manage settlements, deals and withdrawals",
+    "teamLeadEyebrow": "TEAM LEAD WORKSPACE",
+    "teamLeadTitle": "Team dashboard",
+    "teamLeadSubtitle": "Your team, deal activity and accrued profit",
+    "teamSize": "Team size",
+    "teamDeals": "Team deals",
+    "teamLeadDealsText": "Deals completed by USER accounts assigned to your team.",
+    "dealCount": "{count} deals",
     "users": "Users",
     "merchants": "Merchants",
     "deals": "Deals",
@@ -207,6 +218,10 @@
     "finance": "FINANCE",
     "userWallet": "User wallet",
     "merchantWallet": "Merchant wallet",
+    "teamLeadWallet": "Team lead wallet",
+    "teamLeadEyebrow": "TEAM",
+    "assignedTeamLead": "Assigned team lead",
+    "noTeamLead": "No team lead assigned",
     "allocate": "Allocate balance",
     "insurance": "Insurance",
     "adjust": "Adjustment",
@@ -240,6 +255,7 @@
     "onboardingNext": "Next steps",
     "userOnboarding": "Give the user their username and initial password through an approved secure channel.",
     "merchantOnboarding": "Give the merchant their username and initial password through an approved secure channel.",
+    "teamLeadOnboarding": "Give the team lead their username and initial password through an approved secure channel.",
     "passwordNotShownAgain": "For security, the initial password is not displayed or recoverable after creation.",
     "securitySetupInstruction": "Ask them to sign in, change the initial password in Settings and link Telegram there if needed.",
     "done": "Done",
@@ -1084,7 +1100,8 @@
     "role": {
       "owner": "Owner",
       "user": "User",
-      "merchant": "Merchant"
+      "merchant": "Merchant",
+      "team_lead": "Team Lead"
     },
     "deal": {
       "created": "Created",
@@ -1230,5 +1247,26 @@
     "sessionCreated": "Signed in {date}",
     "revokeSession": "Log out",
     "revokeSessionLabel": "Log out this session"
+  },
+  "teamLead": {
+    "eyebrow": "TEAM LEAD",
+    "teamTitle": "Team",
+    "teamSubtitle": "USER accounts assigned to you",
+    "teamEmpty": "No team members yet",
+    "memberActive": "Active",
+    "memberInactive": "Blocked",
+    "joined": "Joined",
+    "username": "Username",
+    "fullName": "Full name",
+    "loading": "Loading…",
+    "profitTitle": "Profit",
+    "profitSubtitle": "Your accrued profit from your team's completed deals",
+    "profitAvailable": "Available profit",
+    "profitPending": "Pending withdrawal",
+    "profitEmpty": "No profit entries yet",
+    "withdrawalTitle": "Withdrawal",
+    "withdrawalSubtitle": "Withdraw your available profit",
+    "ownerWithdrawalsTitle": "Team lead withdrawals",
+    "ownerWithdrawalsSubtitle": "Review and approve team lead payout requests"
   }
 }

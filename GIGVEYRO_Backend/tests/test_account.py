@@ -8,10 +8,11 @@ from app.schemas.account import AccountRead
 
 
 def test_user_role_values():
-    assert {role.value for role in UserRole} == {"owner", "user", "merchant"}
+    assert {role.value for role in UserRole} == {"owner", "user", "merchant", "team_lead"}
     assert UserRole.OWNER == "owner"
     assert UserRole.USER == "user"
     assert UserRole.MERCHANT == "merchant"
+    assert UserRole.TEAM_LEAD == "team_lead"
 
 
 def test_account_read_excludes_password_hash():

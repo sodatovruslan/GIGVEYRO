@@ -99,6 +99,9 @@
     "webhooks": "Вебҳукҳо",
     "withdrawals": "Бардоштҳо",
     "userWithdrawals": "Бардоштҳои корбарон",
+    "teamLeadWithdrawals": "Бардоштҳои сарварони гурӯҳ",
+    "team": "Гурӯҳ",
+    "profit": "Фоида",
     "payouts": "Назорати пардохтҳо",
     "appeals": "Шикоятҳо",
     "notifications": "Огоҳиҳо",
@@ -117,7 +120,8 @@
   "roles": {
     "owner": "Соҳиб",
     "user": "Корбар",
-    "merchant": "Тоҷир"
+    "merchant": "Тоҷир",
+    "team_lead": "Сарвари гурӯҳ"
   },
   "header": {
     "checking": "Система санҷида мешавад…",
@@ -135,6 +139,13 @@
     "merchantEyebrow": "КАБИНЕТИ ТОҶИР",
     "merchantTitle": "Кабинети тоҷир",
     "merchantSubtitle": "Идоракунии ҳисоббаробаркунӣ, муомилаҳо ва бардошт",
+    "teamLeadEyebrow": "КАБИНЕТИ САРВАРИ ГУРӮҲ",
+    "teamLeadTitle": "Лавҳаи гурӯҳ",
+    "teamLeadSubtitle": "Гурӯҳи шумо, фаъолияти муомилаҳо ва фоидаи ҳисобшуда",
+    "teamSize": "Андозаи гурӯҳ",
+    "teamDeals": "Муомилаҳои гурӯҳ",
+    "teamLeadDealsText": "Муомилаҳои анҷомёфта аз ҷониби корбарони гурӯҳи шумо.",
+    "dealCount": "{count} муомила",
     "users": "Корбарон",
     "merchants": "Тоҷирон",
     "deals": "Муомилаҳо",
@@ -207,6 +218,10 @@
     "finance": "МОЛИЯ",
     "userWallet": "Ҳамёни корбар",
     "merchantWallet": "Ҳамёни тоҷир",
+    "teamLeadWallet": "Ҳамёни сарвари гурӯҳ",
+    "teamLeadEyebrow": "ГУРӮҲ",
+    "assignedTeamLead": "Сарвари гурӯҳи таъингардида",
+    "noTeamLead": "Сарвари гурӯҳ таъин нашудааст",
     "allocate": "Ҷудо кардани тавозун",
     "insurance": "Суғурта",
     "adjust": "Ислоҳ",
@@ -240,6 +255,7 @@
     "onboardingNext": "Қадамҳои навбатӣ",
     "userOnboarding": "Номи корбар ва рамзи ибтидоиро тавассути канали бехатари тасдиқшуда ба корбар супоред.",
     "merchantOnboarding": "Номи корбар ва рамзи ибтидоиро тавассути канали бехатари тасдиқшуда ба тоҷир супоред.",
+    "teamLeadOnboarding": "Номи корбар ва рамзи ибтидоиро тавассути канали бехатари тасдиқшуда ба сарвари гурӯҳ супоред.",
     "passwordNotShownAgain": "Барои амният рамзи ибтидоӣ пас аз эҷод нишон дода намешавад ва барқарор карда намешавад.",
     "securitySetupInstruction": "Аз ӯ хоҳиш кунед, ки ворид шуда, рамзи ибтидоиро дар Танзимот иваз кунад ва дар ҳолати зарурӣ Telegram-ро пайваст намояд.",
     "done": "Тайёр",
@@ -1084,7 +1100,8 @@
     "role": {
       "owner": "Соҳиб",
       "user": "Корбар",
-      "merchant": "Тоҷир"
+      "merchant": "Тоҷир",
+      "team_lead": "Сарвари гурӯҳ"
     },
     "deal": {
       "created": "Эҷод шуд",
@@ -1230,5 +1247,26 @@
     "sessionCreated": "Вақти воридшавӣ: {date}",
     "revokeSession": "Хотима додан",
     "revokeSessionLabel": "Хотима додани ин сессия"
+  },
+  "teamLead": {
+    "eyebrow": "САРВАРИ ГУРӮҲ",
+    "teamTitle": "Гурӯҳ",
+    "teamSubtitle": "Ҳисобҳои корбарони таъиншуда ба шумо",
+    "teamEmpty": "Ҳоло аъзои гурӯҳ нест",
+    "memberActive": "Фаъол",
+    "memberInactive": "Баста",
+    "joined": "Санаи таъин",
+    "username": "Номи корбар",
+    "fullName": "Номи пурра",
+    "loading": "Боркунӣ…",
+    "profitTitle": "Фоида",
+    "profitSubtitle": "Фоидаи ҳисобшудаи шумо аз муомилаҳои анҷомёфтаи гурӯҳ",
+    "profitAvailable": "Фоидаи дастрас",
+    "profitPending": "Дар ҳоли бардошт",
+    "profitEmpty": "Ҳоло ҳисобе нест",
+    "withdrawalTitle": "Бардошт",
+    "withdrawalSubtitle": "Бардошти фоидаи дастраси шумо",
+    "ownerWithdrawalsTitle": "Бардоштҳои сарварони гурӯҳ",
+    "ownerWithdrawalsSubtitle": "Баррасӣ ва тасдиқи дархостҳои бардошти сарварони гурӯҳ"
   }
 }

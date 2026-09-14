@@ -174,6 +174,49 @@ async def record_deal_owner_profit(
     )
 
 
+async def credit_team_lead_profit_if_assigned(
+    wallet_service: WalletService,
+    account_repository: AccountRepository,
+    deal: Deal,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> Decimal | None:
+    """Team Lead cabinet: if the accepting USER is currently assigned to a
+    TEAM_LEAD, credits that Team Lead's own wallet with 1.5% of the deal
+    amount - a completely separate accounting flow (OWNER funds it from
+    their own side, per the confirmed business rule), never touching the
+    Deal's own merchant/user/owner split computed by
+    compute_deal_settlement_split(). Returns the credited amount, or None
+    if the USER has no Team Lead assigned (distinct from crediting exactly
+    0 - which the caller should never see in practice, but None
+    unambiguously means "not applicable" for display purposes).
+
+    Shared by DealService.complete_deal and AppealService.resolve_appeal
+    (SETTLE_TO_MERCHANT) so both settlement paths can never diverge - same
+    reasoning as compute_deal_settlement_split/record_deal_owner_profit.
+    """
+    if deal.user_id is None or deal.amount_usdt is None:
+        return None
+
+    user_account = await account_repository.get_by_id(deal.user_id)
+    if user_account is None or user_account.team_lead_id is None:
+        return None
+
+    profit = (deal.amount_usdt * settings.TEAM_LEAD_PROFIT_PERCENT).quantize(
+        USDT_QUANTUM, rounding=ROUND_HALF_UP
+    )
+    if profit <= 0:
+        return Decimal("0")
+
+    await wallet_service.credit_team_lead_profit(
+        team_lead_account_id=user_account.team_lead_id,
+        amount=profit,
+        deal_id=deal.id,
+        actor_id=actor_id,
+    )
+    return profit
+
+
 def transition_deal(deal: Deal, new_status: DealStatus) -> None:
     if new_status not in ALLOWED_TRANSITIONS.get(deal.status, set()):
         raise InvalidDealTransitionError(
@@ -370,10 +413,14 @@ class DealService:
             merchant_amount=merchant_amount,
             owner_profit=owner_profit,
         )
+        team_lead_profit = await credit_team_lead_profit_if_assigned(
+            self._wallet_service, self._accounts, deal, actor_id=actor_id
+        )
 
         deal.merchant_settlement_amount = merchant_amount
         deal.user_profit_amount = user_profit
         deal.owner_profit_amount = owner_profit
+        deal.team_lead_profit_amount = team_lead_profit
 
         transition_deal(deal, DealStatus.COMPLETED)
         deal = await self._deals.save(deal)

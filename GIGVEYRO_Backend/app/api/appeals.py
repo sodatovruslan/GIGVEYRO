@@ -50,6 +50,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> AppealService:
         deal_repository=DealRepository(db),
         wallet_service=wallet_service,
         fee_repository=FeeRepository(db),
+        account_repository=account_repo,
         realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
         notification_service=NotificationService(
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()

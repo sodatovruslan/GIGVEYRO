@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.enums.account import UserRole
@@ -29,6 +31,10 @@ class OwnerAccountUpdate(BaseModel):
 
 class OwnerPasswordReset(BaseModel):
     new_password: PasswordStr
+
+
+class OwnerAssignTeamLead(BaseModel):
+    team_lead_id: uuid.UUID | None = Field(default=None)
 
 
 class AccountListResponse(BaseModel):

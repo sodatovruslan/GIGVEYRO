@@ -11,6 +11,7 @@ from app.models.deposit import Deposit
 from app.models.invoice import Invoice
 from app.models.payout import PayoutIntent
 from app.models.realtime import RealtimeOutbox
+from app.models.team_lead_withdrawal import TeamLeadWithdrawal
 from app.models.user_withdrawal import UserWithdrawal
 from app.realtime.broker import RealtimeBroker
 from app.realtime.contracts import RealtimeEvent, RealtimeEventName
@@ -96,6 +97,20 @@ class RealtimeEventService:
                 event=RealtimeEventName.WITHDRAWAL_UPDATED.value,
                 entity_id=withdrawal.id,
                 recipient_account_ids=[str(withdrawal.user_id)],
+                recipient_roles=[UserRole.OWNER.value],
+                data={"status": withdrawal.status.value},
+                occurred_at=datetime.now(UTC),
+            )
+        )
+
+    async def enqueue_team_lead_withdrawal_updated(
+        self, withdrawal: TeamLeadWithdrawal
+    ) -> RealtimeOutbox:
+        return await self._repository.create(
+            RealtimeOutbox(
+                event=RealtimeEventName.WITHDRAWAL_UPDATED.value,
+                entity_id=withdrawal.id,
+                recipient_account_ids=[str(withdrawal.team_lead_id)],
                 recipient_roles=[UserRole.OWNER.value],
                 data={"status": withdrawal.status.value},
                 occurred_at=datetime.now(UTC),

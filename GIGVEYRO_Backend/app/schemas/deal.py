@@ -54,13 +54,29 @@ class DealListResponse(BaseModel):
 
 
 class OwnerDealRead(DealRead):
-    """Adds the platform's own retained margin - not shown to USER/MERCHANT."""
+    """Adds the platform's own retained margin and the team-lead payout
+    made on this deal - not shown to USER/MERCHANT."""
 
     owner_profit_amount: Money | None
+    team_lead_profit_amount: Money | None
 
 
 class OwnerDealListResponse(BaseModel):
     items: list[OwnerDealRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class TeamLeadDealRead(DealRead):
+    """Adds the Team Lead's own 1.5% share of this deal - visible only in
+    the Team Lead's own view of their team's deals, never owner_profit."""
+
+    team_lead_profit_amount: Money | None
+
+
+class TeamLeadDealListResponse(BaseModel):
+    items: list[TeamLeadDealRead]
     total: int
     limit: int
     offset: int

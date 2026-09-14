@@ -46,6 +46,7 @@ def make_appeal_service(db_session: AsyncSession):
         deal_repository=DealRepository(db_session),
         wallet_service=wallet_service,
         fee_repository=FeeRepository(db_session),
+        account_repository=account_repo,
     )
 
 
@@ -336,6 +337,7 @@ async def test_concurrency_double_open_appeal():
                     deal_repository=DealRepository(session),
                     wallet_service=ws,
                     fee_repository=FeeRepository(session),
+                    account_repository=account_repo,
                 )
                 act = await account_repo.get_by_id(account_id)
                 res = await service.open_appeal(

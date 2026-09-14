@@ -1,4 +1,4 @@
-export type UserRole = "owner" | "user" | "merchant";
+export type UserRole = "owner" | "user" | "merchant" | "team_lead";
 
 export interface Account {
   id: string;
@@ -9,6 +9,7 @@ export interface Account {
   phone: string | null;
   is_active: boolean;
   is_verified: boolean;
+  team_lead_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -345,6 +346,50 @@ export interface Deal {
   /** Only present in the OWNER view (GET /owner/deals/*) - the platform's
    * own retained margin, never sent to USER/MERCHANT responses. */
   owner_profit_amount?: string | null;
+  /** Present in the OWNER view and the TEAM_LEAD's own view of their
+   * team's deals (GET /team-lead/deals) - never sent to USER/MERCHANT. */
+  team_lead_profit_amount?: string | null;
+}
+
+export interface TeamMember {
+  id: string;
+  username: string;
+  full_name: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TeamLeadDashboard {
+  profit_available: string;
+  profit_pending_withdrawal: string;
+  team_size: number;
+  deal_count: number;
+  deal_volume: string;
+}
+
+export type WithdrawalStatus = "pending" | "approved" | "paid" | "rejected" | "cancelled";
+export type WithdrawalDestinationType = "usdt_trc20_address" | "bybit_uid";
+
+export interface TeamLeadWithdrawal {
+  id: string;
+  public_id: string;
+  team_lead_id: string;
+  wallet_id: string;
+  amount: string;
+  currency: string;
+  destination_type: WithdrawalDestinationType;
+  destination: string;
+  status: WithdrawalStatus;
+  comment: string | null;
+  owner_comment: string | null;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+  rejected_at: string | null;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  created_by_account_id: string;
+  actioned_by_account_id: string | null;
 }
 
 export type AppealStatus = "open" | "under_review" | "resolved" | "cancelled";

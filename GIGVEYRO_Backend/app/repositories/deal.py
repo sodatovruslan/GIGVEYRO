@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.deal import DealStatus
+from app.models.account import Account
 from app.models.deal import Deal
 
 
@@ -143,6 +145,53 @@ class DealRepository:
         )
         result = await self._session.execute(query)
         return result.scalar_one()
+
+    async def list_for_team_lead(
+        self, team_lead_id: uuid.UUID, *, status: DealStatus | None, limit: int, offset: int
+    ) -> list[Deal]:
+        """Deals made by any USER currently assigned to this Team Lead -
+        joined live against Account.team_lead_id, not a cached member list,
+        so a reassignment is reflected immediately."""
+        query = (
+            select(Deal)
+            .join(Account, Deal.user_id == Account.id)
+            .where(Account.team_lead_id == team_lead_id)
+        )
+        if status is not None:
+            query = query.where(Deal.status == status)
+        query = query.order_by(Deal.created_at.desc()).limit(limit).offset(offset)
+        result = await self._session.execute(query)
+        return list(result.scalars().all())
+
+    async def count_for_team_lead(
+        self, team_lead_id: uuid.UUID, *, status: DealStatus | None
+    ) -> int:
+        query = (
+            select(func.count())
+            .select_from(Deal)
+            .join(Account, Deal.user_id == Account.id)
+            .where(Account.team_lead_id == team_lead_id)
+        )
+        if status is not None:
+            query = query.where(Deal.status == status)
+        result = await self._session.execute(query)
+        return result.scalar_one()
+
+    async def team_stats(self, team_lead_id: uuid.UUID) -> tuple[int, Decimal, Decimal]:
+        """(completed_deal_count, completed_volume_usdt, team_lead_profit_total)
+        for this Team Lead's team - COMPLETED deals only."""
+        result = await self._session.execute(
+            select(
+                func.count(Deal.id),
+                func.coalesce(func.sum(Deal.amount_usdt), 0),
+                func.coalesce(func.sum(Deal.team_lead_profit_amount), 0),
+            )
+            .select_from(Deal)
+            .join(Account, Deal.user_id == Account.id)
+            .where(Account.team_lead_id == team_lead_id, Deal.status == DealStatus.COMPLETED)
+        )
+        count, volume, profit = result.one()
+        return int(count), Decimal(volume), Decimal(profit)
 
     @staticmethod
     def _filtered(

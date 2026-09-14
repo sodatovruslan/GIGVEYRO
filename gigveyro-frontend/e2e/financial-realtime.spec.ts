@@ -380,6 +380,140 @@ test("deal settlement splits into merchant/user-profit/owner-profit and the UI r
   await ownerContext.close();
 });
 
+test("team lead cabinet: assignment, deal profit accrual, withdrawal lifecycle, and isolation", async ({ browser }) => {
+  const ownerContext = await browser.newContext();
+  const teamLeadContext = await browser.newContext();
+  const otherLeadContext = await browser.newContext();
+  const merchantContext = await browser.newContext();
+  const userContext = await browser.newContext();
+  const owner = await ownerContext.newPage();
+  const teamLead = await teamLeadContext.newPage();
+  const otherLead = await otherLeadContext.newPage();
+  const merchant = await merchantContext.newPage();
+  const user = await userContext.newPage();
+  await login(owner, personas.owner);
+
+  const teamLeadPassword = "E2e-TeamLead-Password-9";
+  const teamLeadUsername = `e2e_team_lead_${Date.now()}`;
+  const created = await owner.request.post("/api/backend/owner/accounts", {
+    data: {
+      username: teamLeadUsername,
+      password: teamLeadPassword,
+      role: "team_lead",
+      full_name: "E2E Team Lead",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const teamLeadAccount = await created.json();
+
+  const otherLeadUsername = `e2e_team_lead_other_${Date.now()}`;
+  const createdOther = await owner.request.post("/api/backend/owner/accounts", {
+    data: {
+      username: otherLeadUsername,
+      password: teamLeadPassword,
+      role: "team_lead",
+      full_name: "E2E Other Team Lead",
+    },
+  });
+  expect(createdOther.status()).toBe(201);
+
+  // 1. Team Lead login.
+  await login(teamLead, teamLeadUsername, teamLeadPassword);
+  await login(otherLead, otherLeadUsername, teamLeadPassword);
+  await login(merchant, personas.merchantA);
+  await login(user, personas.userA);
+
+  // Assign userA to the new Team Lead.
+  const userProfile = await user.request.get("/api/backend/auth/me");
+  const userId = (await userProfile.json()).id;
+  const assign = await owner.request.post(`/api/backend/owner/accounts/${userId}/team-lead`, {
+    data: { team_lead_id: teamLeadAccount.id },
+  });
+  expect(assign.status()).toBe(200);
+
+  // 2. Open dashboard. 3. See team.
+  await teamLead.goto("/team_lead");
+  await expect(teamLead.locator("main")).toBeVisible();
+  const teamResponse = await teamLead.request.get("/api/backend/team-lead/team");
+  const teamBody = await teamResponse.json();
+  expect(teamBody.total).toBe(1);
+  expect(teamBody.items[0].id).toBe(userId);
+
+  // A completed deal by userA (10.90 TJS at the fixed 10.90 demo rate = exactly
+  // 1.00000000 USDT) accrues the Team Lead's 1.5% share = 0.01500000.
+  const dealCreated = await merchant.request.post("/api/backend/merchant/deals", {
+    data: { amount_tjs: "10.90" },
+  });
+  expect(dealCreated.status()).toBe(201);
+  const deal = await dealCreated.json();
+  const requisites = await (await user.request.get("/api/backend/requisites")).json();
+  const requisite = requisites.find((item: { is_active: boolean }) => item.is_active);
+  const accepted = await user.request.post(`/api/backend/deals/${deal.id}/accept`, {
+    data: { payment_requisite_id: requisite.id },
+  });
+  expect(accepted.status()).toBe(200);
+  const completed = await owner.request.post(`/api/backend/owner/deals/${deal.id}/complete`);
+  expect(completed.status()).toBe(200);
+  expect((await completed.json()).team_lead_profit_amount).toBe("0.01500000");
+
+  // 4. See profit.
+  const dashboard = await teamLead.request.get("/api/backend/team-lead/dashboard");
+  const dashboardBody = await dashboard.json();
+  expect(dashboardBody.profit_available).toBe("0.01500000");
+  expect(dashboardBody.deal_count).toBe(1);
+
+  // 5. Create withdrawal.
+  const withdrawalCreated = await teamLead.request.post("/api/backend/team-lead/withdrawals", {
+    data: { amount: "0.015", destination_type: "usdt_trc20_address", destination: "T" + "a".repeat(33) },
+  });
+  expect(withdrawalCreated.status()).toBe(201);
+  const withdrawal = await withdrawalCreated.json();
+  expect(withdrawal.status).toBe("pending");
+
+  // 6. Owner sees withdrawal. 7. Owner approves.
+  const ownerList = await owner.request.get("/api/backend/owner/team-lead-withdrawals");
+  const ownerListBody = await ownerList.json();
+  expect(ownerListBody.items.some((item: { id: string }) => item.id === withdrawal.id)).toBe(true);
+  const approve = await owner.request.post(`/api/backend/owner/team-lead-withdrawals/${withdrawal.id}/approve`);
+  expect(approve.status()).toBe(200);
+
+  // 8. Team Lead sees APPROVED.
+  const afterApprove = await teamLead.request.get(`/api/backend/team-lead/withdrawals/${withdrawal.id}`);
+  expect((await afterApprove.json()).status).toBe("approved");
+
+  // 9. Complete payment using the existing supported flow (owner mark-paid).
+  const markPaid = await owner.request.post(`/api/backend/owner/team-lead-withdrawals/${withdrawal.id}/mark-paid`);
+  expect(markPaid.status()).toBe(200);
+
+  // 10. Team Lead sees PAID.
+  const afterPaid = await teamLead.request.get(`/api/backend/team-lead/withdrawals/${withdrawal.id}`);
+  expect((await afterPaid.json()).status).toBe("paid");
+
+  // 11. Verify balance/ledger.
+  const finalWallet = await owner.request.get(`/api/backend/owner/accounts/${teamLeadAccount.id}/wallet`);
+  const finalWalletBody = await finalWallet.json();
+  expect(finalWalletBody.available_balance).toBe("0.00000000");
+  expect(finalWalletBody.frozen_balance).toBe("0.00000000");
+
+  // 12. Verify Team Lead cannot access Owner pages.
+  await teamLead.goto("/owner");
+  await expect(teamLead).toHaveURL(/\/team_lead$/);
+  const ownerApiAttempt = await teamLead.request.get("/api/backend/owner/accounts");
+  expect(ownerApiAttempt.status()).toBe(403);
+
+  // 13. Verify another Team Lead cannot see this team's data.
+  const otherTeam = await otherLead.request.get("/api/backend/team-lead/team");
+  expect((await otherTeam.json()).total).toBe(0);
+  const otherWithdrawalAttempt = await otherLead.request.get(`/api/backend/team-lead/withdrawals/${withdrawal.id}`);
+  expect(otherWithdrawalAttempt.status()).toBe(404);
+
+  await ownerContext.close();
+  await teamLeadContext.close();
+  await otherLeadContext.close();
+  await merchantContext.close();
+  await userContext.close();
+});
+
 test("merchant critical routes render without owner navigation", async ({ page }) => {
   await login(page, personas.merchantA);
   for (const route of ["/merchant", "/merchant/wallet", "/merchant/deals", "/merchant/withdrawals", "/merchant/appeals", "/merchant/notifications", "/merchant/settings"]) {
