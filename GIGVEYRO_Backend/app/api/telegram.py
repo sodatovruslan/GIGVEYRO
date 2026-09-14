@@ -112,6 +112,8 @@ async def telegram_webhook(
         or not secrets.compare_digest(expected, x_telegram_bot_api_secret_token)
     ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if payload.callback_query:
+        return await _handle_webhook_callback(payload.callback_query, session)
     if not payload.message:
         return {"ok": True}
     message = payload.message
@@ -132,9 +134,46 @@ async def telegram_webhook(
     # Persist linking/settings independently of Telegram's reply availability.
     await session.commit()
     try:
-        await get_telegram_provider().send_message(chat["id"], reply)
-    except TelegramDeliveryError as exc:
-        logger.warning(
-            "telegram_webhook_reply_failed", extra={"error_category": exc.category}
+        await get_telegram_provider().send_message(
+            chat["id"], reply, reply_markup=getattr(reply, "keyboard", None)
         )
+    except TelegramDeliveryError as exc:
+        logger.warning("telegram_webhook_reply_failed", extra={"error_category": exc.category})
+    return {"ok": True}
+
+
+async def _handle_webhook_callback(callback_query: dict, session: AsyncSession):  # noqa: ANN001, ANN201
+    callback_id = callback_query.get("id")
+    data = callback_query.get("data")
+    message = callback_query.get("message") or {}
+    chat = message.get("chat") or {}
+    sender = callback_query.get("from") or {}
+    if not isinstance(data, str) or not isinstance(chat.get("id"), int):
+        return {"ok": True}
+    if not isinstance(sender.get("id"), int) or not isinstance(message.get("message_id"), int):
+        return {"ok": True}
+    reply = await TelegramCommandService(session).handle_callback(
+        telegram_user_id=sender["id"],
+        chat_id=chat["id"],
+        data=data,
+        username=sender.get("username"),
+        first_name=sender.get("first_name"),
+        telegram_language=sender.get("language_code"),
+    )
+    await session.commit()
+    provider = get_telegram_provider()
+    if isinstance(callback_id, str):
+        await provider.answer_callback(callback_id)
+    if reply is not None:
+        try:
+            await provider.edit_message(
+                chat["id"],
+                message["message_id"],
+                reply,
+                reply_markup=getattr(reply, "keyboard", None),
+            )
+        except TelegramDeliveryError as exc:
+            logger.warning(
+                "telegram_webhook_callback_edit_failed", extra={"error_category": exc.category}
+            )
     return {"ok": True}

@@ -85,3 +85,4 @@ class TelegramConnectionUpdate(BaseModel):
 class TelegramWebhookPayload(BaseModel):
     update_id: int
     message: dict[str, Any] | None = None
+    callback_query: dict[str, Any] | None = None

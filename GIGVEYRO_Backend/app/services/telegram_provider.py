@@ -32,6 +32,7 @@ class TelegramMessage(NamedTuple):
     text: str
     web_url: str | None = None
     button_text: str | None = None
+    reply_markup: InlineKeyboardMarkup | None = None
 
 
 @dataclass(frozen=True)
@@ -52,8 +53,26 @@ class TelegramProvider(ABC):
         text: str,
         web_url: str | None = None,
         button_text: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
     ) -> bool:
-        """Send a sanitized message. Implementations must never log its content."""
+        """Send a sanitized message. Implementations must never log its content.
+
+        `reply_markup`, when given, takes precedence over `web_url`/`button_text`
+        (which remain for the single-deep-link-button push-notification case)."""
+
+    async def edit_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> bool:
+        """Edit an existing message in place (interactive menu navigation)."""
+        raise NotImplementedError
+
+    async def answer_callback(self, callback_query_id: str, text: str | None = None) -> None:
+        """Acknowledge a callback_query so Telegram stops showing the spinner."""
+        raise NotImplementedError
 
     async def close(self) -> None:
         return None
@@ -79,14 +98,12 @@ class AiogramTelegramProvider(TelegramProvider):
         text: str,
         web_url: str | None = None,
         button_text: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
     ) -> bool:
         started = monotonic()
-        reply_markup = None
-        if web_url:
+        if reply_markup is None and web_url:
             reply_markup = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text=button_text or "GigaPay", url=web_url)]
-                ]
+                inline_keyboard=[[InlineKeyboardButton(text=button_text or "GigaPay", url=web_url)]]
             )
         try:
             await self._get_bot().send_message(
@@ -153,6 +170,49 @@ class AiogramTelegramProvider(TelegramProvider):
             record_telegram_delivery("retry", monotonic() - started)
             raise TelegramDeliveryError("temporary_unavailable", retryable=True) from exc
 
+    async def edit_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> bool:
+        started = monotonic()
+        try:
+            await self._get_bot().edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=reply_markup,
+            )
+            self.last_success_at = datetime.now(UTC)
+            record_telegram_delivery("success", monotonic() - started)
+            return True
+        except TelegramBadRequest as exc:
+            if "message is not modified" in str(exc).lower():
+                return True
+            record_telegram_delivery("failed", monotonic() - started)
+            raise TelegramDeliveryError("bad_request", retryable=False) from exc
+        except TelegramRetryAfter as exc:
+            record_telegram_delivery("retry", monotonic() - started)
+            raise TelegramDeliveryError(
+                "rate_limited", retryable=True, retry_after=int(exc.retry_after)
+            ) from exc
+        except TelegramForbiddenError as exc:
+            record_telegram_delivery("blocked", monotonic() - started)
+            raise TelegramDeliveryError("blocked", retryable=False) from exc
+        except (TelegramNetworkError, TelegramServerError) as exc:
+            record_telegram_delivery("retry", monotonic() - started)
+            raise TelegramDeliveryError("temporary_unavailable", retryable=True) from exc
+
+    async def answer_callback(self, callback_query_id: str, text: str | None = None) -> None:
+        try:
+            await self._get_bot().answer_callback_query(
+                callback_query_id=callback_query_id, text=text
+            )
+        except (TelegramBadRequest, TelegramNetworkError, TelegramServerError) as exc:
+            logger.warning("telegram.callback.answer_failed category=%s", type(exc).__name__)
+
     async def get_me(self):  # noqa: ANN201
         try:
             result = await self._get_bot().get_me()
@@ -178,6 +238,8 @@ class MockTelegramProvider(TelegramProvider):
         self.should_fail = should_fail
         self.error = error
         self.sent_messages: list[TelegramMessage] = []
+        self.edited_messages: list[TelegramMessage] = []
+        self.answered_callbacks: list[tuple[str, str | None]] = []
 
     async def send_message(
         self,
@@ -185,6 +247,7 @@ class MockTelegramProvider(TelegramProvider):
         text: str,
         web_url: str | None = None,
         button_text: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
     ) -> bool:
         if self.error:
             raise self.error
@@ -196,12 +259,34 @@ class MockTelegramProvider(TelegramProvider):
                 text=text,
                 web_url=web_url,
                 button_text=button_text,
+                reply_markup=reply_markup,
             )
         )
         return True
 
+    async def edit_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> bool:
+        if self.error:
+            raise self.error
+        if self.should_fail:
+            raise TelegramDeliveryError("temporary_unavailable", retryable=True)
+        self.edited_messages.append(
+            TelegramMessage(chat_id=chat_id, text=text, reply_markup=reply_markup)
+        )
+        return True
+
+    async def answer_callback(self, callback_query_id: str, text: str | None = None) -> None:
+        self.answered_callbacks.append((callback_query_id, text))
+
     def clear(self) -> None:
         self.sent_messages.clear()
+        self.edited_messages.clear()
+        self.answered_callbacks.clear()
 
 
 _provider: AiogramTelegramProvider | None = None

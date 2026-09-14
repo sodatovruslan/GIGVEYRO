@@ -3,7 +3,8 @@ import logging
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.types import Message
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import CallbackQuery, Message
 
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
@@ -11,7 +12,7 @@ from app.infra.logging_config import configure_logging
 from app.infra.redis_client import close_redis, init_redis
 from app.telegram_bot.commands import TelegramCommandService
 
-router = Router(name="gigveyro-read-only-commands")
+router = Router(name="gigveyro-commands")
 
 
 @router.message(F.chat.type == "private", F.text)
@@ -32,7 +33,36 @@ async def handle_private_text(message: Message) -> None:
         except Exception:
             await session.rollback()
             raise
-    await message.answer(reply, protect_content=True)
+    await message.answer(reply, reply_markup=getattr(reply, "keyboard", None), protect_content=True)
+
+
+@router.callback_query(F.message.chat.type == "private")
+async def handle_private_callback(callback_query: CallbackQuery) -> None:
+    if callback_query.data is None or callback_query.message is None:
+        await callback_query.answer()
+        return
+    async with AsyncSessionLocal() as session:
+        try:
+            reply = await TelegramCommandService(session).handle_callback(
+                telegram_user_id=callback_query.from_user.id,
+                chat_id=callback_query.message.chat.id,
+                data=callback_query.data,
+                username=callback_query.from_user.username,
+                first_name=callback_query.from_user.first_name,
+                telegram_language=callback_query.from_user.language_code,
+            )
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+    await callback_query.answer()
+    if reply is None:
+        return
+    try:
+        await callback_query.message.edit_text(reply, reply_markup=getattr(reply, "keyboard", None))
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            raise
 
 
 async def run_polling() -> None:
@@ -51,7 +81,7 @@ async def run_polling() -> None:
     try:
         await bot.delete_webhook(drop_pending_updates=False)
         logging.getLogger(__name__).info("event=telegram.polling.started")
-        await dispatcher.start_polling(bot, allowed_updates=["message"])
+        await dispatcher.start_polling(bot, allowed_updates=["message", "callback_query"])
     finally:
         await bot.session.close()
         await close_redis()
