@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     DEAL_TTL_MINUTES: int = 30
     DEMO_USDT_TJS_RATE: Decimal = Decimal("10.90")
 
+    # Deal settlement split - confirmed business rule: of the deal amount,
+    # the accepting USER keeps 10% as their own profit and 7% is retained
+    # as OWNER/platform margin; the MERCHANT receives the remainder. Fixed
+    # constants (not admin-configurable) per client confirmation.
+    DEAL_USER_PROFIT_PERCENT: Decimal = Decimal("0.10")
+    DEAL_OWNER_PROFIT_PERCENT: Decimal = Decimal("0.07")
+
     # Security & CORS Settings
     CORS_ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "test"]

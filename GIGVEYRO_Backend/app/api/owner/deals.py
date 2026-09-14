@@ -12,13 +12,14 @@ from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.deal import DealRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.realtime import RealtimeOutboxRepository
 from app.repositories.traffic import TrafficRepository
 from app.repositories.wallet import WalletRepository
-from app.schemas.deal import DealListResponse, DealRead
+from app.schemas.deal import OwnerDealListResponse, OwnerDealRead
 from app.services.audit import AuditService
 from app.services.deal import (
     DealNotFoundError,
@@ -48,6 +49,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DealService:
         account_repository=account_repo,
         wallet_service=wallet_service,
         rate_provider=ConfiguredExchangeRateProvider(),
+        fee_repository=FeeRepository(db),
         realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
     )
 
@@ -56,7 +58,7 @@ def _audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
     return AuditService(AuditRepository(db))
 
 
-@router.get("", response_model=DealListResponse)
+@router.get("", response_model=OwnerDealListResponse)
 async def list_deals(
     status: DealStatus | None = None,
     merchant_id: uuid.UUID | None = None,
@@ -67,7 +69,7 @@ async def list_deals(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     service: DealService = Depends(_service),
-) -> DealListResponse:
+) -> OwnerDealListResponse:
     items, total = await service.list_for_owner(
         status=status,
         merchant_id=merchant_id,
@@ -78,24 +80,24 @@ async def list_deals(
         limit=limit,
         offset=offset,
     )
-    return DealListResponse(items=items, total=total, limit=limit, offset=offset)
+    return OwnerDealListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
-@router.get("/{deal_id}", response_model=DealRead)
-async def get_deal(deal_id: uuid.UUID, service: DealService = Depends(_service)) -> DealRead:
+@router.get("/{deal_id}", response_model=OwnerDealRead)
+async def get_deal(deal_id: uuid.UUID, service: DealService = Depends(_service)) -> OwnerDealRead:
     try:
         return await service.get_for_owner(deal_id)
     except DealNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="deal not found") from exc
 
 
-@router.post("/{deal_id}/complete", response_model=DealRead)
+@router.post("/{deal_id}/complete", response_model=OwnerDealRead)
 async def complete_deal(
     deal_id: uuid.UUID,
     actor: Account = Depends(get_current_account),
     service: DealService = Depends(_service),
     audit: AuditService = Depends(_audit_service),
-) -> DealRead:
+) -> OwnerDealRead:
     """Owner-controlled settlement: completes deal, moves frozen USDT to merchant available USDT."""
     try:
         deal = await service.complete_deal(deal_id, actor_id=actor.id)
@@ -113,13 +115,13 @@ async def complete_deal(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.post("/{deal_id}/release", response_model=DealRead)
+@router.post("/{deal_id}/release", response_model=OwnerDealRead)
 async def release_deal(
     deal_id: uuid.UUID,
     actor: Account = Depends(get_current_account),
     service: DealService = Depends(_service),
     audit: AuditService = Depends(_audit_service),
-) -> DealRead:
+) -> OwnerDealRead:
     """Owner-controlled release: cancels deal, releases frozen USDT back to user available USDT."""
     try:
         deal = await service.cancel_or_release_deal(deal_id, actor_id=actor.id)

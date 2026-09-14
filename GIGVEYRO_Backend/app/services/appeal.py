@@ -14,7 +14,13 @@ from app.models.deal import Deal
 from app.realtime.contracts import RealtimeEventName
 from app.repositories.appeal import AppealRepository
 from app.repositories.deal import DealRepository
-from app.services.deal import DealNotFoundError, transition_deal
+from app.repositories.fees import FeeRepository
+from app.services.deal import (
+    DealNotFoundError,
+    compute_deal_settlement_split,
+    record_deal_owner_profit,
+    transition_deal,
+)
 from app.services.notification import NotificationService
 from app.services.realtime import RealtimeEventService
 from app.services.wallet import WalletService
@@ -62,12 +68,14 @@ class AppealService:
         appeal_repository: AppealRepository,
         deal_repository: DealRepository,
         wallet_service: WalletService,
+        fee_repository: FeeRepository,
         realtime_service: RealtimeEventService | None = None,
         notification_service: NotificationService | None = None,
     ):
         self._appeals = appeal_repository
         self._deals = deal_repository
         self._wallet_service = wallet_service
+        self._fees = fee_repository
         self._realtime = realtime_service
         self._notifications = notification_service
 
@@ -232,13 +240,27 @@ class AppealService:
             raise AppealNotFoundError("associated deal is invalid")
 
         if resolution == AppealResolution.SETTLE_TO_MERCHANT:
+            amount = deal.amount_usdt
+            merchant_amount, user_profit, owner_profit = compute_deal_settlement_split(amount)
             await self._wallet_service.settle_deal(
                 user_account_id=deal.user_id,
                 merchant_account_id=deal.merchant_id,
-                amount=deal.amount_usdt,
+                amount=amount,
+                merchant_amount=merchant_amount,
+                user_profit_amount=user_profit,
                 deal_id=deal.id,
                 actor_id=owner_id,
             )
+            await record_deal_owner_profit(
+                self._fees,
+                deal,
+                gross_amount=amount,
+                merchant_amount=merchant_amount,
+                owner_profit=owner_profit,
+            )
+            deal.merchant_settlement_amount = merchant_amount
+            deal.user_profit_amount = user_profit
+            deal.owner_profit_amount = owner_profit
             transition_deal(deal, DealStatus.COMPLETED)
         elif resolution == AppealResolution.RELEASE_TO_USER:
             await self._wallet_service.release_for_deal(

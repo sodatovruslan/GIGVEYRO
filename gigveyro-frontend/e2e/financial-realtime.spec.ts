@@ -325,6 +325,61 @@ test("merchant cannot view another merchant's invoice timeline", async ({ browse
   await merchantBContext.close();
 });
 
+test("deal settlement splits into merchant/user-profit/owner-profit and the UI reflects it", async ({ browser }) => {
+  const merchantContext = await browser.newContext();
+  const userContext = await browser.newContext();
+  const ownerContext = await browser.newContext();
+  const merchant = await merchantContext.newPage();
+  const user = await userContext.newPage();
+  const owner = await ownerContext.newPage();
+  await login(merchant, personas.merchantA);
+  await login(user, personas.userA);
+  await login(owner, personas.owner);
+
+  // 10.90 TJS at the fixed demo rate (10.90 USDT/TJS) converts to exactly
+  // 1.00000000 USDT - small enough to never collide with userA's balance
+  // from the other tests in this file, and round enough to hand-verify.
+  const created = await merchant.request.post("/api/backend/merchant/deals", {
+    data: { amount_tjs: "10.90" },
+  });
+  expect(created.status()).toBe(201);
+  const deal = await created.json();
+
+  const requisites = await (await user.request.get("/api/backend/requisites")).json();
+  const requisite = requisites.find((item: { is_active: boolean }) => item.is_active);
+  expect(requisite).toBeTruthy();
+
+  const accepted = await user.request.post(`/api/backend/deals/${deal.id}/accept`, {
+    data: { payment_requisite_id: requisite.id },
+  });
+  expect(accepted.status()).toBe(200);
+  const acceptedDeal = await accepted.json();
+  expect(acceptedDeal.amount_usdt).toBe("1.00000000");
+
+  const completed = await owner.request.post(`/api/backend/owner/deals/${deal.id}/complete`);
+  expect(completed.status()).toBe(200);
+  const settled = await completed.json();
+  // 1.00 USDT deal: owner 7% = 0.07, user profit 10% = 0.10, merchant gets
+  // the residual 0.83 - the three always sum back to exactly 1.00.
+  expect(settled.owner_profit_amount).toBe("0.07000000");
+  expect(settled.user_profit_amount).toBe("0.10000000");
+  expect(settled.merchant_settlement_amount).toBe("0.83000000");
+
+  // USER and MERCHANT views never receive the platform's own margin.
+  const userView = await user.request.get(`/api/backend/deals/${deal.id}`);
+  expect(Object.keys(await userView.json())).not.toContain("owner_profit_amount");
+  const merchantView = await merchant.request.get(`/api/backend/merchant/deals/${deal.id}`);
+  expect(Object.keys(await merchantView.json())).not.toContain("owner_profit_amount");
+
+  await user.goto("/user/deals");
+  await user.getByText(deal.public_id).click();
+  await expect(user.getByText("0.10000000 USDT")).toBeVisible();
+
+  await merchantContext.close();
+  await userContext.close();
+  await ownerContext.close();
+});
+
 test("merchant critical routes render without owner navigation", async ({ page }) => {
   await login(page, personas.merchantA);
   for (const route of ["/merchant", "/merchant/wallet", "/merchant/deals", "/merchant/withdrawals", "/merchant/appeals", "/merchant/notifications", "/merchant/settings"]) {

@@ -19,6 +19,7 @@ from app.models.traffic import UserTrafficSettings
 from app.models.wallet import UserWallet
 from app.repositories.account import AccountRepository
 from app.repositories.deal import DealRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.traffic import TrafficRepository
@@ -111,6 +112,7 @@ async def test_two_users_racing_to_accept_same_deal_exactly_one_wins():
                 account_repository,
                 wallet_service,
                 ConfiguredExchangeRateProvider(),
+                FeeRepository(session),
             )
             try:
                 await service.accept_deal(

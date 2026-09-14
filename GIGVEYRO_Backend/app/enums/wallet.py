@@ -35,6 +35,10 @@ class LedgerEntryType(StrEnum):
     DEAL_RELEASE = "deal_release"
     DEAL_SETTLEMENT = "deal_settlement"
     DEAL_SETTLEMENT_CREDIT = "deal_settlement_credit"
+    # Deal profit split: the accepting USER's own 10% cut, credited back to
+    # their available balance alongside DEAL_SETTLEMENT debiting the full
+    # deal amount from frozen - see DealService.complete_deal.
+    DEAL_USER_PROFIT = "deal_user_profit"
 
     # Used since Stage 8's confirmed TRC20 deposit credit.
     DEPOSIT_CREDIT = "deposit_credit"

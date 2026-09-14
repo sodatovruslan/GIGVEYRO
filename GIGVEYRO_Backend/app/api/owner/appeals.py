@@ -13,6 +13,7 @@ from app.repositories.account import AccountRepository
 from app.repositories.appeal import AppealRepository
 from app.repositories.audit import AuditRepository
 from app.repositories.deal import DealRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.notification import NotificationRepository
@@ -53,6 +54,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> AppealService:
         appeal_repository=AppealRepository(db),
         deal_repository=DealRepository(db),
         wallet_service=wallet_service,
+        fee_repository=FeeRepository(db),
         realtime_service=RealtimeEventService(RealtimeOutboxRepository(db)),
         notification_service=NotificationService(
             NotificationRepository(db), TelegramLinkRepository(db), MockTelegramProvider()

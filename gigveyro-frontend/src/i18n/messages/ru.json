@@ -334,7 +334,10 @@
     "cancelledAt": "Отменена",
     "createFailed": "Не удалось выполнить действие.",
     "detailTitle": "Детали сделки",
-    "backToDeals": "← Назад к сделкам"
+    "backToDeals": "← Назад к сделкам",
+    "merchantReceives": "Мерчант получает",
+    "userProfit": "Ваша прибыль",
+    "ownerProfit": "Маржа платформы"
   },
   "deposits": {
     "eyebrowUser": "ПОПОЛНЕНИЕ USDT",

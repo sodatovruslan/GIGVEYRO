@@ -334,7 +334,10 @@
     "cancelledAt": "Бекор шуд",
     "createFailed": "Амал иҷро нашуд.",
     "detailTitle": "Тафсилоти муомила",
-    "backToDeals": "← Бозгашт ба муомилаҳо"
+    "backToDeals": "← Бозгашт ба муомилаҳо",
+    "merchantReceives": "Мерчант мегирад",
+    "userProfit": "Фоидаи шумо",
+    "ownerProfit": "Маржаи платформа"
   },
   "deposits": {
     "eyebrowUser": "ПУРКУНИИ USDT",

@@ -18,7 +18,9 @@ from app.models.ledger import LedgerEntry
 from app.models.merchant_wallet import MerchantWallet
 from app.models.wallet import UserWallet
 from app.repositories.account import AccountRepository
+from app.models.fees import FeeSnapshot, OwnerProfitEntry
 from app.repositories.deal import DealRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
@@ -83,6 +85,7 @@ async def test_successful_settlement_flow(
         account_repo,
         MerchantWalletRepository(db_session),
     )
+    fee_repo = FeeRepository(db_session)
     deal_service = DealService(
         deal_repository=DealRepository(db_session),
         requisite_repository=PaymentRequisiteRepository(db_session),
@@ -90,17 +93,26 @@ async def test_successful_settlement_flow(
         account_repository=account_repo,
         wallet_service=wallet_service,
         rate_provider=ConfiguredExchangeRateProvider(),
+        fee_repository=fee_repo,
     )
 
     completed_deal = await deal_service.complete_deal(deal.id)
     assert completed_deal.status == DealStatus.COMPLETED
     assert completed_deal.completed_at is not None
 
+    # Deal = 20 USDT: owner 7% = 1.40, user profit 10% = 2.00, merchant net
+    # = 20 - 1.40 - 2.00 = 16.60. Nothing is created or lost: 16.60 + 2.00
+    # + 1.40 == 20.00 exactly.
+    assert completed_deal.merchant_settlement_amount == Decimal("16.60000000")
+    assert completed_deal.user_profit_amount == Decimal("2.00000000")
+    assert completed_deal.owner_profit_amount == Decimal("1.40000000")
+
     u_wallet = await wallet_service.get_wallet_for_account(user.id)
     assert u_wallet.frozen_balance == Decimal("30")
+    assert u_wallet.available_balance == Decimal("2.00000000")
 
     updated_m_wallet = await wallet_service.get_merchant_wallet_for_account(merchant.id)
-    assert updated_m_wallet.available_balance == Decimal("120")
+    assert updated_m_wallet.available_balance == Decimal("116.60000000")
 
     u_ledger, _ = await wallet_service.get_ledger_for_account(
         user.id,
@@ -113,6 +125,17 @@ async def test_successful_settlement_flow(
     assert len(u_ledger) == 1
     assert u_ledger[0].amount == Decimal("-20")
 
+    profit_ledger, _ = await wallet_service.get_ledger_for_account(
+        user.id,
+        entry_type=LedgerEntryType.DEAL_USER_PROFIT,
+        date_from=None,
+        date_to=None,
+        limit=10,
+        offset=0,
+    )
+    assert len(profit_ledger) == 1
+    assert profit_ledger[0].amount == Decimal("2.00000000")
+
     m_ledger, _ = await wallet_service.get_ledger_for_account(
         merchant.id,
         entry_type=LedgerEntryType.DEAL_SETTLEMENT_CREDIT,
@@ -122,7 +145,14 @@ async def test_successful_settlement_flow(
         offset=0,
     )
     assert len(m_ledger) == 1
-    assert m_ledger[0].amount == Decimal("20")
+    assert m_ledger[0].amount == Decimal("16.60000000")
+
+    owner_entry = await fee_repo.get_profit_by_source(
+        source_type="deal", source_id=deal.id, fee_type="deal_fee"
+    )
+    assert owner_entry is not None
+    assert owner_entry.fee_amount == Decimal("1.40000000")
+    assert owner_entry.gross_amount == Decimal("20.00000000")
 
 
 @pytest.mark.asyncio
@@ -156,6 +186,7 @@ async def test_successful_release_flow(
         account_repository=account_repo,
         wallet_service=wallet_service,
         rate_provider=ConfiguredExchangeRateProvider(),
+        fee_repository=FeeRepository(db_session),
     )
 
     released_deal = await deal_service.cancel_or_release_deal(deal.id)
@@ -194,6 +225,7 @@ async def test_settlement_idempotency(
         account_repo,
         MerchantWalletRepository(db_session),
     )
+    fee_repo = FeeRepository(db_session)
     deal_service = DealService(
         deal_repository=DealRepository(db_session),
         requisite_repository=PaymentRequisiteRepository(db_session),
@@ -201,6 +233,7 @@ async def test_settlement_idempotency(
         account_repository=account_repo,
         wallet_service=wallet_service,
         rate_provider=ConfiguredExchangeRateProvider(),
+        fee_repository=fee_repo,
     )
 
     res1 = await deal_service.complete_deal(deal.id)
@@ -211,9 +244,24 @@ async def test_settlement_idempotency(
 
     u_wallet = await wallet_service.get_wallet_for_account(user.id)
     assert u_wallet.frozen_balance == Decimal("30")
+    # Double-complete must not double-credit the user's profit share.
+    assert u_wallet.available_balance == Decimal("2.00000000")
 
     m_wallet = await wallet_service.get_merchant_wallet_for_account(merchant.id)
-    assert m_wallet.available_balance == Decimal("120")
+    assert m_wallet.available_balance == Decimal("116.60000000")
+
+    owner_entries, total = await fee_repo.list_profit_entries(
+        date_from=None,
+        date_to=None,
+        fee_type="deal_fee",
+        currency=None,
+        source_type="deal",
+        source_id=deal.id,
+        limit=10,
+        offset=0,
+    )
+    assert total == 1
+    assert owner_entries[0].fee_amount == Decimal("1.40000000")
 
 
 @pytest.mark.asyncio
@@ -276,6 +324,7 @@ async def test_concurrency_two_completes(
                     account_repository=account_repo,
                     wallet_service=ws,
                     rate_provider=ConfiguredExchangeRateProvider(),
+                    fee_repository=FeeRepository(session),
                 )
                 res = await ds.complete_deal(deal_id)
                 await session.commit()
@@ -301,8 +350,30 @@ async def test_concurrency_two_completes(
                 ).scalar_one()
 
                 assert final_u_wallet.frozen_balance == Decimal("0")
-                assert final_m_wallet.available_balance == Decimal("20")
+                # Deal = 20: owner 1.40 + user profit 2.00 + merchant net
+                # 16.60 == 20 exactly, and - the actual point of this test -
+                # neither concurrent complete_deal() call duplicated any
+                # of the three shares.
+                assert final_u_wallet.available_balance == Decimal("2.00000000")
+                assert final_m_wallet.available_balance == Decimal("16.60000000")
 
+                owner_entries = (
+                    await verify_session.execute(
+                        select(OwnerProfitEntry).where(
+                            OwnerProfitEntry.source_type == "deal",
+                            OwnerProfitEntry.source_id == deal_id,
+                        )
+                    )
+                ).scalars().all()
+                assert len(owner_entries) == 1
+                assert owner_entries[0].fee_amount == Decimal("1.40000000")
+
+                await verify_session.execute(
+                    delete(OwnerProfitEntry).where(OwnerProfitEntry.source_id == deal_id)
+                )
+                await verify_session.execute(
+                    delete(FeeSnapshot).where(FeeSnapshot.source_id == deal_id)
+                )
                 await verify_session.execute(
                     delete(LedgerEntry).where(LedgerEntry.account_id.in_([user.id, merchant.id]))
                 )

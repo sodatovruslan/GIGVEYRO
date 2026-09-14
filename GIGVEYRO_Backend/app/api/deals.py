@@ -10,6 +10,7 @@ from app.enums.deal import DealStatus
 from app.models.account import Account
 from app.repositories.account import AccountRepository
 from app.repositories.deal import DealRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.realtime import RealtimeOutboxRepository
@@ -47,6 +48,7 @@ def _service(db: AsyncSession = Depends(get_db)) -> DealService:
         account_repository,
         wallet_service,
         get_exchange_rate_provider(),
+        FeeRepository(db),
         RealtimeEventService(RealtimeOutboxRepository(db)),
         RiskGuard(RiskRepository(db)),
     )

@@ -20,6 +20,7 @@ from app.models.wallet import UserWallet
 from app.repositories.account import AccountRepository
 from app.repositories.appeal import AppealRepository
 from app.repositories.deal import DealRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
@@ -44,6 +45,7 @@ def make_appeal_service(db_session: AsyncSession):
         appeal_repository=AppealRepository(db_session),
         deal_repository=DealRepository(db_session),
         wallet_service=wallet_service,
+        fee_repository=FeeRepository(db_session),
     )
 
 
@@ -123,6 +125,7 @@ async def test_disputed_deal_cannot_complete_or_release_directly(
         account_repository=account_repo,
         wallet_service=wallet_service,
         rate_provider=ConfiguredExchangeRateProvider(),
+        fee_repository=FeeRepository(db_session),
     )
 
     with pytest.raises(InvalidDealTransitionError):
@@ -258,13 +261,18 @@ async def test_resolve_settle_to_merchant(
         await db_session.execute(select(UserWallet).where(UserWallet.account_id == user.id))
     ).scalar_one()
     assert u_w.frozen_balance == Decimal("0")
+    # Appeal-driven settlement goes through the same complete_deal() path as
+    # a normal owner settlement, so the same profit split applies: of the
+    # 20 USDT deal, USER keeps 10% (2.00) as their own profit.
+    assert u_w.available_balance == Decimal("2.00000000")
 
     m_w = (
         await db_session.execute(
             select(MerchantWallet).where(MerchantWallet.account_id == merchant.id)
         )
     ).scalar_one()
-    assert m_w.available_balance == Decimal("20")
+    # 20 - 7% owner (1.40) - 10% user profit (2.00) = 16.60 net to merchant.
+    assert m_w.available_balance == Decimal("16.60000000")
 
 
 @pytest.mark.asyncio
@@ -327,6 +335,7 @@ async def test_concurrency_double_open_appeal():
                     appeal_repository=AppealRepository(session),
                     deal_repository=DealRepository(session),
                     wallet_service=ws,
+                    fee_repository=FeeRepository(session),
                 )
                 act = await account_repo.get_by_id(account_id)
                 res = await service.open_appeal(

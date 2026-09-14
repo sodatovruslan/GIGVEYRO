@@ -243,12 +243,31 @@ class WalletService:
         user_account_id: uuid.UUID,
         merchant_account_id: uuid.UUID,
         amount: Decimal,
+        merchant_amount: Decimal,
+        user_profit_amount: Decimal,
         deal_id: uuid.UUID,
         actor_id: uuid.UUID | None = None,
-    ) -> tuple[LedgerEntry, LedgerEntry]:
-        """Settles completed deal: User frozen -= amount, Merchant available += amount."""
+    ) -> tuple[LedgerEntry, LedgerEntry, LedgerEntry | None]:
+        """Settles a completed deal. User.frozen -= amount (full deal amount,
+        unchanged from the original 1:1 model). Of that same amount,
+        Merchant.available += merchant_amount and User.available +=
+        user_profit_amount (the user's own profit share) - the remainder
+        (amount - merchant_amount - user_profit_amount) is never credited
+        to any wallet here; it is recorded separately as OWNER profit by
+        the caller (DealService), which has no wallet of its own. No money
+        is created: merchant_amount + user_profit_amount can never exceed
+        amount.
+        """
         if not amount.is_finite() or amount <= 0:
             raise InvalidAmountError("amount must be a positive, finite number")
+        if not merchant_amount.is_finite() or merchant_amount <= 0:
+            raise InvalidAmountError("merchant_amount must be a positive, finite number")
+        if not user_profit_amount.is_finite() or user_profit_amount < 0:
+            raise InvalidAmountError("user_profit_amount must be a non-negative finite number")
+        if merchant_amount + user_profit_amount > amount:
+            raise InvalidAmountError(
+                "merchant_amount + user_profit_amount cannot exceed the settled amount"
+            )
 
         user_existing = await self._ledger.get_by_reference(
             reference_type="deal", reference_id=deal_id, entry_type=LedgerEntryType.DEAL_SETTLEMENT
@@ -258,8 +277,12 @@ class WalletService:
             reference_id=deal_id,
             entry_type=LedgerEntryType.DEAL_SETTLEMENT_CREDIT,
         )
+        profit_existing = await self._ledger.get_by_reference(
+            reference_type="deal", reference_id=deal_id, entry_type=LedgerEntryType.DEAL_USER_PROFIT
+        )
         if user_existing is not None and merchant_existing is not None:
-            return user_existing, merchant_existing
+            if user_profit_amount == 0 or profit_existing is not None:
+                return user_existing, merchant_existing, profit_existing
 
         # Lock ordering: UserWallet then MerchantWallet
         user_wallet = await self._wallets.get_by_account_id_for_update(user_account_id)
@@ -275,7 +298,7 @@ class WalletService:
         if user_wallet.frozen_balance < amount:
             raise InsufficientBalanceError("insufficient frozen balance for deal settlement")
 
-        # 1. Update User wallet (frozen -= amount)
+        # 1. Update User wallet (frozen -= amount, full deal amount)
         u_avail_before = user_wallet.available_balance
         u_ins_before = user_wallet.insurance_balance
         u_froz_before = user_wallet.frozen_balance
@@ -303,11 +326,11 @@ class WalletService:
         )
         user_entry = await self._ledger.create(user_entry)
 
-        # 2. Update Merchant wallet (available += amount)
+        # 2. Update Merchant wallet (available += merchant_amount, net of split)
         m_avail_before = merchant_wallet.available_balance
         m_held_before = merchant_wallet.held_balance
 
-        merchant_wallet.available_balance = m_avail_before + amount
+        merchant_wallet.available_balance = m_avail_before + merchant_amount
         await self._merchant_wallets.save(merchant_wallet)
 
         merchant_entry = LedgerEntry(
@@ -316,7 +339,7 @@ class WalletService:
             type=LedgerEntryType.DEAL_SETTLEMENT_CREDIT,
             balance_bucket=BalanceBucket.AVAILABLE,
             currency=merchant_wallet.currency,
-            amount=amount,
+            amount=merchant_amount,
             available_before=m_avail_before,
             available_after=merchant_wallet.available_balance,
             insurance_before=Decimal("0"),
@@ -332,7 +355,39 @@ class WalletService:
         )
         merchant_entry = await self._ledger.create(merchant_entry)
 
-        return user_entry, merchant_entry
+        # 3. Credit the accepting USER's own profit share, same wallet,
+        # available bucket - re-fetch before/after since (1) already moved
+        # available_before for this wallet.
+        profit_entry: LedgerEntry | None = None
+        if user_profit_amount > 0:
+            p_avail_before = user_wallet.available_balance
+            p_ins_before = user_wallet.insurance_balance
+            p_froz_before = user_wallet.frozen_balance
+
+            user_wallet.available_balance = p_avail_before + user_profit_amount
+            await self._wallets.save(user_wallet)
+
+            profit_entry = LedgerEntry(
+                wallet_id=user_wallet.id,
+                account_id=user_account_id,
+                type=LedgerEntryType.DEAL_USER_PROFIT,
+                balance_bucket=BalanceBucket.AVAILABLE,
+                currency=user_wallet.currency,
+                amount=user_profit_amount,
+                available_before=p_avail_before,
+                available_after=user_wallet.available_balance,
+                insurance_before=p_ins_before,
+                insurance_after=user_wallet.insurance_balance,
+                frozen_before=p_froz_before,
+                frozen_after=user_wallet.frozen_balance,
+                reference_type="deal",
+                reference_id=deal_id,
+                description="User profit share from completed deal",
+                created_by_account_id=actor_id,
+            )
+            profit_entry = await self._ledger.create(profit_entry)
+
+        return user_entry, merchant_entry, profit_entry
 
     # -- STAGE 10 WITHDRAWAL WALLET MUTATIONS ---------------------------
 

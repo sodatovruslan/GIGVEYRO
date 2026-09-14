@@ -41,7 +41,7 @@ export default function OwnerDealDetailPage() {
         {["accepted", "payment_pending"].includes(deal.status) && <div className={styles.rowActions}><button disabled={saving} onClick={() => void act("complete")}>{t("complete")}</button><button disabled={saving} onClick={() => void act("release")}>{t("release")}</button></div>}
       </div>
       {error && <div className={styles.error}>{error}</div>}
-      <DealDetailGrid deal={deal} />
+      <DealDetailGrid deal={deal} role="owner" />
     </>}
   </section>;
 }

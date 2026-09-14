@@ -8,11 +8,14 @@ from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.enums.account import UserRole
 from app.enums.deal import DealStatus
+from app.enums.fees import FeePayer, FeeType
 from app.models.account import Account
 from app.models.deal import Deal
+from app.models.fees import FeeSnapshot, OwnerProfitEntry
 from app.realtime.contracts import RealtimeEventName
 from app.repositories.account import AccountRepository
 from app.repositories.deal import DealRepository
+from app.repositories.fees import FeeRepository
 from app.repositories.payment_requisite import PaymentRequisiteRepository
 from app.repositories.traffic import TrafficRepository
 from app.schemas.payment_requisite import mask_card_number
@@ -87,6 +90,90 @@ def calculate_amount_usdt(amount_tjs: Decimal, rate: Decimal) -> Decimal:
     return (amount_tjs / rate).quantize(USDT_QUANTUM, rounding=ROUND_HALF_UP)
 
 
+def compute_deal_settlement_split(amount: Decimal) -> tuple[Decimal, Decimal, Decimal]:
+    """Splits a settled deal amount into (merchant_amount, user_profit,
+    owner_profit) per the confirmed business rule: USER keeps 10% as their
+    own profit, 7% is retained as OWNER/platform margin, MERCHANT gets the
+    remainder. merchant_amount is computed as the residual (not its own
+    independent percentage) so the three values always sum to exactly
+    `amount`, regardless of rounding on the other two."""
+    owner_profit = (amount * settings.DEAL_OWNER_PROFIT_PERCENT).quantize(
+        USDT_QUANTUM, rounding=ROUND_HALF_UP
+    )
+    user_profit = (amount * settings.DEAL_USER_PROFIT_PERCENT).quantize(
+        USDT_QUANTUM, rounding=ROUND_HALF_UP
+    )
+    merchant_amount = amount - owner_profit - user_profit
+    return merchant_amount, user_profit, owner_profit
+
+
+async def record_deal_owner_profit(
+    fee_repository: FeeRepository,
+    deal: Deal,
+    *,
+    gross_amount: Decimal,
+    merchant_amount: Decimal,
+    owner_profit: Decimal,
+) -> None:
+    """Pure accounting record of the platform's retained share from a
+    settled deal - Owner has no wallet of its own, so unlike User/Merchant
+    this never moves a balance (mirrors the existing FIAT_CONVERSION
+    FeeSnapshot/OwnerProfitEntry pattern in app/services/fiat_wallet.py).
+    Idempotent via the (source_type, source_id, fee_type) pre-check,
+    mirroring LedgerRepository.get_by_reference. Shared by DealService's
+    normal owner-completion path and AppealService's dispute-resolution
+    settlement path, so the two can never diverge.
+
+    total_fee (fee_amount on the snapshot) is everything that isn't the
+    merchant's net - i.e. owner_profit plus the user's own profit share -
+    computed from the exact figures settle_deal already applied, so the
+    snapshot can never drift from what actually moved."""
+    if owner_profit <= 0:
+        return
+    existing = await fee_repository.get_profit_by_source(
+        source_type="deal", source_id=deal.id, fee_type=FeeType.DEAL.value
+    )
+    if existing is not None:
+        return
+
+    policy = await fee_repository.active_policy()
+    total_fee = gross_amount - merchant_amount
+    percent_bps = (
+        int((total_fee / gross_amount * Decimal("10000")).to_integral_value())
+        if gross_amount > 0
+        else 0
+    )
+    snapshot = await fee_repository.create_snapshot(
+        FeeSnapshot(
+            policy_id=policy.id,
+            policy_version=policy.version,
+            source_type="deal",
+            source_id=deal.id,
+            fee_type=FeeType.DEAL.value,
+            payer=FeePayer.MERCHANT.value,
+            currency="USDT",
+            gross_amount=gross_amount,
+            percent_bps=percent_bps,
+            percent_fee=total_fee,
+            fixed_fee=Decimal("0"),
+            fee_amount=total_fee,
+            net_amount=merchant_amount,
+        )
+    )
+    await fee_repository.create_profit(
+        OwnerProfitEntry(
+            fee_snapshot_id=snapshot.id,
+            source_type="deal",
+            source_id=deal.id,
+            fee_type=FeeType.DEAL.value,
+            currency="USDT",
+            gross_amount=gross_amount,
+            fee_amount=owner_profit,
+            policy_version=policy.version,
+        )
+    )
+
+
 def transition_deal(deal: Deal, new_status: DealStatus) -> None:
     if new_status not in ALLOWED_TRANSITIONS.get(deal.status, set()):
         raise InvalidDealTransitionError(
@@ -107,6 +194,7 @@ class DealService:
         account_repository: AccountRepository,
         wallet_service: WalletService,
         rate_provider: ExchangeRateProvider,
+        fee_repository: FeeRepository,
         realtime_service: RealtimeEventService | None = None,
         risk_guard: RiskGuard | None = None,
     ):
@@ -116,6 +204,7 @@ class DealService:
         self._accounts = account_repository
         self._wallet_service = wallet_service
         self._rate_provider = rate_provider
+        self._fees = fee_repository
         self._realtime = realtime_service
         self._risk_guard = risk_guard
 
@@ -241,7 +330,14 @@ class DealService:
     # -- STAGE 9: SETTLEMENT & RELEASE ----------------------------------
 
     async def complete_deal(self, deal_id: uuid.UUID, *, actor_id: uuid.UUID | None = None) -> Deal:
-        """Completes a deal (Settlement): User frozen -= USDT, Merchant available += USDT."""
+        """Completes a deal (Settlement). Of the full deal amount debited from
+        the accepting USER's frozen balance: MERCHANT receives the
+        remainder after the platform's split, USER keeps their own 10%
+        profit share back on their available balance, and 7% is recorded
+        as OWNER profit (a pure accounting record - the platform has no
+        wallet of its own). See app/services/wallet.py::settle_deal for the
+        actual wallet/ledger mutations; nothing here creates money - the
+        three shares always sum to exactly the debited amount."""
         deal = await self._deals.get_by_id_for_update(deal_id)
         if deal is None:
             raise DealNotFoundError()
@@ -255,13 +351,29 @@ class DealService:
         if deal.user_id is None or deal.amount_usdt is None:
             raise InvalidDealTransitionError("deal is missing accepted user or amount_usdt")
 
+        amount = deal.amount_usdt
+        merchant_amount, user_profit, owner_profit = compute_deal_settlement_split(amount)
+
         await self._wallet_service.settle_deal(
             user_account_id=deal.user_id,
             merchant_account_id=deal.merchant_id,
-            amount=deal.amount_usdt,
+            amount=amount,
+            merchant_amount=merchant_amount,
+            user_profit_amount=user_profit,
             deal_id=deal.id,
             actor_id=actor_id,
         )
+        await record_deal_owner_profit(
+            self._fees,
+            deal,
+            gross_amount=amount,
+            merchant_amount=merchant_amount,
+            owner_profit=owner_profit,
+        )
+
+        deal.merchant_settlement_amount = merchant_amount
+        deal.user_profit_amount = user_profit
+        deal.owner_profit_amount = owner_profit
 
         transition_deal(deal, DealStatus.COMPLETED)
         deal = await self._deals.save(deal)

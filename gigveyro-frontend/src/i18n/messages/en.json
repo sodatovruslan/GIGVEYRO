@@ -334,7 +334,10 @@
     "cancelledAt": "Cancelled",
     "createFailed": "Action failed.",
     "detailTitle": "Deal details",
-    "backToDeals": "← Back to deals"
+    "backToDeals": "← Back to deals",
+    "merchantReceives": "Merchant receives",
+    "userProfit": "Your profit",
+    "ownerProfit": "Platform margin"
   },
   "deposits": {
     "eyebrowUser": "USDT FUNDING",

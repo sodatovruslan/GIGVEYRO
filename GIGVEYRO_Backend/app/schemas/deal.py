@@ -42,10 +42,25 @@ class DealRead(BaseModel):
     cancelled_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    merchant_settlement_amount: Money | None
+    user_profit_amount: Money | None
 
 
 class DealListResponse(BaseModel):
     items: list[DealRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class OwnerDealRead(DealRead):
+    """Adds the platform's own retained margin - not shown to USER/MERCHANT."""
+
+    owner_profit_amount: Money | None
+
+
+class OwnerDealListResponse(BaseModel):
+    items: list[OwnerDealRead]
     total: int
     limit: int
     offset: int

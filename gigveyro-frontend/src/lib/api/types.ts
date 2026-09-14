@@ -340,6 +340,11 @@ export interface Deal {
   cancelled_at: string | null;
   created_at: string;
   updated_at: string;
+  merchant_settlement_amount: string | null;
+  user_profit_amount: string | null;
+  /** Only present in the OWNER view (GET /owner/deals/*) - the platform's
+   * own retained margin, never sent to USER/MERCHANT responses. */
+  owner_profit_amount?: string | null;
 }
 
 export type AppealStatus = "open" | "under_review" | "resolved" | "cancelled";

@@ -57,6 +57,18 @@ class FeeRepository:
         await self.session.refresh(entry)
         return entry
 
+    async def get_profit_by_source(
+        self, *, source_type: str, source_id: uuid.UUID, fee_type: str
+    ) -> OwnerProfitEntry | None:
+        result = await self.session.execute(
+            select(OwnerProfitEntry).where(
+                OwnerProfitEntry.source_type == source_type,
+                OwnerProfitEntry.source_id == source_id,
+                OwnerProfitEntry.fee_type == fee_type,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def list_profit_entries(
         self,
         *,

@@ -88,6 +88,13 @@ class Deal(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Populated only on COMPLETED settlement - a denormalized snapshot of
+    # the profit split for display (LedgerEntry/OwnerProfitEntry remain the
+    # source of truth for the actual money movement). NULL until settled.
+    merchant_settlement_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
+    user_profit_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
+    owner_profit_amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
