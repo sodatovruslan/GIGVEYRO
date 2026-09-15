@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,8 +13,10 @@ from app.models.account import Account
 from app.models.ledger import LedgerEntry
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
+from app.repositories.insurance_reserve import InsuranceReservePolicyRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.wallet import WalletRepository
+from app.schemas.insurance_reserve import InsuranceReserveWalletView
 from app.schemas.ledger import LedgerListResponse
 from app.schemas.wallet import (
     AllocateRequest,
@@ -22,9 +25,11 @@ from app.schemas.wallet import (
     WalletRead,
 )
 from app.services.audit import AuditService
+from app.services.insurance_reserve import compute_required_minimum_reserve
 from app.services.wallet import (
     InactiveAccountError,
     InsufficientBalanceError,
+    InsufficientInsuranceReserveError,
     InvalidAmountError,
     WalletNotFoundError,
     WalletService,
@@ -99,6 +104,34 @@ async def get_user_ledger(
     return LedgerListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.get("/{account_id}/wallet/insurance-reserve", response_model=InsuranceReserveWalletView)
+async def get_insurance_reserve(
+    account_id: uuid.UUID,
+    service: WalletService = Depends(_service),
+    db: AsyncSession = Depends(get_db),
+) -> InsuranceReserveWalletView:
+    try:
+        wallet = await service.get_wallet_for_account(account_id)
+    except WalletNotFoundError as exc:
+        raise _wallet_error_response(exc) from exc
+
+    policy = await InsuranceReservePolicyRepository(db).active_policy()
+    required_minimum = compute_required_minimum_reserve(
+        wallet.insurance_reserve_basis, policy.minimum_reserve_percentage
+    )
+    return InsuranceReserveWalletView(
+        account_id=account_id,
+        insurance_balance=wallet.insurance_balance,
+        insurance_reserve_basis=wallet.insurance_reserve_basis,
+        minimum_reserve_percentage=policy.minimum_reserve_percentage,
+        required_minimum_reserve=required_minimum,
+        available_above_reserve=max(wallet.insurance_balance - required_minimum, Decimal("0")),
+        policy_version=policy.version,
+        policy_enabled=policy.enabled,
+        policy_updated_at=policy.updated_at,
+    )
+
+
 @router.post("/{account_id}/wallet/allocate", response_model=WalletRead)
 async def allocate(
     account_id: uuid.UUID,
@@ -136,6 +169,7 @@ async def adjust_insurance(
     actor: Account = Depends(get_current_account),
     service: WalletService = Depends(_service),
     audit: AuditService = Depends(_audit_service),
+    db: AsyncSession = Depends(get_db),
 ) -> WalletRead:
     try:
         entry = await service.adjust_insurance(
@@ -145,6 +179,20 @@ async def adjust_insurance(
             description=payload.description,
             idempotency_key=payload.idempotency_key,
         )
+    except InsufficientInsuranceReserveError as exc:
+        # The wallet mutation never happened (raised before it), but the
+        # denial itself is still an auditable event - commit it explicitly
+        # since the exception below will otherwise roll back this session.
+        await audit.log_action(
+            action="wallet.insurance_reserve_denied",
+            entity_type="wallet",
+            entity_id=str(account_id),
+            actor_account_id=actor.id,
+            actor_role=actor.role.value,
+            audit_metadata={"amount": str(payload.amount), "code": str(exc)},
+        )
+        await db.commit()
+        raise _wallet_error_response(exc) from exc
     except (
         WalletNotFoundError,
         InactiveAccountError,

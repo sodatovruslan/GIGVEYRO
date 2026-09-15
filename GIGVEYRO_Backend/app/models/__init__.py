@@ -7,6 +7,7 @@ from app.models.deal import Deal
 from app.models.deposit import Deposit, DepositReconciliationAction, UnmatchedTransfer
 from app.models.fees import FeePolicy, FeePolicyComponent, FeeSnapshot, OwnerProfitEntry
 from app.models.fiat_wallet import FiatConversion, FiatLedgerEntry, FiatWalletBalance
+from app.models.insurance_reserve import InsuranceReservePolicy
 from app.models.invoice import Invoice
 from app.models.ledger import LedgerEntry
 from app.models.merchant_profile import MerchantProfile
@@ -64,6 +65,7 @@ __all__ = [
     "FeePolicyComponent",
     "FeeSnapshot",
     "OwnerProfitEntry",
+    "InsuranceReservePolicy",
     "Invoice",
     "RiskPolicy",
     "TreasurySnapshotRecord",

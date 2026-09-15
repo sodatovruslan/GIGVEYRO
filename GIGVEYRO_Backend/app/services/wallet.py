@@ -11,9 +11,11 @@ from app.models.ledger import LedgerEntry
 from app.models.merchant_wallet import MerchantWallet
 from app.models.wallet import UserWallet
 from app.repositories.account import AccountRepository
+from app.repositories.insurance_reserve import InsuranceReservePolicyRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.wallet import WalletRepository
+from app.services.insurance_reserve import compute_required_minimum_reserve
 
 
 class WalletNotFoundError(Exception):
@@ -32,6 +34,14 @@ class InsufficientBalanceError(Exception):
     """Raised when a debit would drive a balance bucket below zero."""
 
 
+class InsufficientInsuranceReserveError(InsufficientBalanceError):
+    """Raised when a decrease would drive insurance_balance below the
+    active InsuranceReservePolicy's minimum_reserve_percentage of that
+    wallet's high-water-mark basis. Subclasses InsufficientBalanceError so
+    every existing except-clause that already handles balance-insufficiency
+    (API error mapping, etc.) keeps working without modification."""
+
+
 class WalletService:
     def __init__(
         self,
@@ -39,11 +49,15 @@ class WalletService:
         ledger_repository: LedgerRepository,
         account_repository: AccountRepository,
         merchant_wallet_repository: MerchantWalletRepository | None = None,
+        insurance_reserve_repository: InsuranceReservePolicyRepository | None = None,
     ):
         self._wallets = wallet_repository
         self._ledger = ledger_repository
         self._accounts = account_repository
         self._merchant_wallets = merchant_wallet_repository or MerchantWalletRepository(
+            wallet_repository._session
+        )
+        self._insurance_reserve = insurance_reserve_repository or InsuranceReservePolicyRepository(
             wallet_repository._session
         )
 
@@ -935,9 +949,7 @@ class WalletService:
         if wallet is None:
             raise WalletNotFoundError()
 
-        existing = await self._ledger.get_by_wallet_and_idempotency_key(
-            wallet.id, idempotency_key
-        )
+        existing = await self._ledger.get_by_wallet_and_idempotency_key(wallet.id, idempotency_key)
         if existing is not None:
             return existing
 
@@ -952,6 +964,26 @@ class WalletService:
 
         if new_value < 0:
             raise InsufficientBalanceError(f"{bucket.value} balance cannot go below zero")
+
+        if bucket == BalanceBucket.INSURANCE:
+            if amount > 0:
+                # High-water mark: a top-up can only raise the floor, never
+                # lower it - a later decrease never erodes what was already
+                # committed as the minimum-reserve basis.
+                wallet.insurance_reserve_basis = max(wallet.insurance_reserve_basis, new_value)
+            else:
+                # Row-locked (get_by_account_id_for_update above) + the
+                # policy locked here with key_share - both inside this same
+                # transaction, immediately before the mutation below. No
+                # read-check-write gap a concurrent request could slip
+                # through.
+                policy = await self._insurance_reserve.active_policy(lock=True)
+                if policy.enabled:
+                    required_minimum = compute_required_minimum_reserve(
+                        wallet.insurance_reserve_basis, policy.minimum_reserve_percentage
+                    )
+                    if new_value < required_minimum:
+                        raise InsufficientInsuranceReserveError("INSUFFICIENT_INSURANCE_RESERVE")
 
         if bucket == BalanceBucket.AVAILABLE:
             wallet.available_balance = new_value

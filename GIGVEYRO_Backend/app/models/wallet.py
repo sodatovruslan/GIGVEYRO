@@ -23,6 +23,9 @@ class UserWallet(Base):
         CheckConstraint("available_balance >= 0", name="ck_wallets_available_non_negative"),
         CheckConstraint("insurance_balance >= 0", name="ck_wallets_insurance_non_negative"),
         CheckConstraint("frozen_balance >= 0", name="ck_wallets_frozen_non_negative"),
+        CheckConstraint(
+            "insurance_reserve_basis >= 0", name="ck_wallets_insurance_reserve_basis_non_negative"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -51,6 +54,16 @@ class UserWallet(Base):
         MONEY, nullable=False, default=Decimal("0"), server_default="0"
     )
     frozen_balance: Mapped[Decimal] = mapped_column(
+        MONEY, nullable=False, default=Decimal("0"), server_default="0"
+    )
+    # High-water mark of insurance_balance: bumped up whenever a positive
+    # adjust_insurance() raises the balance above it, never lowered by a
+    # decrease. minimum_insurance_reserve = insurance_reserve_basis *
+    # InsuranceReservePolicy.minimum_reserve_percentage (see
+    # WalletService._apply_bucket_change). Existing wallets were backfilled
+    # to their insurance_balance at the time this column was introduced
+    # (migration 0037) so no wallet silently loses reserve protection.
+    insurance_reserve_basis: Mapped[Decimal] = mapped_column(
         MONEY, nullable=False, default=Decimal("0"), server_default="0"
     )
     created_at: Mapped[datetime] = mapped_column(
