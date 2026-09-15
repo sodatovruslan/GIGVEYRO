@@ -45,7 +45,7 @@ async def test_fee_migration_upgrade_downgrade_one_revision_upgrade():
             disposable_url.set(drivername="postgresql").render_as_string(hide_password=False)
         )
         try:
-            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0036"
+            assert await connection.fetchval("SELECT version_num FROM alembic_version") == "0037"
             assert (
                 await connection.fetchval(
                     "SELECT count(*) FROM fee_policies WHERE status = 'active'"
