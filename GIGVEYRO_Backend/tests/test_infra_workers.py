@@ -79,8 +79,11 @@ class TestProductionConfigValidation:
             )
 
     def test_live_payout_provider_is_rejected_in_every_environment(self):
-        """This stage has no live provider implementation."""
-        with pytest.raises(ValueError, match="no approved live provider"):
+        """PAYOUT_PROVIDER_MODE=live alone (without every accompanying
+        operator-verified flag) must still fail to boot, in every
+        environment - the live Bybit provider exists in code now, but it
+        is gated by a hard multi-flag AND, not just this one setting."""
+        with pytest.raises(ValueError, match="PAYOUT_PROVIDER_MODE=live requires"):
             Settings(PAYOUT_PROVIDER_MODE="live")
 
     def test_payout_enabled_false_is_always_safe(self):
@@ -189,8 +192,11 @@ class TestProductionConfigValidation:
                 WEB_CONCURRENCY=2,
             )
 
-    def test_production_rejects_live_mode_even_with_credentials(self):
-        with pytest.raises(ValueError, match="no approved live provider"):
+    def test_production_rejects_live_mode_missing_operator_flags(self):
+        """PAYOUT_PROVIDER_MODE=live in production, without the write
+        credentials/permission/IP-whitelist/PAYOUT_ENABLED flags an operator
+        must set explicitly, still fails to boot."""
+        with pytest.raises(ValueError, match="PAYOUT_PROVIDER_MODE=live requires"):
             _production_settings(
                 DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
                 JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
@@ -202,6 +208,30 @@ class TestProductionConfigValidation:
                 DOCS_ENABLED=False,
                 METRICS_ENABLED=False,
             )
+
+    def test_production_accepts_live_mode_only_when_every_operator_flag_is_set(self):
+        """The gate is real, not a permanent block: a production Settings
+        with every live prerequisite explicitly set boots successfully.
+        This proves the capability exists without touching the actual
+        deployment's .env, which leaves every one of these flags unset."""
+        s = _production_settings(
+            DATABASE_URL="postgresql+asyncpg://user:pass@db/test",
+            JWT_SECRET_KEY="a-very-long-jwt-secret-key-minimum-32chars",
+            APP_ENV="production",
+            DEBUG=False,
+            DEPOSIT_PROVIDER_TYPE="trongrid",
+            PAYOUT_PROVIDER_MODE="live",
+            PAYOUT_ENABLED=True,
+            BYBIT_WRITE_ENABLED=True,
+            BYBIT_WRITE_API_KEY="write-key",
+            BYBIT_WRITE_API_SECRET="write-secret",
+            BYBIT_WRITE_PERMISSION_VERIFIED=True,
+            BYBIT_WRITE_IP_WHITELIST_VERIFIED=True,
+            ALLOW_MOCK_PROVIDERS_IN_PRODUCTION=False,
+            DOCS_ENABLED=False,
+            METRICS_ENABLED=False,
+        )
+        assert s.PAYOUT_PROVIDER_MODE == "live"
 
     def test_environment_modes_and_debug_contract(self):
         with pytest.raises(ValueError, match="APP_ENV must be one of"):
@@ -287,9 +317,7 @@ class TestDepositScannerSafety:
             ),
             patch("app.workers.jobs.deposit_scanner.DepositService", return_value=service),
         ):
-            result = await _run_scan(
-                "scanner-test", 1, watermark_store=watermark_store
-            )
+            result = await _run_scan("scanner-test", 1, watermark_store=watermark_store)
 
         assert result == {"status": "ok", "processed": 2}
         session.commit.assert_awaited_once()

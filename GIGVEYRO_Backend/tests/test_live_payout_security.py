@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from app.core.config import Settings, settings
 from app.core.security import create_access_token
 from app.enums.account import UserRole
+from app.enums.payout import PayoutProviderResult
 from app.models.audit import AuditLog
 from app.models.payout import PayoutIntent
 from app.repositories.payout import PayoutRepository
@@ -21,7 +22,6 @@ from app.services.payout_live.bybit import (
     BYBIT_WITHDRAW_PATH,
     BybitLivePayoutProvider,
     BybitWithdrawalMetadata,
-    LivePayoutNetworkBlocked,
     LivePayoutSecurityError,
     build_bybit_withdrawal_dry_run,
     sign_post_dry_run,
@@ -177,15 +177,22 @@ def test_post_payout_reserve_includes_amount_and_fee():
         )
 
 
-async def test_live_provider_has_no_network_path(monkeypatch):
+async def test_live_provider_never_writes_without_read_only_metadata(monkeypatch):
+    """With no read-only runtime initialised (as in this process) and no
+    write credentials configured, execute() must fail closed - as a FAILED
+    ProviderPayoutResult, never a raised exception left for the caller to
+    forget to catch, and never an outbound HTTP write."""
+
     async def forbidden(*args, **kwargs):
         pytest.fail("an outbound HTTP write was attempted")
 
     monkeypatch.setattr(httpx.AsyncClient, "post", forbidden)
     provider = BybitLivePayoutProvider()
-    with pytest.raises(LivePayoutNetworkBlocked, match="BYBIT_WRITE_NETWORK_DISABLED"):
-        await provider.execute(_intent())
-    assert "transport='NONE'" in repr(provider)
+    result = await provider.execute(_intent())
+    assert result.status == PayoutProviderResult.FAILED
+    assert result.failure_code == "READ_ONLY_CLIENT_UNAVAILABLE"
+    assert "mode='LIVE'" in repr(provider)
+    assert "configured=False" in repr(provider)
 
 
 async def test_read_only_bybit_metadata_uses_get_only():
@@ -314,6 +321,62 @@ def test_actual_write_configuration_remains_disabled():
     assert settings.BYBIT_WRITE_API_SECRET.get_secret_value() == ""
 
 
-def test_write_configuration_cannot_enable_transport():
-    with pytest.raises(ValueError, match="write network transport is disabled"):
+def test_write_enabled_requires_its_own_separate_credentials():
+    with pytest.raises(ValueError, match="requires BYBIT_WRITE_API_KEY"):
         Settings(BYBIT_WRITE_ENABLED=True)
+
+
+def test_write_key_cannot_reuse_the_read_only_treasury_key():
+    with pytest.raises(ValueError, match="separate credential from the read-only"):
+        Settings(
+            BYBIT_WRITE_ENABLED=True,
+            BYBIT_WRITE_API_KEY=SecretStr("same-key"),
+            BYBIT_WRITE_API_SECRET=SecretStr("write-secret"),
+            BYBIT_API_KEY=SecretStr("same-key"),
+            BYBIT_API_SECRET=SecretStr("read-secret"),
+        )
+
+
+@pytest.mark.parametrize(
+    "missing_flag",
+    [
+        "BYBIT_WRITE_ENABLED",
+        "PAYOUT_ENABLED",
+        "BYBIT_WRITE_PERMISSION_VERIFIED",
+        "BYBIT_WRITE_IP_WHITELIST_VERIFIED",
+    ],
+)
+def test_live_mode_requires_every_operator_flag_simultaneously(missing_flag):
+    """Live mode is a hard multi-flag AND - missing any single one of the
+    operator-verified preconditions must still block boot, not just warn."""
+    live_ready_kwargs = {
+        "PAYOUT_PROVIDER_MODE": "live",
+        "PAYOUT_ENABLED": True,
+        "BYBIT_WRITE_ENABLED": True,
+        "BYBIT_WRITE_API_KEY": SecretStr("write-key"),
+        "BYBIT_WRITE_API_SECRET": SecretStr("write-secret"),
+        "BYBIT_WRITE_PERMISSION_VERIFIED": True,
+        "BYBIT_WRITE_IP_WHITELIST_VERIFIED": True,
+    }
+    live_ready_kwargs[missing_flag] = False
+    with pytest.raises(ValueError, match="PAYOUT_PROVIDER_MODE=live requires"):
+        Settings(**live_ready_kwargs)
+
+
+def test_all_flags_together_boot_successfully_but_stay_the_operators_responsibility():
+    """Proves the gate is real (not a permanent block) without ever touching
+    the actual deployment's .env - PAYOUT_ENABLED/BYBIT_WRITE_ENABLED remain
+    False there unless an operator deliberately sets them."""
+    live = Settings(
+        PAYOUT_PROVIDER_MODE="live",
+        PAYOUT_ENABLED=True,
+        BYBIT_WRITE_ENABLED=True,
+        BYBIT_WRITE_API_KEY=SecretStr("write-key"),
+        BYBIT_WRITE_API_SECRET=SecretStr("write-secret"),
+        BYBIT_WRITE_PERMISSION_VERIFIED=True,
+        BYBIT_WRITE_IP_WHITELIST_VERIFIED=True,
+    )
+    assert live.PAYOUT_PROVIDER_MODE == "live"
+    assert settings.PAYOUT_PROVIDER_MODE == "disabled"
+    assert settings.PAYOUT_ENABLED is False
+    assert settings.BYBIT_WRITE_ENABLED is False

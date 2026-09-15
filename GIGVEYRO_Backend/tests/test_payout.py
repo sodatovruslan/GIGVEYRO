@@ -96,11 +96,14 @@ async def test_payout_defaults_are_disabled_and_live_execute_endpoint_is_blocked
     assert owner_notification.message_key == NotificationMessageKey.PAYOUT_APPROVAL_REQUIRED
     assert intent["provider_mode"] == "disabled"
     assert intent["status"] == "risk_review"
+    # The real state machine now backs /execute - a risk_review intent isn't
+    # execution-pending yet, so it's rejected on that ground, well before any
+    # provider/network concern is even reached.
     response = await client.post(
         f"/api/v1/owner/payouts/{intent['id']}/execute", headers=_headers(owner)
     )
     assert response.status_code == 409
-    assert response.json()["detail"]["code"] == "LIVE_PAYOUT_NOT_AVAILABLE"
+    assert "not execution pending" in response.json()["detail"]["code"]
 
 
 async def test_simulated_success_is_exactly_once_and_finalizes_existing_hold(
