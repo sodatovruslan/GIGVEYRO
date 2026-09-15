@@ -58,7 +58,13 @@ class LivePayoutReadinessService:
             "risk_policy_ready": risk_ready,
             "dual_approval_ready": dual_ready,
             "reconciliation_ready": settings.BYBIT_LIVE_RECONCILIATION_VERIFIED,
-            "write_network_transport_available": False,
+            # The write transport (BybitWritePayoutClient / BybitLivePayoutProvider)
+            # exists in code unconditionally - this check is not "has the network
+            # code been written" (it always has), it is "is the write path not
+            # itself disabled", i.e. mirrors write_enabled. It stays a distinct
+            # check (rather than folded into write_enabled) so a future provider
+            # swap or a code-level kill switch has an independent place to hook.
+            "write_network_transport_available": settings.BYBIT_WRITE_ENABLED,
         }
         mapping = {
             "global_payout_enabled": LivePayoutBlocker.PAYOUT_GLOBAL_DISABLED,
@@ -75,8 +81,6 @@ class LivePayoutReadinessService:
             "write_network_transport_available": LivePayoutBlocker.WRITE_NETWORK_TRANSPORT_DISABLED,
         }
         blockers = [reason.value for check, reason in mapping.items() if not checks[check]]
-        if not checks["write_enabled"] and "WRITE_NETWORK_TRANSPORT_DISABLED" not in blockers:
-            blockers.append(LivePayoutBlocker.WRITE_NETWORK_TRANSPORT_DISABLED.value)
         capabilities: list[str] = []
         if settings.BYBIT_PRIVATE_ENABLED:
             capabilities.append(LivePayoutCapability.READ_ONLY.value)
@@ -86,9 +90,13 @@ class LivePayoutReadinessService:
             capabilities.append(LivePayoutCapability.WRITE_PERMISSION_MISSING.value)
         if networks:
             capabilities.append(LivePayoutCapability.DRY_RUN_READY.value)
-        capabilities.append(LivePayoutCapability.LIVE_DISABLED.value)
         if not settings.BYBIT_PRIVATE_ENABLED and not credentials:
             capabilities.insert(0, LivePayoutCapability.NOT_CONFIGURED.value)
         ready = not blockers
+        capabilities.append(
+            LivePayoutCapability.LIVE_READY.value
+            if ready
+            else LivePayoutCapability.LIVE_DISABLED.value
+        )
         observe_live_payout_readiness(ready, [item.value for item in LivePayoutBlocker], blockers)
         return LivePayoutReadiness(ready, capabilities, blockers, checks)

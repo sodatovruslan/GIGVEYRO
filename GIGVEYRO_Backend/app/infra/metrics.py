@@ -184,12 +184,17 @@ if _PROMETHEUS_AVAILABLE:
     )
     PAYOUT_LIVE_READY = Gauge(
         "gigveyro_payout_live_ready",
-        "Whether all future live payout readiness checks pass (network remains disabled)",
+        "Whether all live payout readiness checks currently pass",
     )
     PAYOUT_LIVE_BLOCKERS = Gauge(
         "gigveyro_payout_live_blockers_total",
         "Current live payout readiness blockers",
         labelnames=["reason"],
+    )
+    PAYOUT_LIVE_WRITE_REQUESTS = Counter(
+        "gigveyro_payout_live_write_requests_total",
+        "Live Bybit withdrawal write attempts by outcome",
+        labelnames=["outcome"],
     )
     TELEGRAM_DELIVERY = Counter(
         "gigveyro_telegram_delivery_total",
@@ -250,6 +255,7 @@ else:
     EXCHANGE_PRIVATE_RATE_LIMITS = _NoopMetric()  # type: ignore[assignment]
     PAYOUT_LIVE_READY = _NoopMetric()  # type: ignore[assignment]
     PAYOUT_LIVE_BLOCKERS = _NoopMetric()  # type: ignore[assignment]
+    PAYOUT_LIVE_WRITE_REQUESTS = _NoopMetric()  # type: ignore[assignment]
     TELEGRAM_DELIVERY = _NoopMetric()  # type: ignore[assignment]
     TELEGRAM_DELIVERY_LATENCY = _NoopMetric()  # type: ignore[assignment]
     TELEGRAM_CONNECTIONS = _NoopMetric()  # type: ignore[assignment]
@@ -401,6 +407,10 @@ def observe_live_payout_readiness(ready: bool, all_reasons: list[str], blockers:
     blocked = set(blockers)
     for reason in all_reasons:
         PAYOUT_LIVE_BLOCKERS.labels(reason=reason).set(1 if reason in blocked else 0)
+
+
+def record_payout_live_write(outcome: str) -> None:
+    PAYOUT_LIVE_WRITE_REQUESTS.labels(outcome=outcome).inc()
 
 
 def set_outbox_pending(count: int) -> None:

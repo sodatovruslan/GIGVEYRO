@@ -131,8 +131,11 @@ class Settings(BaseSettings):
     BYBIT_PRIVATE_TIMEOUT_SECONDS: float = 8.0
     BYBIT_PRIVATE_MAX_RETRIES: int = 2
 
-    # Future payout-write credentials are intentionally isolated from treasury credentials.
-    # This stage contains no network-capable write provider and all values default fail-closed.
+    # Payout-write credentials are intentionally isolated from treasury (read-only)
+    # credentials - a completely separate Bybit Master UID API key, withdrawal-only
+    # permission, IP-whitelisted to the production server. All values default
+    # fail-closed; going live requires an explicit, multi-flag operator decision
+    # (see validate_controlled_payout_settings below) - never a code change alone.
     BYBIT_WRITE_ENABLED: bool = False
     BYBIT_WRITE_API_KEY: SecretStr = SecretStr("")
     BYBIT_WRITE_API_SECRET: SecretStr = SecretStr("")
@@ -140,6 +143,12 @@ class Settings(BaseSettings):
     BYBIT_WRITE_IP_WHITELIST_VERIFIED: bool = False
     BYBIT_LIVE_RECONCILIATION_VERIFIED: bool = False
     BYBIT_WITHDRAW_METADATA_MAX_AGE_SECONDS: int = 60
+    # The withdrawal-create call is attempted at most once per execute() - retrying
+    # a POST that may already have been accepted risks a duplicate withdrawal - so
+    # only the read-side query-record lookup has a retry budget.
+    BYBIT_WRITE_TIMEOUT_SECONDS: float = 8.0
+    BYBIT_WRITE_RECV_WINDOW_MS: int = 5000
+    BYBIT_WRITE_QUERY_MAX_RETRIES: int = 2
 
     # Authoritative fiat-rate composition (official USD/TJS + explicit USDT peg policy)
     NBT_FIAT_BASE_URL: str = "https://nbt.tj/en/kurs/export_xml.php"
@@ -275,9 +284,13 @@ class Settings(BaseSettings):
             if self.TELEGRAM_BOT_MODE != "webhook":
                 raise ValueError("Production Telegram bot must use webhook mode")
             secret = self.TELEGRAM_WEBHOOK_SECRET.get_secret_value()
-            if "CHANGE_ME" in secret or len(secret) < 32 or any(
-                char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
-                for char in secret
+            if (
+                "CHANGE_ME" in secret
+                or len(secret) < 32
+                or any(
+                    char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+                    for char in secret
+                )
             ):
                 raise ValueError("Production Telegram webhook secret must be strong and valid")
             if not self.TELEGRAM_WEBHOOK_BASE_URL.startswith("https://"):
@@ -374,17 +387,54 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_controlled_payout_settings(self) -> "Settings":
         if self.PAYOUT_PROVIDER_MODE not in {"disabled", "simulated", "live"}:
-            raise ValueError("PAYOUT_PROVIDER_MODE must be disabled or simulated")
-        if self.PAYOUT_PROVIDER_MODE == "live":
-            raise ValueError(
-                "PAYOUT_PROVIDER_MODE=live is unavailable: no approved live provider exists"
-            )
-        if self.BYBIT_WRITE_ENABLED:
-            raise ValueError(
-                "BYBIT_WRITE_ENABLED=true is unavailable: write network transport is disabled"
-            )
+            raise ValueError("PAYOUT_PROVIDER_MODE must be disabled, simulated, or live")
         if not 10 <= self.BYBIT_WITHDRAW_METADATA_MAX_AGE_SECONDS <= 300:
             raise ValueError("BYBIT_WITHDRAW_METADATA_MAX_AGE_SECONDS must be between 10 and 300")
+        if not 1000 <= self.BYBIT_WRITE_RECV_WINDOW_MS <= 10000:
+            raise ValueError("BYBIT_WRITE_RECV_WINDOW_MS must be between 1000 and 10000")
+        if not 0 <= self.BYBIT_WRITE_QUERY_MAX_RETRIES <= 3:
+            raise ValueError("BYBIT_WRITE_QUERY_MAX_RETRIES must be between 0 and 3")
+
+        # Write credentials must never collide with the read-only treasury-observation
+        # credentials - they are a different Bybit API key with different permissions.
+        if self.BYBIT_WRITE_ENABLED:
+            if (
+                not self.BYBIT_WRITE_API_KEY.get_secret_value()
+                or not self.BYBIT_WRITE_API_SECRET.get_secret_value()
+            ):
+                raise ValueError(
+                    "BYBIT_WRITE_ENABLED=true requires BYBIT_WRITE_API_KEY and "
+                    "BYBIT_WRITE_API_SECRET to be set"
+                )
+            if self.BYBIT_WRITE_API_KEY.get_secret_value() == self.BYBIT_API_KEY.get_secret_value():
+                raise ValueError(
+                    "BYBIT_WRITE_API_KEY must be a separate credential from the "
+                    "read-only BYBIT_API_KEY - never reuse the treasury-observation key "
+                    "for withdrawals"
+                )
+
+        # Live mode requires every operator-verified precondition simultaneously.
+        # This is deliberately a hard multi-flag AND, not a single switch: removing
+        # this block does not, by itself, enable a live withdrawal - PAYOUT_ENABLED
+        # and BYBIT_WRITE_ENABLED must also be explicitly set to true in the
+        # deployment environment, which does not happen automatically.
+        if self.PAYOUT_PROVIDER_MODE == "live":
+            if not self.BYBIT_WRITE_ENABLED:
+                raise ValueError("PAYOUT_PROVIDER_MODE=live requires BYBIT_WRITE_ENABLED=true")
+            if not self.PAYOUT_ENABLED:
+                raise ValueError("PAYOUT_PROVIDER_MODE=live requires PAYOUT_ENABLED=true")
+            if not self.BYBIT_WRITE_PERMISSION_VERIFIED:
+                raise ValueError(
+                    "PAYOUT_PROVIDER_MODE=live requires BYBIT_WRITE_PERMISSION_VERIFIED=true "
+                    "(operator must manually confirm the write key has withdrawal-only "
+                    "permission - no trading, no transfer)"
+                )
+            if not self.BYBIT_WRITE_IP_WHITELIST_VERIFIED:
+                raise ValueError(
+                    "PAYOUT_PROVIDER_MODE=live requires BYBIT_WRITE_IP_WHITELIST_VERIFIED=true "
+                    "(operator must manually confirm the Bybit key is IP-restricted to the "
+                    "production server's static IP)"
+                )
         if self.PAYOUT_PROVIDER_MODE == "simulated" and not self.PAYOUT_SIMULATION_ENABLED:
             # Safe configuration is allowed to start, but execution remains blocked.
             return self

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_account, require_roles
@@ -157,6 +157,8 @@ async def _command(
             intent = await service.queue(intent_id, owner, payload.outcome)
         elif action == "reconcile":
             intent = await service.reconcile(intent_id, owner, payload.outcome if payload else None)
+        elif action == "execute":
+            intent = await service.execute(intent_id, owner.id)
         elif action == "manual":
             intent = await service.begin_manual(intent_id, owner)
         else:
@@ -244,11 +246,18 @@ async def complete_manual(
     return await _command(intent_id, "manual_complete", owner, service, repo, payload)
 
 
-@router.post("/payouts/{intent_id}/execute")
-async def execute_live_disabled(intent_id: uuid.UUID):
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT, detail={"code": "LIVE_PAYOUT_NOT_AVAILABLE"}
-    )
+@router.post("/payouts/{intent_id}/execute", response_model=PayoutIntentOut)
+async def execute(
+    intent_id: uuid.UUID,
+    owner: Account = Depends(get_current_account),
+    service: ControlledPayoutService = Depends(_service),
+    repo: PayoutRepository = Depends(_repo),
+):
+    """Submits the live withdrawal to Bybit (or advances a simulated intent).
+    Every safety gate (dual approval, unmutated hash, PAYOUT_ENABLED, live
+    readiness, per-coin/chain cooldown, fresh risk/reserve check) runs inside
+    ControlledPayoutService.execute() before any network call is made."""
+    return await _command(intent_id, "execute", owner, service, repo)
 
 
 @router.get("/payout-policy", response_model=PayoutPolicyOut)

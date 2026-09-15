@@ -17,15 +17,19 @@ from app.enums.payout import (
 )
 from app.enums.risk import RiskDecision, RiskReason, RiskStatus
 from app.enums.withdrawal import WithdrawalDestinationType, WithdrawalStatus
+from app.infra.redis_rate_limiter import RedisRateLimiter
 from app.models.account import Account
 from app.models.payout import PayoutApproval, PayoutIntent, PayoutPolicy
 from app.models.withdrawal import MerchantWithdrawal
 from app.repositories.account import AccountRepository
 from app.repositories.payout import PayoutRepository
+from app.repositories.payout_security import PayoutSecurityRepository
 from app.repositories.risk import RiskRepository
 from app.repositories.withdrawal import WithdrawalRepository
 from app.services.audit import AuditService
 from app.services.notification import NotificationService
+from app.services.payout_live.bybit import BybitLivePayoutProvider
+from app.services.payout_live.readiness import LivePayoutReadinessService
 from app.services.payout_provider import (
     DisabledPayoutProvider,
     ExchangePayoutProvider,
@@ -35,6 +39,11 @@ from app.services.realtime import RealtimeEventService
 from app.services.risk import RiskDecisionService, TreasurySnapshotService
 from app.services.wallet import WalletService
 from app.services.withdrawal import transition_withdrawal
+
+# One live Bybit withdrawal-create attempt per coin/chain per this many
+# seconds - matches Bybit's own documented secondary rate limit and prevents
+# two workers from racing a live withdrawal for the same asset/network.
+_BYBIT_WITHDRAW_COOLDOWN_SECONDS = 10
 
 
 class PayoutError(Exception):
@@ -215,19 +224,23 @@ class ControlledPayoutService:
         audit: AuditService | None = None,
         notifications: NotificationService | None = None,
         realtime: RealtimeEventService | None = None,
+        rate_limiter: RedisRateLimiter | None = None,
     ) -> None:
         self.repo = repo
         self.withdrawals = withdrawals
         self.risk_repo = risk_repo
         self.wallet = wallet
         self.accounts = accounts
-        self.provider = provider or self._configured_provider()
+        self.provider = provider or self._configured_provider(risk_repo)
         self.audit = audit
         self.notifications = notifications
         self.realtime = realtime
+        self._rate_limiter = rate_limiter or RedisRateLimiter()
 
     @staticmethod
-    def _configured_provider() -> ExchangePayoutProvider:
+    def _configured_provider(risk_repo: RiskRepository) -> ExchangePayoutProvider:
+        if settings.PAYOUT_PROVIDER_MODE == PayoutProviderMode.LIVE.value:
+            return BybitLivePayoutProvider(risk_repository=risk_repo)
         if settings.PAYOUT_PROVIDER_MODE == PayoutProviderMode.SIMULATED.value:
             return SimulatedPayoutProvider()
         return DisabledPayoutProvider()
@@ -244,15 +257,28 @@ class ControlledPayoutService:
             and withdrawal.amount > policy.dual_approval_threshold_usdt
         ):
             required = policy.high_value_required_approvals
+        network = (
+            "TRC20"
+            if withdrawal.destination_type == WithdrawalDestinationType.USDT_TRC20_ADDRESS
+            else "BYBIT_UID"
+        )
+        # Live execution is scoped to USDT/TRC20 only (V1). A BYBIT_UID
+        # withdrawal never becomes a live-provider intent, even when
+        # PAYOUT_PROVIDER_MODE=live globally - it stays on the existing
+        # manual-settlement path (begin_manual/complete_manual), unchanged.
+        if settings.PAYOUT_PROVIDER_MODE == PayoutProviderMode.LIVE.value and network == "TRC20":
+            provider_name, provider_mode = "bybit", PayoutProviderMode.LIVE.value
+        elif settings.PAYOUT_PROVIDER_MODE == PayoutProviderMode.SIMULATED.value:
+            provider_name, provider_mode = "simulator", PayoutProviderMode.SIMULATED.value
+        else:
+            provider_name, provider_mode = "disabled", PayoutProviderMode.DISABLED.value
         intent = PayoutIntent(
             withdrawal_id=withdrawal.id,
             requester_account_id=withdrawal.created_by_account_id,
             beneficiary_account_id=withdrawal.merchant_id,
             asset=withdrawal.currency.value.upper(),
             amount=withdrawal.amount,
-            network="TRC20"
-            if withdrawal.destination_type == WithdrawalDestinationType.USDT_TRC20_ADDRESS
-            else "BYBIT_UID",
+            network=network,
             destination=withdrawal.destination,
             masked_destination=mask_destination(withdrawal.destination),
             fee_amount=Decimal("0"),
@@ -262,12 +288,8 @@ class ControlledPayoutService:
             treasury_generated_at=snapshot.generated_at,
             approval_policy_version=policy.version,
             required_approvals=required,
-            provider_name=(
-                "simulator"
-                if settings.PAYOUT_PROVIDER_MODE == PayoutProviderMode.SIMULATED.value
-                else "disabled"
-            ),
-            provider_mode=settings.PAYOUT_PROVIDER_MODE,
+            provider_name=provider_name,
+            provider_mode=provider_mode,
             status=PayoutStatus.REQUESTED.value,
             idempotency_key=f"withdrawal:{withdrawal.id}",
             intent_hash="pending",
@@ -603,18 +625,48 @@ class ControlledPayoutService:
         if not policy.payouts_enabled:
             raise PayoutSafetyError("PAYOUT_BUSINESS_KILL_SWITCH")
         if not allow_manual:
-            if (
+            if intent.provider_mode == PayoutProviderMode.LIVE.value:
+                await self._live_gate(intent, require_fresh=require_fresh)
+            elif (
                 settings.PAYOUT_PROVIDER_MODE != PayoutProviderMode.SIMULATED.value
                 or not settings.PAYOUT_SIMULATION_ENABLED
             ):
                 raise PayoutSafetyError("SIMULATED_PROVIDER_DISABLED")
-            if intent.provider_mode != PayoutProviderMode.SIMULATED.value:
+            elif intent.provider_mode != PayoutProviderMode.SIMULATED.value:
                 raise PayoutSafetyError("INTENT_PROVIDER_MODE_DISABLED")
         snapshot, decision, reason = await self._risk(execution=require_fresh)
         if decision == RiskDecision.BLOCK:
             raise PayoutSafetyError(reason.value if reason else "RISK_BLOCKED")
         await self._limits(intent, policy)
         return snapshot, decision, reason
+
+    async def _live_gate(self, intent: PayoutIntent, *, require_fresh: bool) -> None:
+        """Every gate a live Bybit withdrawal must pass before the state
+        machine allows it past QUEUED (require_fresh=False, e.g. queue())
+        or into EXECUTING (require_fresh=True, execute() only). Re-checked
+        on every call - a readiness flag flipping between queue() and
+        execute() is caught, not assumed to still hold."""
+        if settings.PAYOUT_PROVIDER_MODE != PayoutProviderMode.LIVE.value:
+            raise PayoutSafetyError("LIVE_PROVIDER_DISABLED")
+        if intent.network != "TRC20":
+            raise PayoutSafetyError("LIVE_NETWORK_NOT_SUPPORTED")
+        readiness = await LivePayoutReadinessService(
+            PayoutSecurityRepository(self.repo.session), self.repo, self.risk_repo
+        ).evaluate()
+        if not readiness.ready:
+            raise PayoutSafetyError("LIVE_PAYOUT_NOT_READY")
+        if require_fresh:
+            # Only the real network submission is cooled down - queue() does
+            # no network I/O and must not consume the coin/chain slot.
+            cooldown_key = f"bybit_live_withdraw:{intent.asset}:{intent.network}"
+            limited = await self._rate_limiter.is_rate_limited(
+                cooldown_key,
+                max_requests=1,
+                window_seconds=_BYBIT_WITHDRAW_COOLDOWN_SECONDS,
+                fail_mode="closed",
+            )
+            if limited:
+                raise PayoutSafetyError("BYBIT_WITHDRAW_COOLDOWN_ACTIVE")
 
     async def _risk(self, *, execution: bool):
         risk_policy = await self.risk_repo.active_policy(lock=execution)
