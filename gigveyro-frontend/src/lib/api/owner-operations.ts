@@ -39,6 +39,7 @@ export const ownerOperationsApi = {
   rejectPayout: (id: string, comment?: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/reject`, { method: "POST", body: { comment: comment || null } }),
   cancelPayout: (id: string, comment?: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/cancel`, { method: "POST", body: { comment: comment || null } }),
   queuePayout: (id: string, outcome: "succeeded" | "failed" | "pending" | "unknown") => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/queue`, { method: "POST", body: { outcome } }),
+  executePayout: (id: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/execute`, { method: "POST" }),
   reconcilePayout: (id: string, outcome?: "succeeded" | "failed" | "pending" | "unknown") => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/reconcile`, { method: "POST", body: { outcome: outcome || null } }),
   beginManualPayout: (id: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/manual`, { method: "POST" }),
   completeManualPayout: (id: string, externalReference: string, evidence: string) => apiFetch<PayoutIntent>(`/api/v1/owner/payouts/${id}/manual/complete`, { method: "POST", body: { external_reference: externalReference, evidence } }),
