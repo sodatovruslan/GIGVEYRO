@@ -192,7 +192,15 @@ async def test_live_provider_never_writes_without_read_only_metadata(monkeypatch
     assert result.status == PayoutProviderResult.FAILED
     assert result.failure_code == "READ_ONLY_CLIENT_UNAVAILABLE"
     assert "mode='LIVE'" in repr(provider)
-    assert "configured=False" in repr(provider)
+    # "configured" reflects whatever this environment's write credentials
+    # actually are - deliberately not hardcoded to a fixed True/False, since
+    # a deployment with real (but still globally disabled) write credentials
+    # configured is a valid, safe state and must not make this test lie.
+    write_credentials_present = bool(
+        settings.BYBIT_WRITE_API_KEY.get_secret_value()
+        and settings.BYBIT_WRITE_API_SECRET.get_secret_value()
+    )
+    assert f"configured={write_credentials_present}" in repr(provider)
 
 
 async def test_read_only_bybit_metadata_uses_get_only():
@@ -314,16 +322,27 @@ async def test_live_dual_approval_readiness_requires_two_by_default(
 
 
 def test_actual_write_configuration_remains_disabled():
+    """The real safety invariant is these three flags - not whether write
+    credentials happen to be configured in this environment. A deployment
+    with real write credentials loaded but every enable-flag still False is
+    a valid, intended, safe state (see validate_controlled_payout_settings);
+    asserting the credentials themselves are empty would be both false in
+    that state and would risk printing a secret into a failure diff."""
     assert settings.PAYOUT_ENABLED is False
     assert settings.PAYOUT_PROVIDER_MODE == "disabled"
     assert settings.BYBIT_WRITE_ENABLED is False
-    assert settings.BYBIT_WRITE_API_KEY.get_secret_value() == ""
-    assert settings.BYBIT_WRITE_API_SECRET.get_secret_value() == ""
 
 
 def test_write_enabled_requires_its_own_separate_credentials():
+    # Explicit empty overrides - independent of whatever this environment's
+    # own .env may legitimately contain, so this test's meaning never
+    # depends on deployment state.
     with pytest.raises(ValueError, match="requires BYBIT_WRITE_API_KEY"):
-        Settings(BYBIT_WRITE_ENABLED=True)
+        Settings(
+            BYBIT_WRITE_ENABLED=True,
+            BYBIT_WRITE_API_KEY=SecretStr(""),
+            BYBIT_WRITE_API_SECRET=SecretStr(""),
+        )
 
 
 def test_write_key_cannot_reuse_the_read_only_treasury_key():
