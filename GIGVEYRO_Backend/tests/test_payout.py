@@ -74,6 +74,64 @@ async def _intent(client, owner):
     return response.json()["items"][0]
 
 
+async def test_payout_policy_can_be_activated_twice_in_a_row(client, db_session, make_account):
+    """Regression: activating a second policy version used to violate the
+    partial unique index on status='active', because the old version's
+    retirement and the new version's activation were never flushed as two
+    separate statements - Postgres briefly saw two 'active' rows in the
+    same UPDATE batch. Found while preparing the dual-approval bump on
+    production; this reproduces it against a real Postgres instance."""
+    owner = await make_account(role=UserRole.OWNER)
+    payload = {
+        "payouts_enabled": False,
+        "auto_approval_enabled": False,
+        "default_required_approvals": 2,
+        "high_value_required_approvals": 2,
+        "dual_approval_threshold_usdt": None,
+        "max_single_payout_enabled": False,
+        "max_single_payout_usdt": None,
+        "max_daily_payout_enabled": False,
+        "max_daily_payout_usdt": None,
+        "max_hourly_payout_enabled": False,
+        "max_hourly_payout_usdt": None,
+        "max_pending_payout_enabled": False,
+        "max_pending_payout_usdt": None,
+        "max_asset_exposure_enabled": False,
+        "max_asset_exposure_usdt": None,
+    }
+    first = await client.post(
+        "/api/v1/owner/payout-policies", json=payload, headers=_headers(owner)
+    )
+    assert first.status_code == 201
+    first_id = first.json()["id"]
+    first_version = first.json()["version"]
+    activated_first = await client.post(
+        f"/api/v1/owner/payout-policies/{first_id}/activate", headers=_headers(owner)
+    )
+    assert activated_first.status_code == 200
+    assert activated_first.json()["status"] == "active"
+
+    second = await client.post(
+        "/api/v1/owner/payout-policies", json=payload, headers=_headers(owner)
+    )
+    assert second.status_code == 201
+    second_id = second.json()["id"]
+    activated_second = await client.post(
+        f"/api/v1/owner/payout-policies/{second_id}/activate", headers=_headers(owner)
+    )
+    assert activated_second.status_code == 200
+    assert activated_second.json()["status"] == "active"
+    assert activated_second.json()["version"] == first_version + 1
+
+    current = await PayoutRepository(db_session).active_policy()
+    assert current.id.hex == second_id.replace("-", "")
+    assert current.default_required_approvals == 2
+    assert current.high_value_required_approvals == 2
+
+    first_row = await db_session.get(type(current), first_id)
+    assert first_row.status == "retired"
+
+
 def test_payout_state_machine_rejects_arbitrary_jumps():
     intent = PayoutIntent(status=PayoutStatus.REQUESTED.value)
     transition_payout(intent, PayoutStatus.RISK_REVIEW)

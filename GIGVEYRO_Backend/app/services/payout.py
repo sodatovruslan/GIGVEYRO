@@ -186,6 +186,12 @@ class PayoutPolicyService:
         for policy in policies:
             if policy.status == "active":
                 policy.status = "retired"
+        # Flush the retirement before activating the new version: the
+        # partial unique index on status='active' is checked immediately
+        # (not deferred), so both updates must never be visible to Postgres
+        # as "active" at the same instant. (Same fix as
+        # InsuranceReservePolicyService.activate / RiskPolicyService.activate.)
+        await self.repo.session.flush()
         target.status = "active"
         target.activated_at = datetime.now(UTC)
         return await self.repo.save_policy(target)
