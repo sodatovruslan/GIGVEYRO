@@ -119,7 +119,7 @@ async def test_withdrawal_status_change_notifies_merchant(
         json={
             "amount": "25",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant),
     )

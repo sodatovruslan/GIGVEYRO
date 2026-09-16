@@ -51,7 +51,7 @@ export const ownerOperationsApi = {
   activatePayoutPolicy: (id: string) => apiFetch<PayoutPolicy>(`/api/v1/owner/payout-policies/${id}/activate`, { method: "POST" }),
   payoutReadiness: () => apiFetch<LivePayoutReadiness>("/api/v1/owner/payout-readiness"),
   payoutAddresses: () => apiFetch<PayoutDestination[]>("/api/v1/owner/payout-addresses"),
-  createPayoutAddress: (body: { label: string; asset: "USDT"; network: "TRC20"; address: string }) => apiFetch<PayoutDestination>("/api/v1/owner/payout-addresses", { method: "POST", body }),
+  createPayoutAddress: (body: { beneficiary_account_id: string; label: string; asset: "USDT"; network: "TRC20"; address: string }) => apiFetch<PayoutDestination>("/api/v1/owner/payout-addresses", { method: "POST", body }),
   disablePayoutAddress: (id: string) => apiFetch<PayoutDestination>(`/api/v1/owner/payout-addresses/${id}/disable`, { method: "POST" }),
   payoutNetworks: () => apiFetch<PayoutNetwork[]>("/api/v1/owner/payout-networks"),
   auditLogs: (filters: AuditFilters = {}) => apiFetch<Paginated<AuditLogEntry>>(`/api/v1/owner/audit-logs?${queryString({

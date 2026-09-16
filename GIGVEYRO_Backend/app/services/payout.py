@@ -28,7 +28,8 @@ from app.repositories.risk import RiskRepository
 from app.repositories.withdrawal import WithdrawalRepository
 from app.services.audit import AuditService
 from app.services.notification import NotificationService
-from app.services.payout_live.bybit import BybitLivePayoutProvider
+from app.services.payout_live.allowlist import PayoutAllowlistService
+from app.services.payout_live.bybit import BybitLivePayoutProvider, destination_fingerprint
 from app.services.payout_live.readiness import LivePayoutReadinessService
 from app.services.payout_provider import (
     DisabledPayoutProvider,
@@ -302,6 +303,8 @@ class ControlledPayoutService:
         )
         intent.intent_hash = intent_hash(intent)
         await self.repo.add_intent(intent)
+        if network == "TRC20":
+            await self._ensure_destination(intent)
         transition_payout(intent, PayoutStatus.RISK_REVIEW)
         await self.repo.save_intent(intent)
         await self._event(
@@ -317,6 +320,28 @@ class ControlledPayoutService:
             intent, NotificationMessageKey.PAYOUT_APPROVAL_REQUIRED, "approval"
         )
         return intent
+
+    async def _ensure_destination(self, intent: PayoutIntent) -> None:
+        """Auto-register intent.destination as an approved PayoutDestination
+        scoped to intent.beneficiary_account_id, so _live_gate has a real,
+        per-transaction record to check later - not just "some destination
+        exists somewhere". Idempotent: a repeat withdrawal to the same
+        address by the same beneficiary reuses the existing row. Owner can
+        still `disable_destination` this specific row later (e.g. on
+        suspected fraud) even after the intent was created - _live_gate
+        re-checks `enabled` fresh on every call, not just at creation."""
+        beneficiary = await self.accounts.get_by_id(intent.beneficiary_account_id)
+        if beneficiary is None:
+            raise PayoutSafetyError("BENEFICIARY_NOT_FOUND")
+        allowlist = PayoutAllowlistService(PayoutSecurityRepository(self.repo.session), self.audit)
+        await allowlist.ensure_destination_for_beneficiary(
+            beneficiary_account_id=intent.beneficiary_account_id,
+            actor_role=beneficiary.role.value,
+            label=f"Withdrawal {intent.withdrawal_id}",
+            asset=intent.asset,
+            network=intent.network,
+            address=intent.destination,
+        )
 
     async def approve(
         self, intent_id: uuid.UUID, owner: Account, comment: str | None = None
@@ -661,6 +686,17 @@ class ControlledPayoutService:
         ).evaluate()
         if not readiness.ready:
             raise PayoutSafetyError("LIVE_PAYOUT_NOT_READY")
+        # readiness.checks["address_allowlist_configured"] only proves SOME
+        # destination exists somewhere - it says nothing about whether THIS
+        # intent's exact (beneficiary, address) pair is one of them. That
+        # per-transaction check happens here, separately, every time.
+        security = PayoutSecurityRepository(self.repo.session)
+        fingerprint = destination_fingerprint(intent.asset, intent.network, intent.destination)
+        destination = await security.destination_by_fingerprint(
+            intent.beneficiary_account_id, fingerprint
+        )
+        if destination is None or not destination.enabled:
+            raise PayoutSafetyError("DESTINATION_NOT_APPROVED_FOR_BENEFICIARY")
         if require_fresh:
             # Only the real network submission is cooled down - queue() does
             # no network I/O and must not consume the coin/chain slot.

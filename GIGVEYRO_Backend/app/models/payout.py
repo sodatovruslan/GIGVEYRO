@@ -153,12 +153,16 @@ class PayoutEvent(Base):
 
 
 class PayoutDestination(Base):
-    """Immutable approved destination. Disable and recreate instead of editing."""
+    """Immutable approved destination, scoped to the specific beneficiary
+    account it was registered for. Disable and recreate instead of editing.
+    A destination is unique per (beneficiary, fingerprint) - not globally -
+    since each USER supplies their own TRC20 address independently."""
 
     __tablename__ = "payout_destinations"
     __table_args__ = (
         Index(
             "uq_payout_destination_enabled_fingerprint",
+            "beneficiary_account_id",
             "fingerprint",
             unique=True,
             postgresql_where=text("enabled"),
@@ -173,6 +177,9 @@ class PayoutDestination(Base):
     masked_address: Mapped[str] = mapped_column(String(255), nullable=False)
     fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    beneficiary_account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False, index=True
+    )
     created_by_account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False
     )

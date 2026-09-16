@@ -901,7 +901,7 @@ export interface PayoutApproval { id: string; approver_account_id: string; decis
 export interface PayoutEvent { id: string; event: string; actor_account_id: string | null; event_metadata: Record<string, unknown>; created_at: string; }
 export interface PayoutIntent {
   id: string; withdrawal_id: string; beneficiary_account_id: string; asset: string; amount: string;
-  network: string; masked_destination: string; fee_amount: string; risk_policy_version: number;
+  network: string; masked_destination: string; destination?: string | null; fee_amount: string; risk_policy_version: number;
   risk_decision: "allow" | "warn" | "block"; risk_reason: string | null; treasury_generated_at: string;
   approval_policy_version: number; required_approvals: number; approval_count: number;
   provider_name: string; provider_mode: "disabled" | "simulated" | "live"; status: PayoutStatus;
@@ -927,7 +927,7 @@ export interface LivePayoutReadiness {
   checks: Record<string, boolean>;
 }
 export interface PayoutDestination {
-  id: string; label: string; asset: string; network: string; masked_address: string;
+  id: string; beneficiary_account_id: string; label: string; asset: string; network: string; masked_address: string;
   fingerprint: string; enabled: boolean; created_at: string; disabled_at: string | null;
 }
 export interface PayoutNetwork {

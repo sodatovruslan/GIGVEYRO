@@ -13,6 +13,7 @@ from app.models.user_withdrawal import UserWithdrawal
 from app.repositories.account import AccountRepository
 from app.repositories.user_withdrawal import UserWithdrawalRepository
 from app.services.notification import NotificationService
+from app.services.payout_live.bybit import LivePayoutSecurityError, validate_tron_base58check
 from app.services.realtime import RealtimeEventService
 from app.services.risk import RiskGuard
 from app.services.wallet import WalletService
@@ -92,6 +93,10 @@ class UserWithdrawalService:
         if destination_type == WithdrawalDestinationType.USDT_TRC20_ADDRESS:
             if len(destination_clean) < 26 or len(destination_clean) > 50:
                 raise InvalidDestinationError("invalid TRC20 address length")
+            try:
+                validate_tron_base58check(destination_clean)
+            except LivePayoutSecurityError as exc:
+                raise InvalidDestinationError("invalid TRC20 address checksum") from exc
 
         wallet = await self._wallet_service.get_wallet_for_account(user.id)
         if self._risk_guard is not None:

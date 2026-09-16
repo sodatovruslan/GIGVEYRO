@@ -155,7 +155,12 @@ test("user withdrawal completes end to end: create, approve, mark paid", async (
   const before = await (await user.request.get("/api/backend/wallet")).json();
 
   const createdResponse = await user.request.post("/api/backend/withdrawals", {
-    data: { amount: "30", destination_type: "usdt_trc20_address", destination: `T${"e2e".padEnd(33, "a")}`, comment: "E2E full lifecycle" },
+    data: {
+      amount: "30",
+      destination_type: "usdt_trc20_address",
+      destination: "TBXSw8fM4jpQkGc6zZjsVABFpVN7UvXPdV",
+      comment: "E2E full lifecycle",
+    },
   });
   expect(createdResponse.status()).toBe(201);
   const withdrawal = await createdResponse.json();
@@ -201,7 +206,11 @@ test("user withdrawal rejected by owner returns funds", async ({ browser }) => {
 
   const before = await (await user.request.get("/api/backend/wallet")).json();
   const createdResponse = await user.request.post("/api/backend/withdrawals", {
-    data: { amount: "5", destination_type: "usdt_trc20_address", destination: `T${"e2e".padEnd(33, "b")}` },
+    data: {
+      amount: "5",
+      destination_type: "usdt_trc20_address",
+      destination: "TD5gsCwxykWsLN9aPrq2TAfNjByuZKYp4E",
+    },
   });
   expect(createdResponse.status()).toBe(201);
   const withdrawal = await createdResponse.json();
@@ -225,7 +234,11 @@ test("user cancels own pending withdrawal and funds are released", async ({ brow
 
   const before = await (await user.request.get("/api/backend/wallet")).json();
   const createdResponse = await user.request.post("/api/backend/withdrawals", {
-    data: { amount: "5", destination_type: "usdt_trc20_address", destination: `T${"e2e".padEnd(33, "c")}` },
+    data: {
+      amount: "5",
+      destination_type: "usdt_trc20_address",
+      destination: "TEdvoHEatmDKvTh3o9vBRB9Vdtbhn4QFhy",
+    },
   });
   expect(createdResponse.status()).toBe(201);
   const withdrawal = await createdResponse.json();
@@ -464,7 +477,11 @@ test("team lead cabinet: assignment, deal profit accrual, withdrawal lifecycle, 
 
   // 5. Create withdrawal.
   const withdrawalCreated = await teamLead.request.post("/api/backend/team-lead/withdrawals", {
-    data: { amount: "0.015", destination_type: "usdt_trc20_address", destination: "T" + "a".repeat(33) },
+    data: {
+      amount: "0.015",
+      destination_type: "usdt_trc20_address",
+      destination: "TGCAjMXComunWZEXCT1LPBdcYbDVuyexBv",
+    },
   });
   expect(withdrawalCreated.status()).toBe(201);
   const withdrawal = await withdrawalCreated.json();

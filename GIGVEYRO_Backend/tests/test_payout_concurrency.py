@@ -61,7 +61,7 @@ async def _setup_queued_payout() -> dict[str, uuid.UUID]:
             amount=Decimal("25"),
             currency=Currency.USDT,
             destination_type=WithdrawalDestinationType.USDT_TRC20_ADDRESS,
-            destination="T" * 34,
+            destination="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
             status=WithdrawalStatus.APPROVED,
             created_by_account_id=merchant.id,
             actioned_by_account_id=owner.id,

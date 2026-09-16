@@ -60,7 +60,7 @@ async def _withdrawal(client, merchant, amount="25"):
         json={
             "amount": amount,
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_headers(merchant),
     )

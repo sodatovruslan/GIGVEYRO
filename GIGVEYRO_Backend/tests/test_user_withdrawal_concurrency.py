@@ -55,7 +55,7 @@ async def _bootstrap(available: Decimal = Decimal("100")):
             wallet_id=wallet.id,
             amount=Decimal("30"),
             destination_type=WithdrawalDestinationType.USDT_TRC20_ADDRESS,
-            destination="T" + "a" * 33,
+            destination="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
             status=WithdrawalStatus.PENDING,
             created_by_account_id=user.id,
         )

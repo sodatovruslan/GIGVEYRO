@@ -385,7 +385,7 @@ async def test_team_lead_cannot_view_another_team_leads_withdrawal(
         wallet_id=(await commands._wallet_service().get_wallet_for_account(lead_a.id)).id,
         amount=Decimal("5"),
         destination_type="usdt_trc20_address",
-        destination="T" + "a" * 33,
+        destination="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         status=WithdrawalStatus.PENDING,
         created_by_account_id=lead_a.id,
     )
@@ -420,7 +420,7 @@ async def test_team_lead_withdrawal_full_flow_and_owner_approval(
         telegram_user_id=722, chat_id=722, data="wdflow:dt:usdt_trc20_address"
     )
     assert dest_type_reply.keyboard is not None
-    dest_reply = await commands.handle(telegram_user_id=722, chat_id=722, text_value="T" + "a" * 33)
+    dest_reply = await commands.handle(telegram_user_id=722, chat_id=722, text_value="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t")
     assert dest_reply.keyboard is not None
     created_reply = await commands.handle_callback(
         telegram_user_id=722, chat_id=722, data="wdflow_go"

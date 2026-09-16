@@ -71,6 +71,10 @@ class PayoutIntentOut(BaseModel):
     amount: Decimal
     network: str
     masked_destination: str
+    # Full, unmasked destination - populated ONLY on the single-intent
+    # detail view (the one Owner opens before approving), never in list
+    # responses. Owner must see the real address to approve knowingly.
+    destination: str | None = None
     fee_amount: Decimal
     risk_policy_version: int
     risk_decision: str
@@ -120,6 +124,7 @@ class PayoutManualCompleteCommand(BaseModel):
 
 
 class PayoutDestinationInput(BaseModel):
+    beneficiary_account_id: uuid.UUID
     label: str = Field(min_length=1, max_length=100)
     asset: str = Field(default="USDT", min_length=1, max_length=16)
     network: str = Field(default="TRC20", min_length=1, max_length=32)
@@ -129,6 +134,7 @@ class PayoutDestinationInput(BaseModel):
 class PayoutDestinationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    beneficiary_account_id: uuid.UUID
     label: str
     asset: str
     network: str

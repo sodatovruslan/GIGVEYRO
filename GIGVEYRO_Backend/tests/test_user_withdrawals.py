@@ -19,7 +19,7 @@ async def _create(client, user, amount: str = "20") -> dict:
         json={
             "amount": amount,
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -36,7 +36,7 @@ async def test_user_creates_withdrawal(client, make_account, make_wallet):
         json={
             "amount": "40",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -48,6 +48,25 @@ async def test_user_creates_withdrawal(client, make_account, make_wallet):
     assert body["public_id"].startswith("UWD-")
 
 
+async def test_create_withdrawal_invalid_trc20_checksum_rejected(client, make_account, make_wallet):
+    """Correct length (34 chars, starts with T) but a corrupted base58check
+    checksum - must be rejected at creation time, before any approval."""
+    user = await make_account(role=UserRole.USER)
+    await make_wallet(user, available=Decimal("100"))
+
+    response = await client.post(
+        "/withdrawals",
+        json={
+            "amount": "40",
+            "destination_type": "usdt_trc20_address",
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6x",
+        },
+        headers=_auth_headers(user),
+    )
+    assert response.status_code == 400
+    assert "invalid TRC20 address checksum" in response.json()["detail"]
+
+
 async def test_withdrawal_holds_funds_from_available_balance(client, make_account, make_wallet):
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("100"))
@@ -57,7 +76,7 @@ async def test_withdrawal_holds_funds_from_available_balance(client, make_accoun
         json={
             "amount": "40",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -76,7 +95,7 @@ async def test_withdrawal_rejects_insufficient_balance(client, make_account, mak
         json={
             "amount": "40",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -92,7 +111,7 @@ async def test_merchant_cannot_create_user_withdrawal(client, make_account):
         json={
             "amount": "40",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant),
     )
@@ -110,7 +129,7 @@ async def test_user_cannot_see_another_users_withdrawal(client, make_account, ma
         json={
             "amount": "10",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user_a),
     )
@@ -133,7 +152,7 @@ async def test_user_cancels_pending_withdrawal_and_funds_released(
         json={
             "amount": "30",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -159,7 +178,7 @@ async def test_owner_approves_and_rejects_user_withdrawal(client, make_account, 
         json={
             "amount": "20",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -189,7 +208,7 @@ async def test_owner_rejects_user_withdrawal_and_releases_funds(
         json={
             "amount": "20",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -478,7 +497,7 @@ async def test_owner_lists_all_user_withdrawals(client, make_account, make_walle
         json={
             "amount": "10",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user_a),
     )
@@ -487,7 +506,7 @@ async def test_owner_lists_all_user_withdrawals(client, make_account, make_walle
         json={
             "amount": "15",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user_b),
     )

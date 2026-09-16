@@ -275,13 +275,25 @@ async def test_readiness_is_not_ready_and_allowlist_is_owner_only(client, db_ses
 
     denied_create = await client.post(
         "/api/v1/owner/payout-addresses",
-        json={"label": "Treasury", "asset": "USDT", "network": "TRC20", "address": VALID_TRC20},
+        json={
+            "beneficiary_account_id": str(merchant.id),
+            "label": "Treasury",
+            "asset": "USDT",
+            "network": "TRC20",
+            "address": VALID_TRC20,
+        },
         headers=_headers(merchant),
     )
     assert denied_create.status_code == 403
     created = await client.post(
         "/api/v1/owner/payout-addresses",
-        json={"label": "Treasury", "asset": "USDT", "network": "TRC20", "address": VALID_TRC20},
+        json={
+            "beneficiary_account_id": str(merchant.id),
+            "label": "Treasury",
+            "asset": "USDT",
+            "network": "TRC20",
+            "address": VALID_TRC20,
+        },
         headers=_headers(owner),
     )
     assert created.status_code == 201

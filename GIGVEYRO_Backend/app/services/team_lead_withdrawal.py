@@ -13,6 +13,7 @@ from app.models.team_lead_withdrawal import TeamLeadWithdrawal
 from app.repositories.account import AccountRepository
 from app.repositories.team_lead_withdrawal import TeamLeadWithdrawalRepository
 from app.services.notification import NotificationService
+from app.services.payout_live.bybit import LivePayoutSecurityError, validate_tron_base58check
 from app.services.realtime import RealtimeEventService
 from app.services.wallet import WalletService
 from app.services.withdrawal import (
@@ -114,6 +115,10 @@ class TeamLeadWithdrawalService:
         if destination_type == WithdrawalDestinationType.USDT_TRC20_ADDRESS:
             if len(destination_clean) < 26 or len(destination_clean) > 50:
                 raise InvalidDestinationError("invalid TRC20 address length")
+            try:
+                validate_tron_base58check(destination_clean)
+            except LivePayoutSecurityError as exc:
+                raise InvalidDestinationError("invalid TRC20 address checksum") from exc
 
         # Lock the wallet row before inserting anything that references it -
         # see WalletService.get_wallet_for_account_for_update for why this

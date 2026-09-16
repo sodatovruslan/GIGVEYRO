@@ -16,7 +16,7 @@ async def _create(client, team_lead, amount: str = "20") -> dict:
         json={
             "amount": amount,
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(team_lead),
     )
@@ -51,6 +51,25 @@ async def test_withdrawal_holds_funds_from_available_balance(client, make_accoun
     assert wallet_response.json()["frozen_balance"] == "4.00000000"
 
 
+async def test_create_withdrawal_invalid_trc20_checksum_rejected(client, make_account, make_wallet):
+    """Correct length (34 chars, starts with T) but a corrupted base58check
+    checksum - must be rejected at creation time, before any approval."""
+    team_lead = await make_account(role=UserRole.TEAM_LEAD)
+    await make_wallet(team_lead, available=Decimal("10"))
+
+    response = await client.post(
+        "/team-lead/withdrawals",
+        json={
+            "amount": "5",
+            "destination_type": "usdt_trc20_address",
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6x",
+        },
+        headers=_auth_headers(team_lead),
+    )
+    assert response.status_code == 400
+    assert "invalid TRC20 address checksum" in response.json()["detail"]
+
+
 async def test_withdrawal_rejects_insufficient_profit(client, make_account, make_wallet):
     team_lead = await make_account(role=UserRole.TEAM_LEAD)
     await make_wallet(team_lead, available=Decimal("1"))
@@ -60,7 +79,7 @@ async def test_withdrawal_rejects_insufficient_profit(client, make_account, make
         json={
             "amount": "5",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(team_lead),
     )
@@ -79,7 +98,7 @@ async def test_inactive_team_lead_cannot_create_withdrawal(client, make_account,
         json={
             "amount": "5",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(team_lead),
     )
@@ -93,7 +112,7 @@ async def test_user_cannot_create_team_lead_withdrawal(client, make_account):
         json={
             "amount": "5",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user),
     )
@@ -341,7 +360,7 @@ async def test_concurrent_withdrawals_cannot_overspend_available_profit():
                     account,
                     amount=amount,
                     destination_type=WithdrawalDestinationType.USDT_TRC20_ADDRESS,
-                    destination="T" + "a" * 33,
+                    destination="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
                 )
                 await session.commit()
                 return "won"

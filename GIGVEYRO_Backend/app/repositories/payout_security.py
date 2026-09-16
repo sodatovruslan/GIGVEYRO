@@ -25,14 +25,28 @@ class PayoutSecurityRepository:
             query = query.with_for_update()
         return (await self.session.execute(query)).scalar_one_or_none()
 
-    async def destination_by_fingerprint(self, fingerprint: str):
+    async def destination_by_fingerprint(self, beneficiary_account_id: uuid.UUID, fingerprint: str):
         return (
             await self.session.execute(
                 select(PayoutDestination)
+                .where(PayoutDestination.beneficiary_account_id == beneficiary_account_id)
                 .where(PayoutDestination.fingerprint == fingerprint)
                 .where(PayoutDestination.enabled.is_(True))
             )
         ).scalar_one_or_none()
+
+    async def destinations_for_beneficiary(
+        self, beneficiary_account_id: uuid.UUID
+    ) -> list[PayoutDestination]:
+        return list(
+            (
+                await self.session.execute(
+                    select(PayoutDestination)
+                    .where(PayoutDestination.beneficiary_account_id == beneficiary_account_id)
+                    .order_by(PayoutDestination.created_at.desc())
+                )
+            ).scalars()
+        )
 
     async def save_destination(self, destination: PayoutDestination) -> PayoutDestination:
         self.session.add(destination)

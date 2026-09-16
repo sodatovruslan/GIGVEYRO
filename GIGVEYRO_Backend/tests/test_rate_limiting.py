@@ -27,7 +27,7 @@ async def test_merchant_withdrawal_creation_is_rate_limited(
         json={
             "amount": "10",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" + "a" * 33,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant),
     )

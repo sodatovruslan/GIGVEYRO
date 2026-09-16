@@ -31,6 +31,7 @@ export function LivePayoutReadinessPanel() {
   const readiness = useApiQuery(ownerOperationsApi.payoutReadiness, "payout-readiness");
   const addresses = useApiQuery(ownerOperationsApi.payoutAddresses, "payout-addresses");
   const networks = useApiQuery(ownerOperationsApi.payoutNetworks, "payout-networks");
+  const [beneficiaryAccountId, setBeneficiaryAccountId] = useState("");
   const [label, setLabel] = useState("");
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,7 +42,8 @@ export function LivePayoutReadinessPanel() {
     setBusy(true);
     setError("");
     try {
-      await ownerOperationsApi.createPayoutAddress({ label, address, asset: "USDT", network: "TRC20" });
+      await ownerOperationsApi.createPayoutAddress({ beneficiary_account_id: beneficiaryAccountId, label, address, asset: "USDT", network: "TRC20" });
+      setBeneficiaryAccountId("");
       setLabel("");
       setAddress("");
       await Promise.all([addresses.refetch(), readiness.refetch()]);
@@ -88,14 +90,15 @@ export function LivePayoutReadinessPanel() {
         <section className={liveStyles.allowlist}>
           <div className={liveStyles.allowlistHeading}><div><h3>{t("addresses")}</h3><p>{t("addressesHint")}</p></div></div>
           <form onSubmit={(event) => void createAddress(event)} className={liveStyles.addressForm}>
+            <label><span>{t("beneficiaryAccountId")}</span><input required maxLength={36} autoComplete="off" spellCheck={false} placeholder={t("beneficiaryAccountIdHint")} value={beneficiaryAccountId} onChange={(event) => setBeneficiaryAccountId(event.target.value)} /></label>
             <label><span>{t("label")}</span><input required maxLength={100} value={label} onChange={(event) => setLabel(event.target.value)} /></label>
             <label><span>{t("address")}</span><input required maxLength={255} autoComplete="off" spellCheck={false} value={address} onChange={(event) => setAddress(event.target.value)} /></label>
             <div><span>{t("binding")}</span><strong>USDT · TRC20</strong></div>
-            <button disabled={busy || !label.trim() || !address.trim()}>{t("addAddress")}</button>
+            <button disabled={busy || !beneficiaryAccountId.trim() || !label.trim() || !address.trim()}>{t("addAddress")}</button>
           </form>
           <div className={liveStyles.addressList}>
             {!addresses.data?.length ? <span>{t("noAddresses")}</span> : addresses.data.map((item) => <div key={item.id}>
-              <div><strong>{item.label}</strong><small>{item.asset} · {item.network} · {item.masked_address}</small><small>{format.dateTime(item.created_at)}</small></div>
+              <div><strong>{item.label}</strong><small>{item.asset} · {item.network} · {item.masked_address}</small><small>{t("beneficiary")}: {item.beneficiary_account_id}</small><small>{format.dateTime(item.created_at)}</small></div>
               <span data-enabled={item.enabled}>{item.enabled ? t("enabled") : t("disabled")}</span>
               {item.enabled && <button disabled={busy} onClick={() => void disableAddress(item.id)}>{t("disable")}</button>}
             </div>)}

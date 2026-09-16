@@ -36,7 +36,7 @@ async def test_create_withdrawal_holds_balance(
         json={
             "amount": "40",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant.id, UserRole.MERCHANT),
     )
@@ -61,7 +61,7 @@ async def test_create_withdrawal_insufficient_balance(
         json={
             "amount": "40",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant.id, UserRole.MERCHANT),
     )
@@ -89,6 +89,28 @@ async def test_create_withdrawal_invalid_trc20_address(
 
 
 @pytest.mark.asyncio
+async def test_create_withdrawal_invalid_trc20_checksum_rejected(
+    client: AsyncClient, make_account, make_merchant_wallet
+):
+    """Correct length (34 chars, starts with T) but a corrupted base58check
+    checksum - must be rejected at creation time, before any approval."""
+    merchant = await make_account(role=UserRole.MERCHANT)
+    await make_merchant_wallet(merchant, available=Decimal("100"))
+
+    response = await client.post(
+        "/merchant/withdrawals",
+        json={
+            "amount": "40",
+            "destination_type": "usdt_trc20_address",
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6x",
+        },
+        headers=_auth_headers(merchant.id, UserRole.MERCHANT),
+    )
+    assert response.status_code == 400
+    assert "invalid TRC20 address checksum" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_create_withdrawal_forbidden_for_user_role(
     client: AsyncClient, make_account, make_wallet
 ):
@@ -100,7 +122,7 @@ async def test_create_withdrawal_forbidden_for_user_role(
         json={
             "amount": "10",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(user.id, UserRole.USER),
     )
@@ -120,7 +142,7 @@ async def test_cancel_by_merchant_releases_hold_and_is_idempotent(
         json={
             "amount": "30",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=headers,
     )
@@ -161,7 +183,7 @@ async def test_cannot_cancel_already_approved_withdrawal(
         json={
             "amount": "20",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant.id, UserRole.MERCHANT),
     )
@@ -194,7 +216,7 @@ async def test_direct_mark_paid_is_blocked_and_does_not_debit_hold(
         json={
             "amount": "50",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant.id, UserRole.MERCHANT),
     )
@@ -310,7 +332,7 @@ async def test_cannot_approve_non_pending_withdrawal(
         json={
             "amount": "10",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant.id, UserRole.MERCHANT),
     )
@@ -354,7 +376,7 @@ async def test_merchant_cannot_view_another_merchants_withdrawal(
         json={
             "amount": "10",
             "destination_type": "usdt_trc20_address",
-            "destination": "T" * 34,
+            "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
         },
         headers=_auth_headers(merchant_a.id, UserRole.MERCHANT),
     )
@@ -379,12 +401,12 @@ async def test_owner_list_filters_by_merchant_and_status(
 
     await client.post(
         "/merchant/withdrawals",
-        json={"amount": "10", "destination_type": "usdt_trc20_address", "destination": "T" * 34},
+        json={"amount": "10", "destination_type": "usdt_trc20_address", "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"},
         headers=_auth_headers(merchant_a.id, UserRole.MERCHANT),
     )
     await client.post(
         "/merchant/withdrawals",
-        json={"amount": "15", "destination_type": "usdt_trc20_address", "destination": "T" * 34},
+        json={"amount": "15", "destination_type": "usdt_trc20_address", "destination": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"},
         headers=_auth_headers(merchant_b.id, UserRole.MERCHANT),
     )
 

@@ -464,9 +464,13 @@ async def _make_live_intent(db_session, make_account, make_merchant_wallet, clie
     return intent, owner_a, service, payout_repo, risk_repo, account_repo, wallet_service
 
 
-async def test_live_execute_blocked_when_not_ready_no_allowlisted_destination(
+async def test_live_execute_blocked_when_destination_disabled_after_intent_creation(
     db_session, make_account, make_merchant_wallet, client, monkeypatch
 ):
+    """create_for_withdrawal auto-registers a beneficiary-scoped
+    PayoutDestination from the withdrawal's own address - so the meaningful
+    "not approved" scenario now is Owner revoking that specific destination
+    AFTER the intent already exists, not "nothing was ever registered"."""
     intent, owner, service, *_ = await _make_live_intent(
         db_session, make_account, make_merchant_wallet, client, monkeypatch
     )
@@ -476,10 +480,35 @@ async def test_live_execute_blocked_when_not_ready_no_allowlisted_destination(
     monkeypatch.setattr(settings, "BYBIT_WRITE_PERMISSION_VERIFIED", True)
     monkeypatch.setattr(settings, "BYBIT_WRITE_IP_WHITELIST_VERIFIED", True)
     monkeypatch.setattr(settings, "BYBIT_LIVE_RECONCILIATION_VERIFIED", True)
-    # USDT/TRC20 network is already seeded by migration 0025, but no
-    # PayoutDestination is ever seeded - address_allowlist_configured stays
-    # False, so readiness.ready is False even with every other flag set.
-    with pytest.raises(PayoutSafetyError, match="LIVE_PAYOUT_NOT_READY"):
+    security = PayoutSecurityRepository(db_session)
+    destinations = await security.destinations_for_beneficiary(intent.beneficiary_account_id)
+    assert len(destinations) == 1, "create_for_withdrawal should have auto-registered exactly one"
+    # Keep the aggregate address_allowlist_configured readiness check True by
+    # leaving an unrelated, different-beneficiary destination enabled - this
+    # isolates the per-transaction (beneficiary, fingerprint) check under
+    # test from the separate aggregate-count readiness check.
+    from app.models.payout import PayoutDestination
+
+    await security.save_destination(
+        PayoutDestination(
+            label="unrelated",
+            asset="USDT",
+            network="TRC20",
+            address="TXYZ9nRRqPk8y7QAtJvzwj1AmVKUyzTLzT",
+            masked_address="TXYZ9...",
+            beneficiary_account_id=owner.id,
+            fingerprint="e" * 64,
+            enabled=True,
+            created_by_account_id=owner.id,
+        )
+    )
+    destinations[0].enabled = False
+    await db_session.flush()
+    readiness = await LivePayoutReadinessService(
+        security, PayoutRepository(db_session), RiskRepository(db_session)
+    ).evaluate()
+    assert readiness.ready is True, readiness.blocking_reasons
+    with pytest.raises(PayoutSafetyError, match="DESTINATION_NOT_APPROVED_FOR_BENEFICIARY"):
         await service.queue(intent.id, owner, outcome=PayoutSimulationOutcome.SUCCEEDED)
 
 
@@ -513,22 +542,9 @@ async def test_live_execute_cooldown_blocks_concurrent_same_coin_chain_submissio
     monkeypatch.setattr(settings, "BYBIT_WRITE_IP_WHITELIST_VERIFIED", True)
     monkeypatch.setattr(settings, "BYBIT_LIVE_RECONCILIATION_VERIFIED", True)
     security = PayoutSecurityRepository(db_session)
-    from app.models.payout import PayoutDestination
 
-    # USDT/TRC20 network is already seeded by migration 0025 - only the
-    # destination allowlist entry is created here.
-    await security.save_destination(
-        PayoutDestination(
-            label="t",
-            asset="USDT",
-            network="TRC20",
-            address=VALID_TRC20,
-            masked_address="TR7NH...",
-            fingerprint="f" * 64,
-            enabled=True,
-            created_by_account_id=owner.id,
-        )
-    )
+    # create_for_withdrawal already auto-registered a beneficiary-scoped
+    # PayoutDestination for this exact address - no manual seeding needed.
     readiness = await LivePayoutReadinessService(security, payout_repo, risk_repo).evaluate()
     assert readiness.ready is True, readiness.blocking_reasons
 
@@ -576,23 +592,8 @@ async def test_live_execute_end_to_end_success_finalizes_withdrawal(
     monkeypatch.setattr(settings, "BYBIT_WRITE_PERMISSION_VERIFIED", True)
     monkeypatch.setattr(settings, "BYBIT_WRITE_IP_WHITELIST_VERIFIED", True)
     monkeypatch.setattr(settings, "BYBIT_LIVE_RECONCILIATION_VERIFIED", True)
-    security = PayoutSecurityRepository(db_session)
-    from app.models.payout import PayoutDestination
-
-    # USDT/TRC20 network is already seeded by migration 0025 - only the
-    # destination allowlist entry is created here.
-    await security.save_destination(
-        PayoutDestination(
-            label="t",
-            asset="USDT",
-            network="TRC20",
-            address=VALID_TRC20,
-            masked_address="TR7NH...",
-            fingerprint="f" * 64,
-            enabled=True,
-            created_by_account_id=owner.id,
-        )
-    )
+    # create_for_withdrawal already auto-registered a beneficiary-scoped
+    # PayoutDestination for this exact address - no manual seeding needed.
 
     class _AlwaysAllowed:
         async def is_rate_limited(self, key, max_requests, window_seconds, fail_mode=None):

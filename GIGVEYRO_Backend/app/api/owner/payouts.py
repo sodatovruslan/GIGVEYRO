@@ -80,6 +80,7 @@ async def _out(
         amount=intent.amount,
         network=intent.network,
         masked_destination=intent.masked_destination,
+        destination=intent.destination if detail else None,
         fee_amount=intent.fee_amount,
         risk_policy_version=intent.risk_policy_version,
         risk_decision=intent.risk_decision,
