@@ -11,11 +11,9 @@ from app.models.ledger import LedgerEntry
 from app.models.merchant_wallet import MerchantWallet
 from app.models.wallet import UserWallet
 from app.repositories.account import AccountRepository
-from app.repositories.insurance_reserve import InsuranceReservePolicyRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.merchant_wallet import MerchantWalletRepository
 from app.repositories.wallet import WalletRepository
-from app.services.insurance_reserve import compute_required_minimum_reserve
 
 
 class WalletNotFoundError(Exception):
@@ -36,8 +34,7 @@ class InsufficientBalanceError(Exception):
 
 class InsufficientInsuranceReserveError(InsufficientBalanceError):
     """Raised when a decrease would drive insurance_balance below the
-    active InsuranceReservePolicy's minimum_reserve_percentage of that
-    wallet's high-water-mark basis. Subclasses InsufficientBalanceError so
+    wallet's fixed insurance_target. Subclasses InsufficientBalanceError so
     every existing except-clause that already handles balance-insufficiency
     (API error mapping, etc.) keeps working without modification."""
 
@@ -49,15 +46,11 @@ class WalletService:
         ledger_repository: LedgerRepository,
         account_repository: AccountRepository,
         merchant_wallet_repository: MerchantWalletRepository | None = None,
-        insurance_reserve_repository: InsuranceReservePolicyRepository | None = None,
     ):
         self._wallets = wallet_repository
         self._ledger = ledger_repository
         self._accounts = account_repository
         self._merchant_wallets = merchant_wallet_repository or MerchantWalletRepository(
-            wallet_repository._session
-        )
-        self._insurance_reserve = insurance_reserve_repository or InsuranceReservePolicyRepository(
             wallet_repository._session
         )
 
@@ -176,6 +169,31 @@ class WalletService:
             description=description,
             idempotency_key=idempotency_key,
         )
+
+    async def set_insurance_target(
+        self, *, actor: Account, target_account_id: uuid.UUID, new_target: Decimal
+    ) -> tuple[UserWallet, Decimal]:
+        """Owner-only. Changes only the floor itself - never moves money,
+        never touches available/insurance balances, never creates a ledger
+        entry. Returns (wallet, old_target) so the caller can audit-log the
+        change."""
+        if not new_target.is_finite() or new_target < 0:
+            raise InvalidAmountError("insurance_target must be a non-negative, finite number")
+
+        target = await self._accounts.get_by_id(target_account_id)
+        if target is None or target.role != UserRole.USER:
+            raise WalletNotFoundError()
+        if not target.is_active:
+            raise InactiveAccountError("cannot modify the wallet of an inactive account")
+
+        wallet = await self._wallets.get_by_account_id_for_update(target_account_id)
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        old_target = wallet.insurance_target
+        wallet.insurance_target = new_target
+        await self._wallets.save(wallet)
+        return wallet, old_target
 
     async def freeze_for_deal(
         self, *, account_id: uuid.UUID, amount: Decimal, deal_id: uuid.UUID
@@ -826,9 +844,23 @@ class WalletService:
         insurance_before = wallet.insurance_balance
         frozen_before = wallet.frozen_balance
 
-        wallet.available_balance = available_before + amount
+        # Insurance-first allocation: fill the gap to insurance_target before
+        # anything reaches available_balance. Once the target is met, every
+        # further deposit goes entirely to available - see the worked
+        # examples in the insurance_target model docstring (app/models/wallet.py).
+        insurance_gap = max(wallet.insurance_target - insurance_before, Decimal("0"))
+        to_insurance = min(amount, insurance_gap)
+        remainder = amount - to_insurance
+
+        wallet.insurance_balance = insurance_before + to_insurance
+        wallet.available_balance = available_before + remainder
         await self._wallets.save(wallet)
 
+        # One ledger row per deposit (keeps the idempotency lookup above a
+        # simple scalar_one_or_none()). Both halves of the split are fully
+        # reconstructible from this single row: insurance_after -
+        # insurance_before is the insurance portion, available_after -
+        # available_before is the remainder - no second row needed.
         entry = LedgerEntry(
             wallet_id=wallet.id,
             account_id=account_id,
@@ -965,25 +997,14 @@ class WalletService:
         if new_value < 0:
             raise InsufficientBalanceError(f"{bucket.value} balance cannot go below zero")
 
-        if bucket == BalanceBucket.INSURANCE:
-            if amount > 0:
-                # High-water mark: a top-up can only raise the floor, never
-                # lower it - a later decrease never erodes what was already
-                # committed as the minimum-reserve basis.
-                wallet.insurance_reserve_basis = max(wallet.insurance_reserve_basis, new_value)
-            else:
-                # Row-locked (get_by_account_id_for_update above) + the
-                # policy locked here with key_share - both inside this same
-                # transaction, immediately before the mutation below. No
-                # read-check-write gap a concurrent request could slip
-                # through.
-                policy = await self._insurance_reserve.active_policy(lock=True)
-                if policy.enabled:
-                    required_minimum = compute_required_minimum_reserve(
-                        wallet.insurance_reserve_basis, policy.minimum_reserve_percentage
-                    )
-                    if new_value < required_minimum:
-                        raise InsufficientInsuranceReserveError("INSUFFICIENT_INSURANCE_RESERVE")
+        if bucket == BalanceBucket.INSURANCE and amount < 0:
+            # Row-locked (get_by_account_id_for_update above) immediately
+            # before the mutation below - no read-check-write gap a
+            # concurrent request could slip through. insurance_target is a
+            # fixed floor set directly by Owner, not balance-derived, so no
+            # extra policy lock is needed.
+            if new_value < wallet.insurance_target:
+                raise InsufficientInsuranceReserveError("INSUFFICIENT_INSURANCE_RESERVE")
 
         if bucket == BalanceBucket.AVAILABLE:
             wallet.available_balance = new_value

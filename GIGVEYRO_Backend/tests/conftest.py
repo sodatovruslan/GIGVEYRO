@@ -211,6 +211,7 @@ def make_wallet(db_session):
         available: Decimal = Decimal("0"),
         insurance: Decimal = Decimal("0"),
         frozen: Decimal = Decimal("0"),
+        insurance_target: Decimal = Decimal("0"),
     ) -> UserWallet:
         wallet = UserWallet(
             account_id=account.id,
@@ -218,6 +219,7 @@ def make_wallet(db_session):
             available_balance=available,
             insurance_balance=insurance,
             frozen_balance=frozen,
+            insurance_target=insurance_target,
         )
         db_session.add(wallet)
         await db_session.flush()

@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
-import type { Account, FiatAllocation, FiatBalanceList, FiatConversion, FiatConversionPreview, FiatCurrency, FiatLedgerEntry, InsuranceReserveWalletView, LedgerEntry, MerchantWallet, Paginated, PaymentRequisite, TrafficSettings, UserRole, Wallet } from "@/lib/api/types";
+import type { Account, FiatAllocation, FiatBalanceList, FiatConversion, FiatConversionPreview, FiatCurrency, FiatLedgerEntry, InsuranceTargetView, LedgerEntry, MerchantWallet, Paginated, PaymentRequisite, TrafficSettings, UserRole, Wallet } from "@/lib/api/types";
 
 export interface AccountFilters {
   search?: string;
@@ -36,7 +36,9 @@ export const ownerAccountsApi = {
   setActive: (id: string, active: boolean) => apiFetch<Account>(`/owner/accounts/${id}/${active ? "unblock" : "block"}`, { method: "POST" }),
   resetPassword: (id: string, newPassword: string) => apiFetch<void>(`/owner/accounts/${id}/reset-password`, { method: "POST", body: { new_password: newPassword } }),
   userWallet: (id: string) => apiFetch<Wallet>(`/owner/accounts/${id}/wallet`),
-  insuranceReserve: (id: string) => apiFetch<InsuranceReserveWalletView>(`/owner/accounts/${id}/wallet/insurance-reserve`),
+  insuranceTarget: (id: string) => apiFetch<InsuranceTargetView>(`/owner/accounts/${id}/wallet/insurance-target`),
+  updateInsuranceTarget: (id: string, insurance_target: string) =>
+    apiFetch<InsuranceTargetView>(`/owner/accounts/${id}/wallet/insurance-target`, { method: "PATCH", body: { insurance_target } }),
   merchantWallet: (id: string) => apiFetch<MerchantWallet>(`/owner/accounts/${id}/merchant-wallet`),
   ledger: (id: string, merchant: boolean) => apiFetch<Paginated<LedgerEntry>>(`/owner/accounts/${id}/${merchant ? "merchant-wallet/ledger" : "wallet/ledger"}?limit=20&offset=0`),
   requisites: (id: string) => apiFetch<PaymentRequisite[]>(`/owner/accounts/${id}/requisites`),

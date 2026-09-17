@@ -26,6 +26,7 @@ class UserWallet(Base):
         CheckConstraint(
             "insurance_reserve_basis >= 0", name="ck_wallets_insurance_reserve_basis_non_negative"
         ),
+        CheckConstraint("insurance_target >= 0", name="ck_wallets_insurance_target_non_negative"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -56,14 +57,20 @@ class UserWallet(Base):
     frozen_balance: Mapped[Decimal] = mapped_column(
         MONEY, nullable=False, default=Decimal("0"), server_default="0"
     )
-    # High-water mark of insurance_balance: bumped up whenever a positive
-    # adjust_insurance() raises the balance above it, never lowered by a
-    # decrease. minimum_insurance_reserve = insurance_reserve_basis *
-    # InsuranceReservePolicy.minimum_reserve_percentage (see
-    # WalletService._apply_bucket_change). Existing wallets were backfilled
-    # to their insurance_balance at the time this column was introduced
-    # (migration 0037) so no wallet silently loses reserve protection.
+    # Historical: high-water mark from the retired percentage-based reserve
+    # model (migration 0037). No longer read or written by any code path -
+    # kept in the schema only so existing data isn't destroyed. The live
+    # enforcement mechanism is insurance_target below.
     insurance_reserve_basis: Mapped[Decimal] = mapped_column(
+        MONEY, nullable=False, default=Decimal("0"), server_default="0"
+    )
+    # Fixed, absolute, Owner-set floor for this USER's insurance_balance
+    # (migration 0039) - not a percentage, not balance-derived. Deposits fill
+    # the gap between insurance_balance and this target before anything goes
+    # to available_balance (WalletService.credit_deposit); insurance_balance
+    # can never be decreased below it (WalletService._apply_bucket_change).
+    # Changing this value never moves money by itself.
+    insurance_target: Mapped[Decimal] = mapped_column(
         MONEY, nullable=False, default=Decimal("0"), server_default="0"
     )
     created_at: Mapped[datetime] = mapped_column(

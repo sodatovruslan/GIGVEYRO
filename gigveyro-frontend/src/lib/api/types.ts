@@ -99,33 +99,11 @@ export interface Wallet {
   frozen_balance: string;
 }
 
-export interface InsuranceReservePolicy {
-  id: string;
-  version: number;
-  status: string;
-  enabled: boolean;
-  minimum_reserve_percentage: string;
-  created_by_account_id: string | null;
-  created_at: string;
-  updated_at: string;
-  activated_at: string | null;
-}
-
-export interface InsuranceReservePolicyInput {
-  enabled: boolean;
-  minimum_reserve_percentage: string;
-}
-
-export interface InsuranceReserveWalletView {
+export interface InsuranceTargetView {
   account_id: string;
   insurance_balance: string;
-  insurance_reserve_basis: string;
-  minimum_reserve_percentage: string;
-  required_minimum_reserve: string;
-  available_above_reserve: string;
-  policy_version: number;
-  policy_enabled: boolean;
-  policy_updated_at: string;
+  insurance_target: string;
+  remaining_to_target: string;
 }
 
 export interface MerchantWallet {

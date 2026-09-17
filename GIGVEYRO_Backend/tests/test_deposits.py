@@ -425,6 +425,10 @@ async def test_overpayment_causes_amount_mismatch(client, make_account, make_dep
 async def test_credit_increases_available_leaves_insurance_and_frozen_unchanged(
     client, make_account, make_wallet, make_deposit
 ):
+    """No insurance_target is set here (defaults to 0), so the insurance gap
+    is always 0 and the full deposit goes to available - same outcome as
+    before insurance-first allocation existed. See test_insurance_target.py
+    for wallets that do have a target configured."""
     owner = await make_account(role=UserRole.OWNER)
     user = await make_account(role=UserRole.USER)
     await make_wallet(user, available=Decimal("50"), insurance=Decimal("10"), frozen=Decimal("5"))

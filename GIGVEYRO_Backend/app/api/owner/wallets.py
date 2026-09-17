@@ -13,19 +13,18 @@ from app.models.account import Account
 from app.models.ledger import LedgerEntry
 from app.repositories.account import AccountRepository
 from app.repositories.audit import AuditRepository
-from app.repositories.insurance_reserve import InsuranceReservePolicyRepository
 from app.repositories.ledger import LedgerRepository
 from app.repositories.wallet import WalletRepository
-from app.schemas.insurance_reserve import InsuranceReserveWalletView
 from app.schemas.ledger import LedgerListResponse
 from app.schemas.wallet import (
     AllocateRequest,
     InsuranceAdjustRequest,
+    InsuranceTargetUpdateRequest,
+    InsuranceTargetView,
     ManualAdjustRequest,
     WalletRead,
 )
 from app.services.audit import AuditService
-from app.services.insurance_reserve import compute_required_minimum_reserve
 from app.services.wallet import (
     InactiveAccountError,
     InsufficientBalanceError,
@@ -104,32 +103,53 @@ async def get_user_ledger(
     return LedgerListResponse(items=items, total=total, limit=limit, offset=offset)
 
 
-@router.get("/{account_id}/wallet/insurance-reserve", response_model=InsuranceReserveWalletView)
-async def get_insurance_reserve(
-    account_id: uuid.UUID,
-    service: WalletService = Depends(_service),
-    db: AsyncSession = Depends(get_db),
-) -> InsuranceReserveWalletView:
+def _insurance_target_view(account_id: uuid.UUID, wallet) -> InsuranceTargetView:
+    return InsuranceTargetView(
+        account_id=account_id,
+        insurance_balance=wallet.insurance_balance,
+        insurance_target=wallet.insurance_target,
+        remaining_to_target=max(wallet.insurance_target - wallet.insurance_balance, Decimal("0")),
+    )
+
+
+@router.get("/{account_id}/wallet/insurance-target", response_model=InsuranceTargetView)
+async def get_insurance_target(
+    account_id: uuid.UUID, service: WalletService = Depends(_service)
+) -> InsuranceTargetView:
     try:
         wallet = await service.get_wallet_for_account(account_id)
     except WalletNotFoundError as exc:
         raise _wallet_error_response(exc) from exc
+    return _insurance_target_view(account_id, wallet)
 
-    policy = await InsuranceReservePolicyRepository(db).active_policy()
-    required_minimum = compute_required_minimum_reserve(
-        wallet.insurance_reserve_basis, policy.minimum_reserve_percentage
+
+@router.patch("/{account_id}/wallet/insurance-target", response_model=InsuranceTargetView)
+async def update_insurance_target(
+    account_id: uuid.UUID,
+    payload: InsuranceTargetUpdateRequest,
+    actor: Account = Depends(get_current_account),
+    service: WalletService = Depends(_service),
+    audit: AuditService = Depends(_audit_service),
+) -> InsuranceTargetView:
+    try:
+        wallet, old_target = await service.set_insurance_target(
+            actor=actor, target_account_id=account_id, new_target=payload.insurance_target
+        )
+    except (WalletNotFoundError, InactiveAccountError, InvalidAmountError) as exc:
+        raise _wallet_error_response(exc) from exc
+
+    await audit.log_action(
+        action="wallet.insurance_target_changed",
+        entity_type="wallet",
+        entity_id=str(account_id),
+        actor_account_id=actor.id,
+        actor_role=actor.role.value,
+        audit_metadata={
+            "old_target": str(old_target),
+            "new_target": str(payload.insurance_target),
+        },
     )
-    return InsuranceReserveWalletView(
-        account_id=account_id,
-        insurance_balance=wallet.insurance_balance,
-        insurance_reserve_basis=wallet.insurance_reserve_basis,
-        minimum_reserve_percentage=policy.minimum_reserve_percentage,
-        required_minimum_reserve=required_minimum,
-        available_above_reserve=max(wallet.insurance_balance - required_minimum, Decimal("0")),
-        policy_version=policy.version,
-        policy_enabled=policy.enabled,
-        policy_updated_at=policy.updated_at,
-    )
+    return _insurance_target_view(account_id, wallet)
 
 
 @router.post("/{account_id}/wallet/allocate", response_model=WalletRead)
