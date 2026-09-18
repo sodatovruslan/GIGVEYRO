@@ -211,6 +211,31 @@ async def test_commands_are_read_only_role_scoped_and_require_active_account(
     )
 
 
+async def test_bare_start_points_to_web_login_and_never_asks_for_a_password(db_session):
+    """/start with no token must guide the user to the website's own
+    Connect Telegram flow (Settings -> Notifications) instead of ever
+    prompting for a username/password in the chat itself."""
+    commands = TelegramCommandService(db_session)
+    reply = await commands.handle(
+        telegram_user_id=777, chat_id=777, text_value="/start", telegram_language="en"
+    )
+    expected_url = f"{settings.TELEGRAM_WEB_APP_URL.rstrip('/')}/login"
+    assert expected_url in reply
+    assert "never ask for your password" in reply.lower()
+
+
+async def test_unlinked_user_message_points_to_web_login(db_session):
+    """Any command from an account that has never linked Telegram gets the
+    same actionable pointer to the website, not a bare 'unlinked' notice."""
+    commands = TelegramCommandService(db_session)
+    reply = await commands.handle(
+        telegram_user_id=778, chat_id=778, text_value="/status", telegram_language="en"
+    )
+    expected_url = f"{settings.TELEGRAM_WEB_APP_URL.rstrip('/')}/login"
+    assert expected_url in reply
+    assert "no password is ever needed" in reply.lower()
+
+
 @pytest.mark.asyncio
 async def test_owner_and_merchant_command_boundaries(
     db_session, make_account, make_merchant_wallet, monkeypatch

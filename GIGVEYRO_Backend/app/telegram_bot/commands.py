@@ -116,6 +116,10 @@ _WD_KIND_AUDIT_PREFIX = {
 }
 
 
+def _web_login_url() -> str:
+    return f"{settings.TELEGRAM_WEB_APP_URL.rstrip('/')}/login"
+
+
 def _fmt_dt(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M") if value else "-"
 
@@ -287,7 +291,7 @@ class TelegramCommandService:
         record_telegram_command(safe_command, "received")
         if command == "/start":
             if not argument:
-                return text(fallback_language, "welcome")
+                return text(fallback_language, "welcome", url=_web_login_url())
             try:
                 result = await self.telegram.consume_link_token(
                     raw_token=argument,
@@ -305,7 +309,7 @@ class TelegramCommandService:
 
         connection = await self.repo.get_by_telegram_user_id(telegram_user_id, include_account=True)
         if connection is None or connection.chat_id != chat_id:
-            return text(fallback_language, "unlinked")
+            return text(fallback_language, "unlinked", url=_web_login_url())
         account = connection.account
         language = connection.language
         if not account.is_active:
@@ -514,7 +518,7 @@ class TelegramCommandService:
 
         connection = await self.repo.get_by_telegram_user_id(telegram_user_id, include_account=True)
         if connection is None or connection.chat_id != chat_id:
-            return TelegramReply(text(fallback_language, "unlinked"))
+            return TelegramReply(text(fallback_language, "unlinked", url=_web_login_url()))
         account = connection.account
         language = connection.language
         if not account.is_active:

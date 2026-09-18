@@ -4,10 +4,10 @@ SUPPORTED_LANGUAGES = {"ru", "en", "tg"}
 
 _MESSAGES = {
     "ru": {
-        "welcome": "Добро пожаловать в GigaPay. Подключите Telegram в веб-кабинете.",
+        "welcome": "Добро пожаловать в GigaPay!\n\nЧтобы подключить Telegram:\n1. Зайдите на сайт и войдите в свой аккаунт: {url}\n2. Откройте Настройки → Уведомления\n3. Нажмите «Подключить Telegram» и перейдите по ссылке\n\nМы никогда не спрашиваем пароль в этом чате.",
         "linked": "Telegram успешно подключён.",
-        "invalid_link": "Ссылка недействительна или истекла. Создайте новую в кабинете.",
-        "unlinked": "Telegram не подключён. Используйте ссылку из веб-кабинета.",
+        "invalid_link": "Ссылка недействительна или истекла. Создайте новую в кабинете (Настройки → Уведомления → Подключить Telegram).",
+        "unlinked": "Telegram не подключён.\n\nЗайдите на сайт ({url}), откройте Настройки → Уведомления и нажмите «Подключить Telegram». Пароль вводить в Telegram не нужно.",
         "blocked": "Доступ временно недоступен. Обратитесь в поддержку.",
         "rate_limited": "Слишком много запросов. Попробуйте позже.",
         "help": "Команды: /status /notifications /settings /language /unlink",
@@ -120,10 +120,10 @@ _MESSAGES = {
         "lang_picker_title": "Выберите язык:",
     },
     "en": {
-        "welcome": "Welcome to GigaPay. Connect Telegram in the authenticated web cabinet.",
+        "welcome": "Welcome to GigaPay!\n\nTo connect Telegram:\n1. Sign in on the website: {url}\n2. Open Settings -> Notifications\n3. Tap \"Connect Telegram\" and follow the link\n\nWe will never ask for your password in this chat.",
         "linked": "Telegram connected successfully.",
-        "invalid_link": "This link is invalid or expired. Generate a new one in the cabinet.",
-        "unlinked": "Telegram is not connected. Use the link from the web cabinet.",
+        "invalid_link": "This link is invalid or expired. Generate a new one in the cabinet (Settings -> Notifications -> Connect Telegram).",
+        "unlinked": "Telegram is not connected.\n\nSign in on the website ({url}), open Settings -> Notifications and tap \"Connect Telegram\". No password is ever needed here.",
         "blocked": "Access is temporarily unavailable. Contact support.",
         "rate_limited": "Too many requests. Try again later.",
         "help": "Commands: /status /notifications /settings /language /unlink",
@@ -236,10 +236,10 @@ _MESSAGES = {
         "lang_picker_title": "Choose a language:",
     },
     "tg": {
-        "welcome": "Хуш омадед ба GigaPay. Telegram-ро дар кабинети веб пайваст кунед.",
+        "welcome": "Хуш омадед ба GigaPay!\n\nБарои пайваст кардани Telegram:\n1. Ба сайт ворид шавед: {url}\n2. Танзимот → Огоҳиномаҳо-ро кушоед\n3. «Пайваст кардани Telegram»-ро зер карда, аз пайванд гузаред\n\nМо ҳеҷ гоҳ дар ин чат рамзи убурро напурсем.",
         "linked": "Telegram бомуваффақият пайваст шуд.",
-        "invalid_link": "Пайванд нодуруст ё муҳлаташ гузаштааст. Дар кабинет пайванди нав созед.",
-        "unlinked": "Telegram пайваст нест. Пайвандро аз кабинети веб истифода баред.",
+        "invalid_link": "Пайванд нодуруст ё муҳлаташ гузаштааст. Дар кабинет пайванди нав созед (Танзимот → Огоҳиномаҳо → Пайваст кардани Telegram).",
+        "unlinked": "Telegram пайваст нест.\n\nБа сайт ворид шавед ({url}), Танзимот → Огоҳиномаҳо-ро кушоед ва «Пайваст кардани Telegram»-ро зер кунед. Рамзи убур дар ин ҷо лозим нест.",
         "blocked": "Дастрасӣ муваққатан дастнорас аст. Ба дастгирӣ муроҷиат кунед.",
         "rate_limited": "Дархостҳо хеле зиёданд. Баъдтар кӯшиш кунед.",
         "help": "Фармонҳо: /status /notifications /settings /language /unlink",
