@@ -397,3 +397,58 @@ class TestWorkerSettings:
 
         assert heartbeat.cancelled()
         close_redis.assert_awaited_once()
+
+
+class TestScanDepositsCronCadence:
+    """Regression test for the every-minute scan_deposits schedule.
+
+    A previous `minute={0, 1}` config made ARQ's cron match only two
+    minute-of-hour values per hour (:00 and :01), not "every minute" - ARQ's
+    `minute` kwarg is a literal match-set, not an interval. Combined with
+    DEPOSIT_TTL_MINUTES=30, real deposit intents could expire before the
+    scanner ever ran. This test drives the job's own `calculate_next()`
+    (real arq.cron.next_cron, not a string/comment check) across an hour
+    boundary and proves every consecutive firing is exactly 60 seconds apart.
+    """
+
+    def _scan_deposits_cron_job(self):
+        from app.workers.arq_settings import WorkerSettings
+
+        for job in WorkerSettings.cron_jobs:
+            if job.coroutine.__name__ == "scan_deposits":
+                return job
+        raise AssertionError("scan_deposits is not registered as a cron job")
+
+    def test_fires_every_60_seconds_with_no_gap(self):
+        from datetime import datetime, timezone
+
+        job = self._scan_deposits_cron_job()
+
+        # Start deliberately just before an hour boundary so a "twice per
+        # hour" style bug (large gap crossing :00/:01) would be caught.
+        current = datetime(2026, 9, 19, 17, 58, 30, tzinfo=timezone.utc)
+        run_times = []
+        for _ in range(10):
+            job.calculate_next(current)
+            assert job.next_run is not None
+            run_times.append(job.next_run)
+            current = job.next_run
+
+        deltas = [
+            (run_times[i + 1] - run_times[i]).total_seconds() for i in range(len(run_times) - 1)
+        ]
+
+        assert all(delta == 60.0 for delta in deltas), deltas
+        assert max(deltas) <= 65.0
+
+    def test_schedule_matches_every_minute_not_a_fixed_subset(self):
+        job = self._scan_deposits_cron_job()
+
+        assert job.minute is None
+        assert job.second == {0}
+
+    def test_deposit_ttl_is_not_smaller_than_scan_interval(self):
+        from app.core.config import settings
+
+        scan_interval_seconds = 60
+        assert settings.DEPOSIT_TTL_MINUTES * 60 > scan_interval_seconds

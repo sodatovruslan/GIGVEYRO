@@ -146,7 +146,12 @@ class WorkerSettings:
         cron(
             scan_deposits,
             second={0},
-            minute={0, 1},  # every minute (ARQ cron granularity is minute-based)
+            # minute intentionally omitted: ARQ's `minute` param is a match-set of
+            # minute-of-hour values, not an interval. Leaving it unset (None) means
+            # "match every minute" - the only way to get a true every-60s cadence
+            # from arq.cron. A previous `minute={0, 1}` here fired only twice per
+            # hour, letting real deposit intents expire (DEPOSIT_TTL_MINUTES=30)
+            # before the scanner ever ran. See test_infra_workers.py::TestScanDepositsCronCadence.
             unique=True,
         ),
         cron(
