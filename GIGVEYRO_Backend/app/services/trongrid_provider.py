@@ -30,6 +30,8 @@ _PROVIDER = "trongrid"
 _TX_ID = re.compile(r"^[0-9a-fA-F]{64}$")
 _BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 _BASE58_INDEX = {char: index for index, char in enumerate(_BASE58)}
+_HEX_20 = re.compile(r"^(0x)?[0-9a-fA-F]{40}$")
+_HEX_21 = re.compile(r"^41[0-9a-fA-F]{40}$")
 
 
 class DepositProviderError(Exception):
@@ -310,6 +312,13 @@ class TronGridTRC20DepositProvider(CryptoDepositProvider):
     async def _event_identity(
         self, *, tx_hash: str, from_address: str, to_address: str, raw_value: str
     ) -> tuple[int, int]:
+        # TronGrid's history endpoint and its transaction-events endpoint
+        # represent the same address differently (Base58Check vs raw EVM
+        # hex - see normalize_tron_address) - normalize both sides to the
+        # same canonical form before comparing, or a legitimate transfer
+        # would never match its own event log entry.
+        canonical_from = normalize_tron_address(from_address)
+        canonical_to = normalize_tron_address(to_address)
         rows = await self._transaction_events(tx_hash)
         matches: list[tuple[int, int]] = []
         for event in rows:
@@ -321,10 +330,17 @@ class TronGridTRC20DepositProvider(CryptoDepositProvider):
                 or event.get("event_name") != "Transfer"
                 or event.get("contract_address") != self._token_contract
                 or not isinstance(result, dict)
-                or result.get("from") != from_address
-                or result.get("to") != to_address
                 or str(result.get("value")) != raw_value
             ):
+                continue
+            try:
+                event_from = normalize_tron_address(result.get("from"))
+                event_to = normalize_tron_address(result.get("to"))
+            except ValueError:
+                # This one event entry can't be safely identified - skip
+                # it, don't fail the whole lookup over one malformed row.
+                continue
+            if event_from != canonical_from or event_to != canonical_to:
                 continue
             event_index = event.get("event_index")
             block_number = event.get("block_number")
@@ -336,14 +352,14 @@ class TronGridTRC20DepositProvider(CryptoDepositProvider):
             ):
                 matches.append((event_index, block_number))
         if not matches:
-            raise DepositProviderInvalidResponse(
+            raise DepositProviderRejectedEvent(
                 "TronGrid event identity was missing"
             )
         matches.sort()
         signature = (tx_hash, from_address, to_address, raw_value)
         offset = self._event_match_offsets.get(signature, 0)
         if offset >= len(matches):
-            raise DepositProviderInvalidResponse(
+            raise DepositProviderRejectedEvent(
                 "TronGrid history contained more events than the transaction event log"
             )
         self._event_match_offsets[signature] = offset + 1
@@ -476,25 +492,80 @@ def required_string(value: object, field: str) -> str:
     return value
 
 
-def require_tron_address(address: str, field: str, *, response_error: bool = False) -> None:
-    error_type = (
-        DepositProviderRejectedEvent
-        if response_error
-        else DepositProviderConfigurationError
-    )
+def _base58check_decode(address: str) -> bytes:
+    """Decode a Base58Check TRON address to its verified 21-byte payload
+    (0x41 address-type prefix + 20-byte address). Raises ValueError on
+    anything that isn't a validly-checksummed TRON address."""
     if len(address) != 34 or not address.startswith("T"):
-        raise error_type(f"TRON {field} is not a valid Base58Check address")
+        raise ValueError("not a valid Base58Check TRON address")
     try:
         value = 0
         for char in address:
             value = value * 58 + _BASE58_INDEX[char]
         decoded = value.to_bytes(25, "big")
     except (KeyError, OverflowError, ValueError) as exc:
-        raise error_type(f"TRON {field} is not a valid Base58Check address") from exc
+        raise ValueError("not a valid Base58Check TRON address") from exc
     payload, checksum = decoded[:-4], decoded[-4:]
     expected = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
     if len(payload) != 21 or payload[0] != 0x41 or checksum != expected:
-        raise error_type(f"TRON {field} is not a valid Base58Check address")
+        raise ValueError("not a valid Base58Check TRON address")
+    return payload
+
+
+def _base58check_encode(payload: bytes) -> str:
+    """Encode a 21-byte TRON address payload (0x41 prefix + 20 bytes) to
+    Base58Check. TRON payloads always start with 0x41, never 0x00, so the
+    classic Base58 leading-zero-byte -> '1' padding rule never applies here."""
+    checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
+    value = int.from_bytes(payload + checksum, "big")
+    chars: list[str] = []
+    while value > 0:
+        value, remainder = divmod(value, 58)
+        chars.append(_BASE58[remainder])
+    return "".join(reversed(chars))
+
+
+def normalize_tron_address(value: str) -> str:
+    """Canonical Base58Check form of a TRON address supplied in EITHER of
+    the two forms TronGrid itself actually uses (inconsistently, across
+    different endpoints of the same API):
+
+    - Base58Check ("T...", 34 chars) - used by the transaction-history
+      endpoint's from/to fields.
+    - raw hex ("0x" + 40 hex chars, or 41 + 40 hex chars) - used by the
+      transaction-events endpoint's ABI-decoded result.from/result.to
+      fields, since TRON's VM is EVM-compatible and event logs are
+      decoded per the Solidity ABI, which has no concept of TRON's
+      address encoding - it only knows the raw 20-byte EVM address.
+
+    Comparing these two forms as raw strings (as the code used to) means
+    a single real address never equals itself across the two endpoints.
+    Never returns without full checksum/format validation - two
+    different addresses must never normalize to the same value, and an
+    invalid address must never silently normalize to anything. Raises
+    ValueError on anything that isn't a recognized, valid address."""
+    if not isinstance(value, str) or not value:
+        raise ValueError("TRON address is empty")
+    if value.startswith("T"):
+        return _base58check_encode(_base58check_decode(value))
+    if _HEX_21.fullmatch(value):
+        return _base58check_encode(bytes.fromhex(value.lower()))
+    if _HEX_20.fullmatch(value):
+        hex20 = value[2:] if value.lower().startswith("0x") else value
+        return _base58check_encode(bytes.fromhex("41" + hex20.lower()))
+    raise ValueError(f"unrecognized TRON address format: {value!r}")
+
+
+def require_tron_address(address: str, field: str, *, response_error: bool = False) -> None:
+    error_type = (
+        DepositProviderRejectedEvent
+        if response_error
+        else DepositProviderConfigurationError
+    )
+    try:
+        _base58check_decode(address)
+    except ValueError as exc:
+        raise error_type(f"TRON {field} is not a valid Base58Check address") from exc
 
 
 def backoff(attempt: int) -> float:
