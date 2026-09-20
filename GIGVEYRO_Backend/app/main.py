@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 import app.models  # noqa: F401  (register all ORM models before application startup)
+from app.api.access_requests import router as access_requests_router
 from app.api.appeals import router as appeals_router
 from app.api.auth import router as auth_router
 from app.api.deals import router as deals_router
@@ -148,6 +149,7 @@ app.add_middleware(
 app.add_middleware(HealthCheckBypassMiddleware)
 
 app.include_router(health_router)
+app.include_router(access_requests_router)
 app.include_router(auth_router)
 app.include_router(realtime_router)
 app.include_router(owner_accounts_router)

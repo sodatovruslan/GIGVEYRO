@@ -9,6 +9,7 @@ import QRCode from "qrcode";
 import { useAuth } from "@/features/auth/auth-provider";
 import { loginErrorKey } from "@/features/auth/login-error";
 import { dashboardPath } from "@/features/auth/roles";
+import { accessRequestApi } from "@/lib/api/access-requests";
 import { ApiError } from "@/lib/api/error";
 import { startForcedTwoFactorSetup } from "@/lib/api/setup-required";
 import { ThemeSwitcher } from "@/features/theme/theme-switcher";
@@ -51,6 +52,14 @@ export default function LoginPage() {
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [setupCode, setSetupCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+
+  const [showAccessRequest, setShowAccessRequest] = useState(false);
+  const [accessName, setAccessName] = useState("");
+  const [accessContact, setAccessContact] = useState("");
+  const [accessNote, setAccessNote] = useState("");
+  const [accessSubmitting, setAccessSubmitting] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [accessSent, setAccessSent] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated" && account) router.replace(dashboardPath(account.role));
@@ -151,6 +160,30 @@ export default function LoginPage() {
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleAccessRequestSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = accessName.trim();
+    const contact = accessContact.trim();
+    if (!name || !contact) {
+      setAccessError(t("requestAccessMissingFields"));
+      return;
+    }
+    setAccessError("");
+    setAccessSubmitting(true);
+    try {
+      await accessRequestApi.submit({ full_name: name, contact, note: accessNote.trim() || null });
+      setAccessSent(true);
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 429) {
+        setAccessError(t("requestAccessRateLimited"));
+      } else {
+        setAccessError(t("requestAccessError"));
+      }
+    } finally {
+      setAccessSubmitting(false);
     }
   }
 
@@ -321,7 +354,57 @@ export default function LoginPage() {
             {submitting ? t("submitting") : t("submit")}
           </button>
         </form>
-        <p className={styles.managedOnboarding}>{t("managedOnboarding")}</p>
+        <div className={styles.managedOnboarding}>
+          {accessSent ? (
+            <p>{t("requestAccessSuccess")}</p>
+          ) : !showAccessRequest ? (
+            <>
+              <p>{t("managedOnboarding")}</p>
+              <button type="button" className={styles.linkButton} onClick={() => setShowAccessRequest(true)}>
+                {t("requestAccessCta")}
+              </button>
+            </>
+          ) : (
+            <form className={styles.accessRequestForm} onSubmit={handleAccessRequestSubmit}>
+              <p className={styles.setupHint}>{t("requestAccessSubtitle")}</p>
+              <label>
+                {t("requestAccessNameLabel")}
+                <input
+                  value={accessName}
+                  onChange={(e) => { setAccessName(e.target.value); setAccessError(""); }}
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label>
+                {t("requestAccessContactLabel")}
+                <input
+                  value={accessContact}
+                  onChange={(e) => { setAccessContact(e.target.value); setAccessError(""); }}
+                  maxLength={120}
+                  required
+                />
+              </label>
+              <label>
+                {t("requestAccessNoteLabel")}
+                <textarea
+                  value={accessNote}
+                  onChange={(e) => setAccessNote(e.target.value)}
+                  maxLength={500}
+                />
+              </label>
+              {accessError && <div className={styles.error} role="alert">{accessError}</div>}
+              <div className={styles.accessRequestActions}>
+                <button type="submit" disabled={accessSubmitting}>
+                  {accessSubmitting ? t("requestAccessSubmitting") : t("requestAccessSubmit")}
+                </button>
+                <button type="button" className={styles.linkButton} onClick={() => setShowAccessRequest(false)}>
+                  {t("requestAccessCancel")}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
         <p className={styles.security}>{t("security")}</p>
       </section>
       <aside className={styles.visual} aria-hidden="true">

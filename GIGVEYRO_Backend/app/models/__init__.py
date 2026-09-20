@@ -1,3 +1,4 @@
+from app.models.access_request import AccessRequest
 from app.models.account import Account
 from app.models.api_key import ApiKey
 from app.models.appeal import DealAppeal
@@ -44,6 +45,7 @@ from app.models.webhook import Webhook, WebhookDelivery
 from app.models.withdrawal import MerchantWithdrawal
 
 __all__ = [
+    "AccessRequest",
     "ApiKey",
     "AccountTwoFactor",
     "PendingTwoFactorSetup",

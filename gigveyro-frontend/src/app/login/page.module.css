@@ -19,10 +19,20 @@
 .form button:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
 .form button:disabled { opacity: .6; cursor: wait; }
 .error { padding: 11px 13px; border: 1px solid var(--danger-border); border-radius: var(--radius-sm); color: var(--danger-text); background: var(--danger-soft); font-size: 12px; }
+.success { padding: 11px 13px; border: 1px solid var(--success-border); border-radius: var(--radius-sm); color: var(--success-text); background: var(--success-soft); font-size: 12px; }
 .managedOnboarding { margin-top: 24px; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); background: var(--surface-subtle); font-size: 11px; text-align: center; }
+.managedOnboarding p { margin: 0 0 8px; }
 .security { margin-top: 26px; color: var(--text-muted); font-size: 10px; text-align: center; }
 .managedOnboarding + .security { margin-top: 12px; }
 .linkButton { color: var(--primary); font-size: 10px; font-weight: 600; text-decoration: underline; cursor: pointer; background: none; border: 0; padding: 0; }
+.accessRequestForm { display: grid; gap: 12px; text-align: left; }
+.accessRequestForm label { display: grid; gap: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 600; }
+.accessRequestForm input, .accessRequestForm textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-control); font-size: 12px; font-family: inherit; }
+.accessRequestForm input:focus, .accessRequestForm textarea:focus { border-color: var(--primary); outline: 0; background: var(--surface-control-focus); }
+.accessRequestForm textarea { resize: vertical; min-height: 60px; }
+.accessRequestActions { display: flex; gap: 10px; }
+.accessRequestActions button[type="submit"] { flex: 1; height: 40px; border-radius: var(--radius-sm); color: var(--on-accent); background: var(--primary); font-weight: 700; cursor: pointer; }
+.accessRequestActions button[type="submit"]:disabled { opacity: .6; cursor: wait; }
 .setupHint { color: var(--text-secondary); font-size: 12px; }
 .qrWrap { display: grid; justify-items: center; padding: 16px; border-radius: var(--radius-sm); background: var(--surface-control); }
 .qrWrap img { width: 180px; height: 180px; border-radius: 8px; background: #fff; padding: 8px; }

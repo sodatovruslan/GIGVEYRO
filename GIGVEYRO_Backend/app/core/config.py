@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     FINANCIAL_MUTATION_RATE_LIMIT_WINDOW_SECONDS: int = 60
     API_KEY_AUTH_RATE_LIMIT_REQUESTS: int = 30
     API_KEY_AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    # Public, unauthenticated endpoint that writes a DB row and pages the
+    # Owner's Telegram - kept tight since abuse there is a spam vector
+    # against a real person, not just a resource cost.
+    ACCESS_REQUEST_RATE_LIMIT_REQUESTS: int = 3
+    ACCESS_REQUEST_RATE_LIMIT_WINDOW_SECONDS: int = 3600
 
     # Telegram is an optional, read-only communication channel. It never authorizes finance.
     TELEGRAM_BOT_ENABLED: bool = False

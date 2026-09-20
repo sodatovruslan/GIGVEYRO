@@ -72,3 +72,15 @@ async def test_api_key_authentication_is_rate_limited(client, monkeypatch):
     )
 
     assert response.status_code == 429
+
+
+async def test_access_request_creation_is_rate_limited(client, monkeypatch):
+    limited = _force_rate_limited(monkeypatch)
+
+    response = await client.post(
+        "/access-requests",
+        json={"full_name": "Spammer", "contact": "@spammer"},
+    )
+
+    assert response.status_code == 429
+    assert limited.await_count == 1

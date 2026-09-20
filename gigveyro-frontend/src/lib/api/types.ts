@@ -912,3 +912,11 @@ export interface PayoutNetwork {
   id: string; asset: string; network: string; enabled: boolean;
   created_at: string; disabled_at: string | null;
 }
+export interface AccessRequestInput {
+  full_name: string;
+  contact: string;
+  note?: string | null;
+}
+export interface AccessRequestAck {
+  status: string;
+}

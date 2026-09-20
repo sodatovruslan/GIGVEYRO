@@ -20,6 +20,7 @@ class NotificationType(StrEnum):
     SECURITY_EVENT = "SECURITY_EVENT"
     FIAT_BALANCE_UPDATED = "FIAT_BALANCE_UPDATED"
     TREASURY_RISK_CHANGED = "TREASURY_RISK_CHANGED"
+    ACCESS_REQUEST_SUBMITTED = "ACCESS_REQUEST_SUBMITTED"
 
 
 class NotificationStatus(StrEnum):
@@ -50,3 +51,4 @@ class NotificationMessageKey(StrEnum):
     TREASURY_WARNING = "treasury.warning"
     TREASURY_CRITICAL = "treasury.critical"
     TREASURY_STALE = "treasury.stale"
+    ACCESS_REQUEST_SUBMITTED = "access_request.submitted"

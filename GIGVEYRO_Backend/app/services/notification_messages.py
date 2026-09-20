@@ -133,6 +133,10 @@ _CATALOG: dict[str, dict[NotificationMessageKey, tuple[str, str]]] = {
             "Treasury data is stale",
             "Treasury data must be refreshed before making decisions.",
         ),
+        NotificationMessageKey.ACCESS_REQUEST_SUBMITTED: (
+            "New access request",
+            "{full_name} ({contact}) wants to register on GigaPay. Note: {note}",
+        ),
     },
     "ru": {
         NotificationMessageKey.APPEAL_OPENED: (
@@ -215,6 +219,10 @@ _CATALOG: dict[str, dict[NotificationMessageKey, tuple[str, str]]] = {
         NotificationMessageKey.TREASURY_STALE: (
             "Данные казначейства устарели",
             "Перед принятием решений обновите данные казначейства.",
+        ),
+        NotificationMessageKey.ACCESS_REQUEST_SUBMITTED: (
+            "Новая заявка на регистрацию",
+            "{full_name} ({contact}) хочет зарегистрироваться в GigaPay. Заметка: {note}",
         ),
     },
     "tg": {
@@ -301,6 +309,10 @@ _CATALOG: dict[str, dict[NotificationMessageKey, tuple[str, str]]] = {
         NotificationMessageKey.TREASURY_STALE: (
             "Маълумоти хазина куҳна шудааст",
             "Пеш аз қабули қарор маълумоти хазинаро нав кунед.",
+        ),
+        NotificationMessageKey.ACCESS_REQUEST_SUBMITTED: (
+            "Дархости нави бақайдгирӣ",
+            "{full_name} ({contact}) мехоҳад дар GigaPay бақайд гирад. Қайд: {note}",
         ),
     },
 }
