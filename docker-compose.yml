@@ -100,10 +100,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       APP_ENV: production
       DEBUG: "false"
-      PAYOUT_ENABLED: "false"
-      PAYOUT_PROVIDER_MODE: disabled
+      # PAYOUT_ENABLED / PAYOUT_PROVIDER_MODE / BYBIT_WRITE_ENABLED are
+      # intentionally NOT hardcoded here - going live is controlled solely
+      # by GIGVEYRO_Backend/.env.production (see the multi-flag AND gate in
+      # app/core/config.py). Hardcoding them here would silently override
+      # that operator decision on every deploy.
       PAYOUT_SIMULATION_ENABLED: "false"
-      BYBIT_WRITE_ENABLED: "false"
       REALTIME_BROKER: redis
       RATE_LIMIT_FAIL_MODE: closed
       FORWARDED_ALLOW_IPS: 172.30.0.10
@@ -153,10 +155,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       APP_ENV: production
       DEBUG: "false"
-      PAYOUT_ENABLED: "false"
-      PAYOUT_PROVIDER_MODE: disabled
+      # PAYOUT_ENABLED / PAYOUT_PROVIDER_MODE / BYBIT_WRITE_ENABLED are
+      # intentionally NOT hardcoded here - going live is controlled solely
+      # by GIGVEYRO_Backend/.env.production (see the multi-flag AND gate in
+      # app/core/config.py). Hardcoding them here would silently override
+      # that operator decision on every deploy.
       PAYOUT_SIMULATION_ENABLED: "false"
-      BYBIT_WRITE_ENABLED: "false"
       REALTIME_BROKER: redis
       RATE_LIMIT_FAIL_MODE: closed
     networks:
