@@ -43,10 +43,12 @@ export const ownerAccountsApi = {
   ledger: (id: string, merchant: boolean) => apiFetch<Paginated<LedgerEntry>>(`/owner/accounts/${id}/${merchant ? "merchant-wallet/ledger" : "wallet/ledger"}?limit=20&offset=0`),
   requisites: (id: string) => apiFetch<PaymentRequisite[]>(`/owner/accounts/${id}/requisites`),
   traffic: (id: string) => apiFetch<TrafficSettings>(`/owner/accounts/${id}/traffic`),
-  adjustWallet: (id: string, action: "allocate" | "insurance" | "adjust", amount: string, description: string) =>
+  adjustWallet: (id: string, action: "allocate" | "insurance" | "adjust", amount: string, description: string, idempotencyKey: string) =>
     apiFetch<Wallet>(`/owner/accounts/${id}/wallet/${action}`, {
       method: "POST",
-      body: action === "adjust" ? { amount, reason: description } : { amount, description },
+      body: action === "adjust"
+        ? { amount, reason: description, idempotency_key: idempotencyKey }
+        : { amount, description, idempotency_key: idempotencyKey },
     }),
   fiatBalances: (id: string) => apiFetch<FiatBalanceList>(`/owner/accounts/${id}/fiat-wallets`),
   fiatLedger: (id: string, offset = 0) => apiFetch<Paginated<FiatLedgerEntry>>(`/owner/accounts/${id}/fiat-wallets/ledger?limit=20&offset=${offset}`),

@@ -34,6 +34,7 @@ export default function OwnerAccountDetailsPage() {
   const [password, setPassword] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const accountQuery = useApiQuery(() => ownerAccountsApi.get(accountId), `account:${accountId}`);
   const account = accountQuery.data;
@@ -72,10 +73,10 @@ export default function OwnerAccountDetailsPage() {
     return () => window.clearTimeout(timeout);
   }, [successMessage]);
 
-  function open(nextDialog: Dialog) { setMutationError(""); setAmount(""); setDescription(""); setPassword(""); if (nextDialog === "insuranceTarget" && targetQuery.data) { setInsuranceTargetInput(targetQuery.data.insurance_target); } setDialog(nextDialog); }
+  function open(nextDialog: Dialog) { setMutationError(""); setAmount(""); setDescription(""); setPassword(""); setIdempotencyKey(crypto.randomUUID()); if (nextDialog === "insuranceTarget" && targetQuery.data) { setInsuranceTargetInput(targetQuery.data.insurance_target); } setDialog(nextDialog); }
   async function runMutation(action: () => Promise<unknown>, options: { refresh?: boolean; success?: string } = {}) { setSaving(true); setMutationError(""); try { await action(); setDialog(null); if (options.success) setSuccessMessage(options.success); if (options.refresh !== false) await Promise.all([accountQuery.refetch(), walletQuery.refetch(), ledgerQuery.refetch()]); } catch (reason) { setMutationError(localizeError(reason)); } finally { setSaving(false); } }
   async function saveProfile(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); await runMutation(() => ownerAccountsApi.update(accountId, { full_name: String(form.get("full_name")), email: String(form.get("email")) || null, phone: String(form.get("phone")) || null })); }
-  async function submitSimple(event: FormEvent) { event.preventDefault(); if (dialog === "password") await runMutation(() => ownerAccountsApi.resetPassword(accountId, password), { refresh: false, success: t("passwordChanged") }); if (dialog === "allocate" || dialog === "insurance" || dialog === "adjust") await runMutation(() => ownerAccountsApi.adjustWallet(accountId, dialog, amount, description)); }
+  async function submitSimple(event: FormEvent) { event.preventDefault(); if (dialog === "password") await runMutation(() => ownerAccountsApi.resetPassword(accountId, password), { refresh: false, success: t("passwordChanged") }); if (dialog === "allocate" || dialog === "insurance" || dialog === "adjust") await runMutation(() => ownerAccountsApi.adjustWallet(accountId, dialog, amount, description, idempotencyKey)); }
 
   if (accountQuery.loading) return <div className={styles.state}>{t("loadingProfile")}</div>;
   if (accountQuery.error || !account) return <div className={`${styles.state} ${styles.error}`}>{accountQuery.error || t("profileNotFound")}<button onClick={accountQuery.refetch}>{common("retry")}</button></div>;
